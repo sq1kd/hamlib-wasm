@@ -1,0 +1,19 @@
+{
+  "name": "hamlib-web-test-harness",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Browser test harness for the hamlib-web package",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "hamlib-web": "*"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.1.9"
+  }
+}

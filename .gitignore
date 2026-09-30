@@ -1,0 +1,10 @@
+.DS_Store
+node_modules/
+dist/
+.cache/
+*.tgz
+test-results/
+playwright-report/
+tests/consumer/node_modules/
+tests/consumer/packed/
+packages/hamlib-web/src/native/hamlib-web.d.mts

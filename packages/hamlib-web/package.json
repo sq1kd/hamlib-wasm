@@ -1,0 +1,42 @@
+{
+  "name": "hamlib-web",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Hamlib CAT control in the browser over Web Serial, compiled to WebAssembly",
+  "keywords": [
+    "hamlib",
+    "wasm",
+    "webassembly",
+    "web-serial",
+    "ham-radio",
+    "cat"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./native": {
+      "types": "./dist/native/hamlib-web.d.mts",
+      "default": "./dist/native/hamlib-web.mjs"
+    },
+    "./native/hamlib-web.wasm": "./dist/native/hamlib-web.wasm",
+    "./third_party/*": "./dist/third_party/*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@types/w3c-web-serial": "1.0.8"
+  },
+  "scripts": {
+    "build": "node scripts/build-package.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

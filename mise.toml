@@ -1,0 +1,63 @@
+min_version = "2025.1.0"
+
+[tools]
+node = "24.21.0"
+emsdk = "6.0.10"
+
+[env]
+_.path = ["{{config_root}}/node_modules/.bin"]
+
+[tasks.bootstrap]
+description = "Install pinned toolchain, locked npm dependencies, and Playwright Chromium"
+run = '''
+npm ci
+npx playwright install chromium
+'''
+
+[tasks."build:native"]
+description = "Fetch, verify, patch and compile Hamlib 4.7.2 to WebAssembly"
+run = "node packages/hamlib-web/scripts/build-native.mjs"
+
+[tasks."build:package"]
+description = "Compile the public TypeScript package against the generated Embind declarations"
+depends = ["build:native"]
+run = "node packages/hamlib-web/scripts/build-package.mjs"
+
+[tasks."build:example"]
+description = "Build the Vanilla TypeScript/Vite example"
+depends = ["build:package"]
+run = "npm run build --workspace examples/basic"
+
+[tasks."build:harness"]
+description = "Build the browser test harness app"
+depends = ["build:package"]
+run = "npm run build --workspace tests/harness"
+
+[tasks.build]
+description = "Full reproducible build: native Wasm, package, example"
+depends = ["build:example"]
+
+[tasks.typecheck]
+description = "Typecheck package, example and the packed-package consumer fixture"
+depends = ["build:package"]
+run = "node scripts/typecheck.mjs"
+
+[tasks.test]
+description = "Run deterministic transport/lifecycle checks and the Playwright scenarios"
+depends = ["build:example", "build:harness"]
+run = "npx playwright test"
+
+[tasks."test:browser"]
+description = "Run only the example-driven Playwright browser scenarios"
+depends = ["build:example", "build:harness"]
+run = "npx playwright test tests/browser/e2e"
+
+[tasks."pack:check"]
+description = "Verify the published package contents"
+depends = ["build:package"]
+run = "npm pack --dry-run --workspace packages/hamlib-web"
+
+[tasks.dev]
+description = "Run the example dev server on a localhost URL"
+depends = ["build:package"]
+run = "npm run dev --workspace examples/basic"

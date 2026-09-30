@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>hamlib-web basic example</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main id="app">
+      <h1>hamlib-web</h1>
+
+      <p>
+        Hamlib <span data-testid="hamlib-version">loading…</span> compiled to
+        WebAssembly, talking to your radio over Web Serial.
+      </p>
+
+      <p data-testid="web-serial-status" data-state="unknown">
+        Checking Web Serial support…
+      </p>
+
+      <section>
+        <h2>Rig</h2>
+
+        <label>
+          Model
+          <select data-testid="model-select" disabled></select>
+        </label>
+
+        <label>
+          Baud rate (optional)
+          <input
+            data-testid="baud-input"
+            type="number"
+            inputmode="numeric"
+            placeholder="model default"
+            disabled
+          />
+        </label>
+
+        <p class="actions">
+          <button data-testid="connect-button" type="button" disabled>
+            Grant port &amp; connect
+          </button>
+          <button data-testid="disconnect-button" type="button" disabled>
+            Disconnect
+          </button>
+        </p>
+
+        <p data-testid="connection-state">disconnected</p>
+      </section>
+
+      <section>
+        <h2>Frequency, mode and passband</h2>
+
+        <p>
+          Frequency
+          <output data-testid="status-frequency">—</output>
+          Hz, mode
+          <output data-testid="status-mode">—</output>
+          , passband
+          <output data-testid="status-passband">—</output>
+          Hz
+        </p>
+
+        <p class="actions">
+          <button data-testid="refresh-button" type="button" disabled>
+            Refresh
+          </button>
+        </p>
+
+        <label>
+          Set frequency (Hz)
+          <input data-testid="frequency-input" type="number" inputmode="numeric" disabled />
+        </label>
+        <button data-testid="frequency-set" type="button" disabled>Set frequency</button>
+
+        <label>
+          Set mode
+          <input
+            data-testid="mode-input"
+            list="mode-suggestions"
+            placeholder="USB"
+            disabled
+          />
+        </label>
+        <datalist id="mode-suggestions">
+          <option value="USB"></option>
+          <option value="LSB"></option>
+          <option value="CW"></option>
+          <option value="CWR"></option>
+          <option value="FM"></option>
+          <option value="AM"></option>
+          <option value="RTTY"></option>
+        </datalist>
+
+        <label>
+          Passband (Hz, optional)
+          <input data-testid="passband-input" type="number" inputmode="numeric" disabled />
+        </label>
+        <button data-testid="mode-set" type="button" disabled>Set mode</button>
+      </section>
+
+      <section data-testid="ptt-section">
+        <h2>PTT</h2>
+
+        <p>
+          Reported state:
+          <output data-testid="ptt-state">—</output>
+        </p>
+
+        <label>
+          Set PTT
+          <select data-testid="ptt-select" disabled>
+            <option value="off">off</option>
+            <option value="on">on</option>
+            <option value="on-mic">on-mic</option>
+            <option value="on-data">on-data</option>
+          </select>
+        </label>
+        <button data-testid="ptt-set" type="button" disabled>Set PTT</button>
+      </section>
+
+      <section data-testid="error-section" hidden>
+        <h2>Last error</h2>
+        <p data-testid="error-message"></p>
+        <p data-testid="error-detail"></p>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

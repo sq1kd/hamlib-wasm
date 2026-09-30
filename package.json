@@ -1,0 +1,30 @@
+{
+  "name": "hamlib-web-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Hamlib compiled to WebAssembly with a Web Serial transport, plus a browser example",
+  "workspaces": [
+    "packages/*",
+    "examples/*",
+    "tests/harness"
+  ],
+  "scripts": {
+    "build": "node packages/hamlib-web/scripts/build-package.mjs && npm run build --workspace examples/basic",
+    "typecheck": "node scripts/typecheck.mjs",
+    "test": "playwright test",
+    "test:browser": "playwright test tests/browser/e2e",
+    "dev": "npm run dev --workspace examples/basic",
+    "build:harness": "npm run build --workspace tests/harness"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "24.19.0",
+    "typescript": "5.9.3",
+    "vite": "7.1.9"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

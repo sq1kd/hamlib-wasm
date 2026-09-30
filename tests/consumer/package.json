@@ -1,0 +1,11 @@
+{
+  "name": "hamlib-web-consumer-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Typechecks the hamlib-web package as an external consumer sees it",
+  "dependencies": {
+    "hamlib-web": "file:packed/hamlib-web.tgz"
+  }
+}

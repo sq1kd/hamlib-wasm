@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": ["w3c-web-serial"]
+  },
+  "include": ["src/**/*.ts", "vite.config.ts"]
+}

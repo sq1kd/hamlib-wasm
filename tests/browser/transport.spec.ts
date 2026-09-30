@@ -1,0 +1,349 @@
+/**
+ * Deterministic transport and lifecycle checks.
+ *
+ * These run against the built package in a real browser, driving the Web
+ * Serial double over the harness page.  No timing assumptions beyond the
+ * emulator's immediate replies.
+ */
+import { expect, test } from '@playwright/test';
+
+import {
+  TS480_LINE_SETTINGS,
+  failNextPortOpen,
+  installFakeSerial,
+  installTestHelpers,
+  readFakeSerial,
+  removeWebSerial,
+} from './fixtures';
+import type { Captured, HamlibErrorView } from './globals';
+
+const HARNESS_URL = 'http://127.0.0.1:4174/';
+
+interface ModelSummary {
+  id: number;
+  manufacturer: string;
+  model: string;
+  backendVersion: string;
+  status: number;
+  serialRateMin: number;
+  serialRateMax: number;
+  canGetFrequency: boolean;
+  canSetFrequency: boolean;
+  canGetMode: boolean;
+  canSetMode: boolean;
+  canGetPtt: boolean;
+  canSetPtt: boolean;
+}
+
+function expectOk<T>(captured: Captured<T>): T {
+  if (!captured.ok) {
+    throw new Error(
+      `expected success but the page reported ${JSON.stringify(captured.error)}`,
+    );
+  }
+
+  return captured.value;
+}
+
+function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
+  if (captured.ok) {
+    throw new Error(`expected a failure but the page succeeded: ${JSON.stringify(captured.value)}`);
+  }
+
+  return captured.error;
+}
+
+test.beforeEach(async ({ page }) => {
+  await installFakeSerial(page);
+  await installTestHelpers(page);
+  await page.goto(HARNESS_URL);
+});
+
+test('lists the serial rig catalogue sorted by manufacturer and model', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createHamlib();
+
+    const models: ModelSummary[] = hamlib.models.map((model) => ({
+      id: model.id,
+      manufacturer: model.manufacturer,
+      model: model.model,
+      backendVersion: model.backendVersion,
+      status: model.status,
+      serialRateMin: model.serialRateMin,
+      serialRateMax: model.serialRateMax,
+      canGetFrequency: model.canGetFrequency,
+      canSetFrequency: model.canSetFrequency,
+      canGetMode: model.canGetMode,
+      canSetMode: model.canSetMode,
+      canGetPtt: model.canGetPtt,
+      canSetPtt: model.canSetPtt,
+    }));
+
+    const version = hamlib.version;
+    await hamlib.dispose();
+
+    return { version, models };
+  }));
+
+  const { version, models } = expectOk(captured);
+
+  expect(version).toMatch(/4\.7\.2/);
+  expect(models.length).toBeGreaterThan(50);
+
+  for (const model of models) {
+    expect(model.manufacturer.length).toBeGreaterThan(0);
+    expect(model.model.length).toBeGreaterThan(0);
+    expect(Number.isInteger(model.id)).toBe(true);
+  }
+
+  /* Sorted the same way the native side sorts: byte-wise, then by id. */
+  const sorted = [...models].sort((left, right) => {
+    if (left.manufacturer !== right.manufacturer) {
+      return left.manufacturer < right.manufacturer ? -1 : 1;
+    }
+
+    if (left.model !== right.model) {
+      return left.model < right.model ? -1 : 1;
+    }
+
+    return left.id - right.id;
+  });
+
+  expect(models.map((model) => model.id)).toEqual(sorted.map((model) => model.id));
+
+  const ts480 = models.find(
+    (model) => model.manufacturer === 'Kenwood' && model.model === 'TS-480',
+  );
+
+  expect(ts480).toBeDefined();
+  expect(ts480?.serialRateMin).toBe(4800);
+  expect(ts480?.serialRateMax).toBe(115200);
+  expect(ts480?.canGetFrequency).toBe(true);
+  expect(ts480?.canSetFrequency).toBe(true);
+  expect(ts480?.canGetMode).toBe(true);
+  expect(ts480?.canSetMode).toBe(true);
+  expect(ts480?.canGetPtt).toBe(true);
+  expect(ts480?.canSetPtt).toBe(true);
+});
+
+test('reports WEB_SERIAL_UNAVAILABLE when the browser has no Web Serial', async ({ page }) => {
+  await removeWebSerial(page);
+
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createHamlib();
+    const port = window.__fakeSerial.port;
+
+    const request = await window.__testHelpers.capture(() => hamlib.requestPort());
+    const open = await window.__testHelpers.capture(
+      () => hamlib.open({ modelId: 1, port }),
+    );
+
+    await hamlib.dispose();
+
+    return { request, open };
+  }));
+
+  const { request, open } = expectOk(captured);
+
+  expect(expectFailure(request).code).toBe('WEB_SERIAL_UNAVAILABLE');
+  expect(expectFailure(request).operation).toBe('requestPort');
+  expect(expectFailure(open).code).toBe('WEB_SERIAL_UNAVAILABLE');
+  expect(expectFailure(open).operation).toBe('open');
+});
+
+test('rejects invalid input before entering Wasm', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createHamlib();
+    const port = window.__fakeSerial.port;
+    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
+
+    if (!ts480) {
+      throw new Error('the TS-480 model is missing');
+    }
+
+    const unknownModel = await window.__testHelpers.capture(
+      () => hamlib.open({ modelId: 999_999, port }),
+    );
+    const badBaud = await window.__testHelpers.capture(
+      () => hamlib.open({ modelId: ts480.id, port, baudRate: 300 }),
+    );
+
+    const rig = await hamlib.open({ modelId: ts480.id, port });
+
+    const badFrequency = await window.__testHelpers.capture(() => rig.setFrequency(-1));
+    const badMode = await window.__testHelpers.capture(() => rig.setMode('NOT-A-MODE'));
+
+    await rig.close();
+    await hamlib.dispose();
+
+    return { unknownModel, badBaud, badFrequency, badMode };
+  }));
+
+  const results = expectOk(captured);
+
+  const unknownModel = expectFailure(results.unknownModel);
+  expect(unknownModel.code).toBe('INVALID_ARGUMENT');
+  expect(unknownModel.message).toContain('999999');
+
+  const badBaud = expectFailure(results.badBaud);
+  expect(badBaud.code).toBe('INVALID_ARGUMENT');
+  expect(badBaud.message).toContain('4800-115200');
+
+  const badFrequency = expectFailure(results.badFrequency);
+  expect(badFrequency.code).toBe('INVALID_ARGUMENT');
+  expect(badFrequency.operation).toBe('setFrequency');
+
+  /* Hamlib's own rig_parse_mode() rejects the mode name. */
+  const badMode = expectFailure(results.badMode);
+  expect(badMode.code).toBe('HAMLIB_ERROR');
+  /* Hamlib reports failures as negative codes; -RIG_EINVAL is -1. */
+  expect(badMode.hamlibCode).toBe(-1);
+  expect(badMode.hamlibMessage).toBe('invalid parameter');
+});
+
+test('opens a rig, drives it over the transport and releases the port', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createHamlib();
+    const port = await hamlib.requestPort();
+    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
+
+    if (!ts480) {
+      throw new Error('the TS-480 model is missing');
+    }
+
+    const rig = await hamlib.open({ modelId: ts480.id, port });
+
+    const status = await rig.getStatus();
+    await rig.setFrequency(7_074_000);
+    const frequency = await rig.getFrequency();
+    await rig.setMode('CW', 500);
+    const mode = await rig.getMode();
+    await rig.setPtt('on');
+    const pttOn = await rig.getPtt();
+    await rig.setPtt('off');
+    const pttOff = await rig.getPtt();
+
+    await rig.close();
+    const connectedAfterClose = rig.connected;
+
+    /* close() is idempotent and operations after close are rejected. */
+    const secondClose = await window.__testHelpers.capture(() => rig.close());
+    const afterClose = await window.__testHelpers.capture(() => rig.getFrequency());
+
+    await hamlib.dispose();
+    const secondDispose = await window.__testHelpers.capture(() => hamlib.dispose());
+    const afterDispose = await window.__testHelpers.capture(() => hamlib.requestPort());
+
+    return {
+      serialRateMax: ts480.serialRateMax,
+      status,
+      frequency,
+      mode,
+      pttOn,
+      pttOff,
+      connectedAfterClose,
+      secondClose,
+      afterClose,
+      secondDispose,
+      afterDispose,
+    };
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.status.frequency).toBe(14_074_000);
+  expect(result.status.mode).toBe('USB');
+  expect(result.status.passband).toBe(2400);
+
+  expect(result.frequency).toBe(7_074_000);
+  expect(result.mode.mode).toBe('CW');
+  expect(result.mode.passband).toBe(500);
+
+  expect(result.pttOn).toBe('on');
+  expect(result.pttOff).toBe('off');
+
+  expect(result.connectedAfterClose).toBe(false);
+  expectOk(result.secondClose);
+
+  const afterClose = expectFailure(result.afterClose);
+  expect(afterClose.code).toBe('RIG_CLOSED');
+  expect(afterClose.operation).toBe('getFrequency');
+
+  expectOk(result.secondDispose);
+
+  const afterDispose = expectFailure(result.afterDispose);
+  expect(afterDispose.code).toBe('DISPOSED');
+
+  const transport = await readFakeSerial(page);
+
+  /* The port was opened once, with the model's line settings, and closed. */
+  expect(transport.openCount).toBe(1);
+  expect(transport.closeCount).toBe(1);
+  expect(transport.isOpen).toBe(false);
+  expect(transport.closedWithLockedStreams).toBe(false);
+  expect(transport.openedOptions).toEqual({
+    baudRate: result.serialRateMax,
+    ...TS480_LINE_SETTINGS,
+  });
+
+  /* Real round trips reached the emulator. */
+  expect(transport.commands).toContain('ID');
+  expect(transport.commands).toContain('FA');
+  expect(transport.commands).toContain('FA00007074000');
+  expect(transport.commands).toContain('MD3');
+  expect(transport.commands).toContain('FW0500');
+  expect(transport.commands).toContain('TX');
+  expect(transport.commands).toContain('RX');
+
+  expect(transport.state.frequency).toBe(7_074_000);
+  expect(transport.state.modeDigit).toBe(3);
+  expect(transport.state.filterValue).toBe(500);
+  expect(transport.state.transmitting).toBe(false);
+});
+
+test('surfaces a Hamlib error when the port cannot be opened', async ({ page }) => {
+  await failNextPortOpen(page, 'TypeError');
+
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createHamlib();
+    const port = await hamlib.requestPort();
+    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
+
+    if (!ts480) {
+      throw new Error('the TS-480 model is missing');
+    }
+
+    const rejected = await window.__testHelpers.capture(
+      () => hamlib.open({ modelId: ts480.id, port }),
+    );
+
+    /* The logical path must not stay registered: the retry succeeds. */
+    const retried = await window.__testHelpers.capture(async () => {
+      const rig = await hamlib.open({ modelId: ts480.id, port });
+      const status = await rig.getStatus();
+      await rig.close();
+      return status;
+    });
+
+    await hamlib.dispose();
+
+    return { rejected, retried };
+  }));
+
+  const { rejected, retried } = expectOk(captured);
+
+  const error = expectFailure(rejected);
+  expect(error.code).toBe('HAMLIB_ERROR');
+  /* -RIG_ECONF: Web Serial refused the requested line settings. */
+  expect(error.hamlibCode).toBe(-2);
+  expect(error.hamlibMessage).toBe('invalid configuration');
+  expect(error.operation).toBe('open');
+
+  const status = expectOk(retried);
+  expect(status.frequency).toBe(14_074_000);
+
+  const transport = await readFakeSerial(page);
+  expect(transport.openCount).toBe(1);
+  expect(transport.isOpen).toBe(false);
+  expect(transport.closedWithLockedStreams).toBe(false);
+});
