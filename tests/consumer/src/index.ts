@@ -13,22 +13,20 @@ import type {
   HamlibErrorCode,
   HamlibOptions,
   OpenRigOptions,
-  PttState,
   Rig,
   RigCapabilities,
+  RigConfparam,
   RigMode,
   RigModeState,
   RigModel,
-  RigStatus,
 } from 'hamlib-web';
 
 export interface ConsumerSummary {
   version: string;
   modelId: number;
-  status: RigStatus;
   frequency: number;
   mode: RigModeState;
-  ptt: PttState;
+  ptt: string;
   capabilities: RigCapabilities;
 }
 
@@ -65,18 +63,40 @@ export async function runConsumerFlow(
     const granted: SerialPort = await hamlib.requestPort();
     rig = await hamlib.open({ ...options, port: granted });
 
-    const status: RigStatus = await rig.getStatus();
-    await rig.setFrequency(7_074_000);
     const frequency: number = await rig.getFrequency();
+    await rig.setFrequency(7_074_000);
     const mode: RigModeState = await rig.getMode();
     await rig.setMode('CW', 500);
     await rig.setPtt('on');
-    const ptt: PttState = await rig.getPtt();
+    const ptt: string = await rig.getPtt();
+
+    /* The operations whose C++ body is hand-written (the buffer, ext and
+     * walker shapes) are typed methods like every other generated one. */
+    const vfoList: string = await rig.getVfoList();
+    const rigInfo: string = await rig.getRigInfo();
+    const tokens: RigConfparam[] = await rig.tokenForeach();
+    const extLevels: RigConfparam[] = await rig.extLevelForeach();
+    await rig.extFuncForeach();
+    await rig.extParmForeach();
+
+    const firstExt: RigConfparam | undefined = extLevels[0];
+
+    if (firstExt) {
+      const value: number = await rig.getExtLevel(firstExt.token);
+      await rig.setExtLevel(firstExt.token, value);
+    }
+
+    const firstToken: RigConfparam | undefined = tokens[0];
+    const agc: number = await rig.valueAgcLevel(0);
+
+    void vfoList;
+    void rigInfo;
+    void firstToken;
+    void agc;
 
     summary = {
       version,
       modelId: rig.model.id,
-      status,
       frequency,
       mode,
       ptt,

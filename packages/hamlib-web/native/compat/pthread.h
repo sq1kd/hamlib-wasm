@@ -16,9 +16,11 @@
  *     code path that would need a second thread fails loudly instead of
  *     silently degrading or deadlocking the browser event loop.
  *
- * Hamlib never reaches the failing paths in this build: the facade pins
- * async_data_enabled, poll_interval and asyncio to 0 before rig_open(), so no
- * polling thread, async data handler or Morse worker is ever started.
+ * Hamlib never reaches the failing paths in this build: the facade sets
+ * async=0 and poll_interval=0 through Hamlib's public configuration before
+ * rig_open(), and the pinned patch skips only the Morse worker start.  A
+ * backend that would still need a second thread (AnyTone D578A, for example)
+ * therefore fails its open loudly instead of degrading quietly.
  *
  * This header must be passed first on the include path so it wins over the
  * platform pthread.h for every Hamlib translation unit.

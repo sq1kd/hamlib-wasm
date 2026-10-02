@@ -1,0 +1,143 @@
+/*
+ * Ambient globals and library types provided by Emscripten when a file is used
+ * as a `--js-library`.
+ *
+ * The library file is evaluated inside Emscripten's library scope, where these
+ * symbols exist but are not part of any TypeScript `lib`.  Declaring them here
+ * lets the transport be written and type-checked as ordinary strict TypeScript
+ * instead of raw JavaScript.
+ */
+
+declare function addToLibrary(library: Record<string, unknown>): void;
+
+/** The current Wasm heap, byte-addressed. */
+declare const HEAPU8: Uint8Array;
+
+declare function UTF8ToString(ptr: number): string;
+
+declare function stringToUTF8(str: string, ptr: number, maxBytesToWrite: number): void;
+
+declare function lengthBytesUTF8(str: string): number;
+
+/* --- transport state types ---------------------------------------------- */
+
+type WakeReason = 'data' | 'timeout' | 'error';
+
+interface ByteQueue {
+  chunks: Uint8Array[];
+  offset: number;
+  length: number;
+}
+
+interface TransportFailure {
+  name: string;
+  message: string;
+}
+
+interface PortState {
+  options: SerialOptions;
+  queue: ByteQueue;
+  waiters: ((reason: WakeReason) => void)[];
+  failure: TransportFailure | null;
+  closed: boolean;
+  reader: ReadableStreamDefaultReader<Uint8Array> | null;
+  writer: WritableStreamDefaultWriter<Uint8Array> | null;
+  writeChain: Promise<number> | null;
+  pumpPromise: Promise<void> | null;
+  lastRts: number;
+  lastDtr: number;
+  rtsKnown: boolean;
+  dtrKnown: boolean;
+}
+
+interface PortRecord {
+  path: string;
+  port: SerialPort;
+  openCount: number;
+  state: PortState | null;
+}
+
+interface HandleEntry {
+  record: PortRecord;
+  state: PortState;
+}
+
+interface ErrorRecord {
+  name: string;
+  message: string;
+  context: string;
+}
+
+/**
+ * The transport object Emscripten injects as `Module.HamlibWs`.
+ *
+ * It is the contextual type for the `$HamlibWs` object literal, so the
+ * literal's methods get a typed `this`, and it is the type of the injected
+ * `HamlibWs` global that the sibling library entries call.  Emscripten lifts
+ * each entry out of the `--js-library` file, so entries may reference only this
+ * global and other Emscripten globals - never a module-scope closure.
+ */
+interface HamlibWsApi {
+  WS_OK: number;
+  WS_ERR_IO: number;
+  WS_ERR_CONF: number;
+  WS_ERR_INVAL: number;
+  WS_ERR_TIMEOUT: number;
+  WS_ERR_ACCESS: number;
+  WS_ERR_BUSY: number;
+
+  /* token -> SerialPort, waiting for the facade to bind it to a logical path */
+  pendingPorts: Map<number, SerialPort>;
+  /* logical path -> record */
+  ports: Map<string, PortRecord>;
+  /* handle -> record + state */
+  handles: Map<number, HandleEntry>;
+  nextToken: number;
+  nextHandle: number;
+  lastError: ErrorRecord | null;
+
+  recordError(name: string, message: string, context?: string): void;
+  fail(error: unknown, context: string): number;
+  lastErrorText(): string;
+  storePort(port: SerialPort): number;
+  isSerialSupported(): boolean;
+  registerPort(path: string, token: number): number;
+  unregisterPort(path: string): number;
+  queuePush(queue: ByteQueue, chunk: Uint8Array): void;
+  queueRead(queue: ByteQueue, heap: Uint8Array, ptr: number, max: number): number;
+  queueClear(queue: ByteQueue): void;
+  wake(state: PortState, reason: WakeReason): void;
+  startPump(state: PortState): Promise<void>;
+  makeState(options: SerialOptions): PortState;
+  allocHandle(record: PortRecord): number;
+  teardown(record: PortRecord, state: PortState): Promise<number>;
+  openPort(
+    path: string,
+    rate: number,
+    dataBits: number,
+    stopBits: number,
+    parity: number,
+    flowControl: number,
+  ): Promise<number>;
+  closePort(handle: number): Promise<number>;
+  matchesOpenOptions(
+    handle: number,
+    rate: number,
+    dataBits: number,
+    stopBits: number,
+    parity: number,
+    flowControl: number,
+  ): number;
+  read(handle: number, ptr: number, len: number): number;
+  write(handle: number, ptr: number, len: number): Promise<number>;
+  waitReadable(handle: number, timeoutMs: number): Promise<number>;
+  flush(handle: number): number;
+  setSignals(handle: number, rts: number, dtr: number, brk: number): Promise<number>;
+  getSignals(handle: number): Promise<number>;
+  lastRts(handle: number): number;
+  lastDtr(handle: number): number;
+  writeLastError(ptr: number, len: number): number;
+  clearLastError(): number;
+}
+
+declare const HamlibWs: HamlibWsApi;

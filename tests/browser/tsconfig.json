@@ -4,7 +4,18 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "types": ["node", "w3c-web-serial"]
   },
-  "include": ["**/*.ts", "**/*.d.ts"]
+  "include": ["**/*.ts", "**/*.d.ts"],
+  /* The in-page fixtures are standalone scripts with their own project
+   * (fixtures/tsconfig.json).  Their global declarations cannot be typed here
+   * without colliding with globals.d.ts and fixtures.ts, so the spec project
+   * does not carry them; fixtures/compile.ts stays in. */
+  "exclude": [
+    "fixtures/rigs.ts",
+    "fixtures/fake-serial.ts",
+    "fixtures/helpers.ts",
+    "fixtures/fixtures-globals.d.ts"
+  ]
 }

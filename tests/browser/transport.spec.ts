@@ -16,6 +16,7 @@ import {
   removeWebSerial,
 } from './fixtures';
 import type { Captured, HamlibErrorView } from './globals';
+import { UPSTREAM_VERSION } from './upstream';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
 
@@ -87,7 +88,7 @@ test('lists the serial rig catalogue sorted by manufacturer and model', async ({
 
   const { version, models } = expectOk(captured);
 
-  expect(version).toMatch(/4\.7\.2/);
+  expect(version).toContain(UPSTREAM_VERSION);
   expect(models.length).toBeGreaterThan(50);
 
   for (const model of models) {
@@ -151,7 +152,7 @@ test('reports WEB_SERIAL_UNAVAILABLE when the browser has no Web Serial', async 
   expect(expectFailure(open).operation).toBe('open');
 });
 
-test('rejects invalid input before entering Wasm', async ({ page }) => {
+test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting input', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib();
     const port = window.__fakeSerial.port;
@@ -170,13 +171,15 @@ test('rejects invalid input before entering Wasm', async ({ page }) => {
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
 
-    const badFrequency = await window.__testHelpers.capture(() => rig.setFrequency(-1));
-    const badMode = await window.__testHelpers.capture(() => rig.setMode('NOT-A-MODE'));
+    /* The library no longer validates arguments (Hamlib owns the semantics),
+     * so an out-of-range frequency is Hamlib's to reject; a mode name it does
+     * not know is a guaranteed -RIG_EINVAL from rig_parse_mode(). */
+    const badMode = await window.__testHelpers.capture(() => rig.setMode('NOT-A-MODE', 0));
 
     await rig.close();
     await hamlib.dispose();
 
-    return { unknownModel, badBaud, badFrequency, badMode };
+    return { unknownModel, badBaud, badMode };
   }));
 
   const results = expectOk(captured);
@@ -189,16 +192,13 @@ test('rejects invalid input before entering Wasm', async ({ page }) => {
   expect(badBaud.code).toBe('INVALID_ARGUMENT');
   expect(badBaud.message).toContain('4800-115200');
 
-  const badFrequency = expectFailure(results.badFrequency);
-  expect(badFrequency.code).toBe('INVALID_ARGUMENT');
-  expect(badFrequency.operation).toBe('setFrequency');
-
   /* Hamlib's own rig_parse_mode() rejects the mode name. */
   const badMode = expectFailure(results.badMode);
   expect(badMode.code).toBe('HAMLIB_ERROR');
   /* Hamlib reports failures as negative codes; -RIG_EINVAL is -1. */
   expect(badMode.hamlibCode).toBe(-1);
   expect(badMode.hamlibMessage).toBe('invalid parameter');
+  expect(badMode.operation).toBe('setMode');
 });
 
 test('opens a rig, drives it over the transport and releases the port', async ({ page }) => {
@@ -213,7 +213,8 @@ test('opens a rig, drives it over the transport and releases the port', async ({
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
 
-    const status = await rig.getStatus();
+    const frequencyBefore = await rig.getFrequency();
+    const modeBefore = await rig.getMode();
     await rig.setFrequency(7_074_000);
     const frequency = await rig.getFrequency();
     await rig.setMode('CW', 500);
@@ -236,7 +237,8 @@ test('opens a rig, drives it over the transport and releases the port', async ({
 
     return {
       serialRateMax: ts480.serialRateMax,
-      status,
+      frequencyBefore,
+      modeBefore,
       frequency,
       mode,
       pttOn,
@@ -251,9 +253,9 @@ test('opens a rig, drives it over the transport and releases the port', async ({
 
   const result = expectOk(captured);
 
-  expect(result.status.frequency).toBe(14_074_000);
-  expect(result.status.mode).toBe('USB');
-  expect(result.status.passband).toBe(2400);
+  expect(result.frequencyBefore).toBe(14_074_000);
+  expect(result.modeBefore.mode).toBe('USB');
+  expect(result.modeBefore.passband).toBe(2400);
 
   expect(result.frequency).toBe(7_074_000);
   expect(result.mode.mode).toBe('CW');
@@ -320,9 +322,9 @@ test('surfaces a Hamlib error when the port cannot be opened', async ({ page }) 
     /* The logical path must not stay registered: the retry succeeds. */
     const retried = await window.__testHelpers.capture(async () => {
       const rig = await hamlib.open({ modelId: ts480.id, port });
-      const status = await rig.getStatus();
+      const frequency = await rig.getFrequency();
       await rig.close();
-      return status;
+      return frequency;
     });
 
     await hamlib.dispose();
@@ -339,8 +341,7 @@ test('surfaces a Hamlib error when the port cannot be opened', async ({ page }) 
   expect(error.hamlibMessage).toBe('invalid configuration');
   expect(error.operation).toBe('open');
 
-  const status = expectOk(retried);
-  expect(status.frequency).toBe(14_074_000);
+  expect(expectOk(retried)).toBe(14_074_000);
 
   const transport = await readFakeSerial(page);
   expect(transport.openCount).toBe(1);

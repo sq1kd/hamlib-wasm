@@ -1,15 +1,21 @@
 /*
  * Browser (Web Serial) implementation of Hamlib's serial transport.
  *
- * This file replaces Hamlib's upstream src/serial.c when building for
- * Emscripten.  It keeps the exact upstream entry points and signatures -
- * serial_open(), serial_setup(), serial_flush(), ser_open(), ser_close(),
- * ser_set_rts(), ser_get_rts(), ser_set_dtr(), ser_get_dtr(), ser_set_brk(),
- * ser_get_cts(), ser_get_dsr() and ser_get_car() - so that neither the rig
- * backends nor src/iofunc.c need any knowledge of Web Serial.
+ * This file *replaces* Hamlib's upstream src/serial.c when building for
+ * Emscripten (the build installs it as src/serial.c before configuring).  It
+ * keeps the exact upstream entry points and signatures - serial_open(),
+ * serial_setup(), serial_flush(), ser_open(), ser_close(), ser_set_rts(),
+ * ser_get_rts(), ser_set_dtr(), ser_get_dtr(), ser_set_brk(), ser_get_cts(),
+ * ser_get_dsr() and ser_get_car() - so that neither the rig backends nor
+ * src/iofunc.c need any knowledge of Web Serial.
+ *
+ * Nothing else upstream is touched for the transport: the read()/write()/
+ * select() calls src/iofunc.c makes for a serial port are redirected here by
+ * the link-time wrapper in native/wrapped_io.c, so upstream's own read loop
+ * (including its 7 data bit masking) stays in charge.
  *
  * hamlib_port_t.fd keeps holding an integer, but it is an opaque handle owned
- * by the JavaScript registry (native/web_serial.js) rather than an operating
+ * by the JavaScript registry (native/web_serial.ts) rather than an operating
  * system descriptor.  All blocking work is exported to JavaScript through
  * imports annotated with __async: "auto", which Emscripten's Asyncify turns
  * back into synchronous-looking C.
@@ -36,7 +42,7 @@
 #include "serial.h"
 #include "web_serial.h"
 
-/* --- JavaScript transport imports (see native/web_serial.js) ------------- */
+/* --- JavaScript transport imports (see native/web_serial.ts) ------------- */
 
 extern int hamlibWsOpenPort(const char *path, int rate, int data_bits,
                             int stop_bits, int parity, int flow_control);
@@ -100,6 +106,51 @@ const char *webserial_last_error(void)
 void webserial_clear_error(void)
 {
     hamlibWsClearLastError();
+}
+
+/* --- handle registry ---------------------------------------------------- */
+
+/*
+ * The POSIX wrappers only receive a descriptor, so the transport keeps the
+ * set of descriptors it owns.  Serial opens are rare and bounded, so a small
+ * linear table beats any allocation.
+ */
+static int ws_handles[WEBSERIAL_MAX_HANDLES];
+
+int webserial_owns_fd(int fd)
+{
+    if (fd <= 0) { return 0; }
+
+    for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
+    {
+        if (ws_handles[i] == fd) { return 1; }
+    }
+
+    return 0;
+}
+
+void webserial_register_handle(int fd)
+{
+    if (fd <= 0 || webserial_owns_fd(fd)) { return; }
+
+    for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
+    {
+        if (ws_handles[i] == 0)
+        {
+            ws_handles[i] = fd;
+            return;
+        }
+    }
+
+    rig_debug(RIG_DEBUG_ERR, "%s: handle table is full\n", __func__);
+}
+
+void webserial_unregister_handle(int fd)
+{
+    for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
+    {
+        if (ws_handles[i] == fd) { ws_handles[i] = 0; }
+    }
 }
 
 /* --- configuration validation ------------------------------------------ */
@@ -223,6 +274,7 @@ int HAMLIB_API serial_open(hamlib_port_t *rp)
         return ws_map_error(handle, -RIG_EIO);
     }
 
+    webserial_register_handle(handle);
     rp->fd = handle;
     return RIG_OK;
 }
@@ -281,6 +333,7 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
     rig_debug(RIG_DEBUG_VERBOSE, "%s: reopening %s for %d baud\n", __func__,
               rp->pathname, rp->parm.serial.rate);
 
+    webserial_unregister_handle(rp->fd);
     status = hamlibWsClosePort(rp->fd);
 
     if (status < 0)
@@ -302,6 +355,7 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
         return ws_map_error(handle, -RIG_EIO);
     }
 
+    webserial_register_handle(handle);
     rp->fd = handle;
     return RIG_OK;
 }
@@ -378,6 +432,7 @@ int ser_close(hamlib_port_t *p)
         return RIG_OK;
     }
 
+    webserial_unregister_handle(p->fd);
     status = hamlibWsClosePort(p->fd);
     p->fd = -1;
 
@@ -524,21 +579,21 @@ int HAMLIB_API ser_get_dsr(hamlib_port_t *p, int *state)
     return ws_get_input_signal(p, state, WEBSERIAL_SIGNAL_DSR, "DSR");
 }
 
-/* --- bytes ------------------------------------------------------------- */
+/* --- byte primitives used by the link-time wrappers -------------------- */
 
-ssize_t webserial_read(hamlib_port_t *p, void *buf, size_t count)
+ssize_t webserial_read_fd(int fd, void *buf, size_t count)
 {
     int want;
     int got;
 
-    if (!p || !buf || p->fd <= 0)
+    if (fd <= 0 || !buf)
     {
-        return -RIG_EIO;
+        return -1;
     }
 
     /*
-     * read_string() shrinks its request to zero bytes once it has learnt the
-     * response length, so treat "no bytes requested" as "one byte".
+     * Hamlib's read_string() shrinks its request to zero bytes once it has
+     * learnt the response length, so treat "no bytes requested" as "one byte".
      */
     if (count == 0)
     {
@@ -553,11 +608,12 @@ ssize_t webserial_read(hamlib_port_t *p, void *buf, size_t count)
         want = (int) count;
     }
 
-    got = hamlibWsRead(p->fd, buf, want);
+    got = hamlibWsRead(fd, buf, want);
 
     if (got < 0)
     {
-        return ws_map_error(got, -RIG_EIO);
+        errno = EIO;
+        return -1;
     }
 
     if (got == 0)
@@ -567,27 +623,17 @@ ssize_t webserial_read(hamlib_port_t *p, void *buf, size_t count)
     }
 
     errno = 0;
-
-    if (p->parm.serial.data_bits == 7)
-    {
-        unsigned char *pbuf = (unsigned char *) buf;
-
-        for (int i = 0; i < got; ++i)
-        {
-            pbuf[i] &= ~0x80;
-        }
-    }
-
     return got;
 }
 
-ssize_t webserial_write(hamlib_port_t *p, const void *buf, size_t count)
+ssize_t webserial_write_fd(int fd, const void *buf, size_t count)
 {
     int written;
 
-    if (!p || p->fd <= 0)
+    if (fd <= 0)
     {
-        return -RIG_EIO;
+        errno = EIO;
+        return -1;
     }
 
     if (count == 0)
@@ -597,35 +643,50 @@ ssize_t webserial_write(hamlib_port_t *p, const void *buf, size_t count)
 
     if (count > (size_t) INT_MAX)
     {
-        return -RIG_EINVAL;
+        errno = EINVAL;
+        return -1;
     }
 
-    written = hamlibWsWrite(p->fd, buf, (int) count);
+    written = hamlibWsWrite(fd, buf, (int) count);
 
     if (written < 0)
     {
-        return ws_map_error(written, -RIG_EIO);
+        errno = EIO;
+        return -1;
     }
 
     /* The JavaScript writer accepts whole chunks or fails. */
     if (written != (int) count)
     {
-        return -RIG_EIO;
+        errno = EIO;
+        return -1;
     }
 
     return (ssize_t) count;
 }
 
-int webserial_select(hamlib_port_t *p, fd_set *readfds,
-                     struct timeval *timeout)
+int webserial_select_fd(fd_set *readfds, struct timeval *timeout, int *handled)
 {
+    int fd = -1;
     int timeout_ms = -1;
     int ready;
 
-    if (!p || p->fd <= 0)
+    if (handled) { *handled = 0; }
+
+    if (!readfds) { return 0; }
+
+    for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
     {
-        return -1;
+        if (ws_handles[i] > 0 && FD_ISSET(ws_handles[i], readfds))
+        {
+            fd = ws_handles[i];
+            break;
+        }
     }
+
+    if (fd < 0) { return 0; }
+
+    if (handled) { *handled = 1; }
 
     if (timeout)
     {
@@ -633,19 +694,17 @@ int webserial_select(hamlib_port_t *p, fd_set *readfds,
                            + (timeout->tv_usec + 999) / 1000);
     }
 
-    ready = hamlibWsWaitReadable(p->fd, timeout_ms);
+    ready = hamlibWsWaitReadable(fd, timeout_ms);
 
     if (ready > 0)
     {
-        if (readfds) { FD_SET(p->fd, readfds); }
-
+        FD_SET(fd, readfds);
         return 1;
     }
 
     if (ready == 0)
     {
-        if (readfds) { FD_ZERO(readfds); }
-
+        FD_ZERO(readfds);
         return 0;
     }
 

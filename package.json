@@ -11,8 +11,8 @@
     "tests/harness"
   ],
   "scripts": {
-    "build": "node packages/hamlib-web/scripts/build-package.mjs && npm run build --workspace examples/basic",
-    "typecheck": "node scripts/typecheck.mjs",
+    "build": "node packages/hamlib-web/build/package.ts && npm run build --workspace examples/basic",
+    "typecheck": "mise run typecheck",
     "test": "playwright test",
     "test:browser": "playwright test tests/browser/e2e",
     "dev": "npm run dev --workspace examples/basic",

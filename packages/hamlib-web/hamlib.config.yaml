@@ -1,0 +1,352 @@
+# The binding surface of packages/hamlib-web, and the upstream release it binds.
+#
+# One file, two readers: the native build reads `release:`
+# (packages/hamlib-web/build/upstream.ts) and the generator reads the rest
+# (packages/hamlib-codegen).  Nothing here is rewritten by a tool.
+#
+# After changing this file run `mise run generate`; the native build and
+# `mise run typecheck` fail when the committed generated artifacts are stale.
+
+# The pinned upstream release: the archive the native build downloads and
+# verifies, and the patches it applies.  Everything that identifies a release
+# lives here.
+release:
+  version: 4.7.2
+  series: "4.7"
+  archive:
+    name: hamlib-4.7.2.tar.gz
+    url: https://github.com/Hamlib/Hamlib/releases/download/4.7.2/hamlib-4.7.2.tar.gz
+    sha256: ae1fcf2dbc80ea0786ea8f047b09399c3f7737d1930442f61a031708ed33e88f
+  license: LGPL-2.1-or-later
+  patches:
+    - file: hamlib-4.7.2-web.patch
+      purpose: "Skip the Morse worker start in rig_open(): the browser build has no pthreads, and without this the worker's thread creation would fail the whole open. One hunk, no other upstream source change."
+
+# Value objects the Embind boundary returns whose C++ structs are declared in
+# native/facade.cpp.  The generator registers them; it never defines them.
+# The generated single-output results (NumberResult, TextResult and the
+# per-operation Get*Result structs) are derived from the AST instead.
+results:
+  ModelInfo:
+    binding: RigModelInfo
+    fields:
+      - [ id, int ]
+      - [ manufacturer, string ]
+      - [ model, string ]
+      - [ backendVersion, string ]
+      - [ status, int ]
+      - [ serialRateMin, int ]
+      - [ serialRateMax, int ]
+      - [ serialDataBits, int ]
+      - [ serialStopBits, int ]
+      - [ serialParity, string ]
+      - [ serialHandshake, string ]
+      - [ canGetFrequency, bool ]
+      - [ canSetFrequency, bool ]
+      - [ canGetMode, bool ]
+      - [ canSetMode, bool ]
+      - [ canGetPtt, bool ]
+      - [ canSetPtt, bool ]
+  CodeResult:
+    fields:
+      - [ code, int ]
+      - [ error, string ]
+  OpenResult:
+    fields:
+      - [ code, int ]
+      - [ handle, int ]
+      - [ error, string ]
+  PttResult:
+    fields:
+      - [ code, int ]
+      - [ ptt, string ]
+      - [ error, string ]
+
+# Embind vector registrations.  The element type is a C++ type declared in
+# native/facade.cpp, so it cannot be derived from the upstream headers.
+vectors:
+  - type: ModelInfo
+    binding: RigModelList
+  - type: RigConfparams
+    binding: RigConfparamsList
+
+# Operations whose C++ body is hand-written in native/facade.cpp, because a
+# signature cannot describe them: the module lifecycle, port registration and
+# open/close ownership (scope: module), plus the out-buffer, callback-walker,
+# extended-setting and PTT operations (scope: rig).  `calls` lists the upstream
+# symbols the body uses; those symbols are excluded from generation and their
+# pinned signatures are recorded in coverage.json, so a drift fails the build.
+# `capability` names a ModelInfo flag the method is gated on, for the
+# operations rig_caps cannot describe (serial RTS/DTR push-to-talk declares no
+# get_ptt function pointer).  Everything else is classified from the upstream
+# AST and generated end to end.
+operations:
+  - name: initialize
+    scope: module
+    args: []
+    result: CodeResult
+    calls:
+      - rig_set_debug
+      - rig_load_all_backends
+  - name: version
+    scope: module
+    args: []
+    result: string
+    calls:
+      - rig_version
+  - name: listModels
+    scope: module
+    args: []
+    result: ModelInfo[]
+    calls:
+      - rig_list_foreach
+  - name: registerPort
+    scope: module
+    args:
+      - [ logicalPath, string ]
+      - [ portToken, int ]
+    result: CodeResult
+    calls: []
+  - name: unregisterPort
+    scope: module
+    args:
+      - [ logicalPath, string ]
+    result: CodeResult
+    calls: []
+  - name: openRig
+    scope: module
+    args:
+      - [ modelId, int ]
+      - [ logicalPath, string ]
+      - [ baudRate, int ]
+    result: OpenResult
+    calls:
+      - rig_get_caps
+      - rig_init
+      - rig_token_lookup
+      - rig_set_conf
+      - rig_open
+      - rig_close
+      - rig_cleanup
+  - name: closeRig
+    scope: module
+    args:
+      - [ handle, int ]
+    result: CodeResult
+    calls:
+      - rig_close
+      - rig_cleanup
+  - name: getPtt
+    scope: rig
+    capability: canGetPtt
+    args:
+      - [ handle, int ]
+    result: PttResult
+    calls:
+      - rig_get_ptt
+  - name: setPtt
+    scope: rig
+    capability: canSetPtt
+    args:
+      - [ handle, int ]
+      - [ state, string ]
+    result: PttResult
+    calls:
+      - rig_set_ptt
+  - name: getRigInfo
+    scope: rig
+    args:
+      - [ handle, int ]
+    result: TextResult
+    calls:
+      - rig_get_rig_info
+  - name: getVfoList
+    scope: rig
+    args:
+      - [ handle, int ]
+    result: TextResult
+    calls:
+      - rig_get_vfo_list
+  - name: getExtLevel
+    scope: rig
+    args:
+      - [ handle, int ]
+      - [ token, int ]
+    result: NumberResult
+    calls:
+      - rig_get_ext_level
+  - name: setExtLevel
+    scope: rig
+    args:
+      - [ handle, int ]
+      - [ token, int ]
+      - [ value, double ]
+    result: CodeResult
+    calls:
+      - rig_set_ext_level
+  - name: getExtParm
+    scope: rig
+    args:
+      - [ handle, int ]
+      - [ token, int ]
+    result: NumberResult
+    calls:
+      - rig_get_ext_parm
+  - name: setExtParm
+    scope: rig
+    args:
+      - [ handle, int ]
+      - [ token, int ]
+      - [ value, double ]
+    result: CodeResult
+    calls:
+      - rig_set_ext_parm
+  - name: tokenForeach
+    scope: rig
+    args:
+      - [ handle, int ]
+    result: RigConfparams[]
+    calls:
+      - rig_token_foreach
+  - name: extLevelForeach
+    scope: rig
+    args:
+      - [ handle, int ]
+    result: RigConfparams[]
+    calls:
+      - rig_ext_level_foreach
+  - name: extFuncForeach
+    scope: rig
+    args:
+      - [ handle, int ]
+    result: RigConfparams[]
+    calls:
+      - rig_ext_func_foreach
+  - name: extParmForeach
+    scope: rig
+    args:
+      - [ handle, int ]
+    result: RigConfparams[]
+    calls:
+      - rig_ext_parm_foreach
+
+# Renames for the mechanically generated surface.  The generated names are
+# derived from the upstream symbols; a public name or field that reads badly is
+# fixed here rather than by hand-writing the operation.
+overrides:
+  operations:
+    rig_get_freq:
+      method: getFrequency
+    rig_set_freq:
+      method: setFrequency
+    rig_get_mode:
+      method: getMode
+      fields:
+        width: passband
+    rig_valueagclevel:
+      method: valueAgcLevel
+    rig_levelagcstr:
+      method: levelAgcStr
+    rig_levelagcvalue:
+      method: levelAgcValue
+    rig_idx2setting:
+      method: idxToSetting
+    rig_setting2idx:
+      method: settingToIdx
+    rig_strvfo:
+      method: strVfo
+    rig_strfunc:
+      method: strFunc
+      fields:
+        value0: func
+    rig_strlevel:
+      method: strLevel
+      fields:
+        value0: level
+    rig_strparm:
+      method: strParm
+      fields:
+        value0: parm
+    rig_stragclevel:
+      method: strAgcLevel
+    rig_strptrshift:
+      method: strPtrShift
+      fields:
+        value0: shift
+    rig_strvfop:
+      method: strVfoOp
+    rig_strscan:
+      method: strScan
+    rig_strrmode:
+      method: strRmode
+    rig_strstatus:
+      method: strStatus
+    rig_strcommstatus:
+      method: strCommStatus
+    rig_strmtype:
+      method: strMType
+    rig_strspectrummode:
+      method: strSpectrumMode
+    rig_parse_mtype:
+      method: parseMType
+    rig_get_split_freq:
+      fields:
+        tx_freq: txFreq
+    rig_set_split_freq:
+      fields:
+        tx_freq: txFreq
+    rig_get_split_mode:
+      fields:
+        tx_mode: txMode
+        tx_width: txWidth
+    rig_set_split_mode:
+      fields:
+        tx_mode: txMode
+        tx_width: txWidth
+    rig_get_split_freq_mode:
+      fields:
+        tx_freq: txFreq
+        tx_mode: txMode
+        tx_width: txWidth
+    rig_set_split_freq_mode:
+      fields:
+        tx_freq: txFreq
+        tx_mode: txMode
+        tx_width: txWidth
+    rig_get_split_vfo:
+      fields:
+        tx_vfo: txVfo
+    rig_set_split_vfo:
+      fields:
+        tx_vfo: txVfo
+    rig_get_ant:
+      fields:
+        ant_curr: antCurr
+        ant_tx: antTx
+        ant_rx: antRx
+    rig_set_clock:
+      fields:
+        utc_offset: utcOffset
+    rig_get_clock:
+      fields:
+        utc_offset: utcOffset
+    rig_get_channel:
+      fields:
+        read_only: readOnly
+  projections:
+    channel:
+      channel_num: channelNum
+      bank_num: bankNum
+      tx_freq: txFreq
+      tx_mode: txMode
+      tx_width: txWidth
+      tx_vfo: txVfo
+      rptr_shift: rptrShift
+      rptr_offs: rptrOffs
+      tuning_step: tuningStep
+      ctcss_tone: ctcssTone
+      ctcss_sql: ctcssSql
+      dcs_code: dcsCode
+      dcs_sql: dcsSql
+      scan_group: scanGroup
+      channel_desc: channelDesc

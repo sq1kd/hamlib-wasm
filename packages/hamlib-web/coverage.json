@@ -1,0 +1,1114 @@
+{
+  "$comment": "Generated coverage report: which upstream declarations this generator binds and which it refuses, and why, plus the pinned signature of every symbol a bespoke operation calls.  Diff it on an upstream bump to see what changed.",
+  "release": "4.7.2",
+  "summary": {
+    "bespoke": 19,
+    "generated": 110,
+    "refused": 65
+  },
+  "signatures": {
+    "rig_cleanup": [
+      "int rig_cleanup(RIG *)"
+    ],
+    "rig_close": [
+      "int rig_close(RIG *)"
+    ],
+    "rig_ext_func_foreach": [
+      "int rig_ext_func_foreach(RIG *, int (*)(RIG *, const struct confparams *, void *), void *)"
+    ],
+    "rig_ext_level_foreach": [
+      "int rig_ext_level_foreach(RIG *, int (*)(RIG *, const struct confparams *, void *), void *)"
+    ],
+    "rig_ext_parm_foreach": [
+      "int rig_ext_parm_foreach(RIG *, int (*)(RIG *, const struct confparams *, void *), void *)"
+    ],
+    "rig_get_caps": [
+      "struct rig_caps * rig_get_caps(rig_model_t)"
+    ],
+    "rig_get_ext_level": [
+      "int rig_get_ext_level(RIG *, vfo_t, hamlib_token_t, value_t *)"
+    ],
+    "rig_get_ext_parm": [
+      "int rig_get_ext_parm(RIG *, hamlib_token_t, value_t *)"
+    ],
+    "rig_get_ptt": [
+      "int rig_get_ptt(RIG *, vfo_t, ptt_t *)"
+    ],
+    "rig_get_rig_info": [
+      "int rig_get_rig_info(RIG *, char *, int)"
+    ],
+    "rig_get_vfo_list": [
+      "int rig_get_vfo_list(RIG *, char *, int)"
+    ],
+    "rig_init": [
+      "RIG * rig_init(rig_model_t)"
+    ],
+    "rig_list_foreach": [
+      "int rig_list_foreach(int (*)(const struct rig_caps *, void *), void *)"
+    ],
+    "rig_load_all_backends": [
+      "int rig_load_all_backends(void)"
+    ],
+    "rig_open": [
+      "int rig_open(RIG *)"
+    ],
+    "rig_set_conf": [
+      "int rig_set_conf(RIG *, hamlib_token_t, const char *)"
+    ],
+    "rig_set_debug": [
+      "void rig_set_debug(enum rig_debug_level_e)"
+    ],
+    "rig_set_ext_level": [
+      "int rig_set_ext_level(RIG *, vfo_t, hamlib_token_t, value_t)"
+    ],
+    "rig_set_ext_parm": [
+      "int rig_set_ext_parm(RIG *, hamlib_token_t, value_t)"
+    ],
+    "rig_set_ptt": [
+      "int rig_set_ptt(RIG *, vfo_t, ptt_t)"
+    ],
+    "rig_token_foreach": [
+      "int rig_token_foreach(RIG *, int (*)(const struct confparams *, void *), void *)"
+    ],
+    "rig_token_lookup": [
+      "hamlib_token_t rig_token_lookup(RIG *, const char *)"
+    ],
+    "rig_version": [
+      "const char * rig_version(void)"
+    ]
+  },
+  "generated": [
+    {
+      "symbol": "rig_confparam_lookup",
+      "method": "confparamLookup",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_copyright",
+      "method": "copyright",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_ext_lookup",
+      "method": "extLookup",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_ext_lookup_tok",
+      "method": "extLookupTok",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_ext_token_lookup",
+      "method": "extTokenLookup",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_get_ant",
+      "method": "getAnt",
+      "shape": "get",
+      "result": "GetAntResult",
+      "capability": "getAnt"
+    },
+    {
+      "symbol": "rig_get_channel",
+      "method": "getChannel",
+      "shape": "get",
+      "result": "GetChannelResult",
+      "capability": "getChannel"
+    },
+    {
+      "symbol": "rig_get_clock",
+      "method": "getClock",
+      "shape": "get",
+      "result": "GetClockResult",
+      "capability": "getClock"
+    },
+    {
+      "symbol": "rig_get_ctcss_sql",
+      "method": "getCtcssSql",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getCtcssSql"
+    },
+    {
+      "symbol": "rig_get_ctcss_tone",
+      "method": "getCtcssTone",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getCtcssTone"
+    },
+    {
+      "symbol": "rig_get_dcd",
+      "method": "getDcd",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getDcd"
+    },
+    {
+      "symbol": "rig_get_dcs_code",
+      "method": "getDcsCode",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getDcsCode"
+    },
+    {
+      "symbol": "rig_get_dcs_sql",
+      "method": "getDcsSql",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getDcsSql"
+    },
+    {
+      "symbol": "rig_get_ext_func",
+      "method": "getExtFunc",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getExtFunc"
+    },
+    {
+      "symbol": "rig_get_freq",
+      "method": "getFrequency",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getFrequency"
+    },
+    {
+      "symbol": "rig_get_func",
+      "method": "getFunc",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getFunc"
+    },
+    {
+      "symbol": "rig_get_info",
+      "method": "getInfo",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_get_level",
+      "method": "getLevel",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getLevel"
+    },
+    {
+      "symbol": "rig_get_mem",
+      "method": "getMem",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getMem"
+    },
+    {
+      "symbol": "rig_get_mode",
+      "method": "getMode",
+      "shape": "get",
+      "result": "GetModeResult",
+      "capability": "getMode"
+    },
+    {
+      "symbol": "rig_get_parm",
+      "method": "getParm",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getParm"
+    },
+    {
+      "symbol": "rig_get_powerstat",
+      "method": "getPowerstat",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getPowerstat"
+    },
+    {
+      "symbol": "rig_get_resolution",
+      "method": "getResolution",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_get_rit",
+      "method": "getRit",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getRit"
+    },
+    {
+      "symbol": "rig_get_rptr_offs",
+      "method": "getRptrOffs",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getRptrOffs"
+    },
+    {
+      "symbol": "rig_get_rptr_shift",
+      "method": "getRptrShift",
+      "shape": "get",
+      "result": "TextResult",
+      "capability": "getRptrShift"
+    },
+    {
+      "symbol": "rig_get_split_freq",
+      "method": "getSplitFreq",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getSplitFreq"
+    },
+    {
+      "symbol": "rig_get_split_freq_mode",
+      "method": "getSplitFreqMode",
+      "shape": "get",
+      "result": "GetSplitFreqModeResult",
+      "capability": "getSplitFreqMode"
+    },
+    {
+      "symbol": "rig_get_split_mode",
+      "method": "getSplitMode",
+      "shape": "get",
+      "result": "GetSplitModeResult",
+      "capability": "getSplitMode"
+    },
+    {
+      "symbol": "rig_get_split_vfo",
+      "method": "getSplitVfo",
+      "shape": "get",
+      "result": "GetSplitVfoResult",
+      "capability": "getSplitVfo"
+    },
+    {
+      "symbol": "rig_get_trn",
+      "method": "getTrn",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getTrn"
+    },
+    {
+      "symbol": "rig_get_ts",
+      "method": "getTs",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getTs"
+    },
+    {
+      "symbol": "rig_get_twiddle",
+      "method": "getTwiddle",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": null
+    },
+    {
+      "symbol": "rig_get_vfo",
+      "method": "getVfo",
+      "shape": "get",
+      "result": "TextResult",
+      "capability": "getVfo"
+    },
+    {
+      "symbol": "rig_get_vfo_info",
+      "method": "getVfoInfo",
+      "shape": "get",
+      "result": "GetVfoInfoResult",
+      "capability": null
+    },
+    {
+      "symbol": "rig_get_xit",
+      "method": "getXit",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": "getXit"
+    },
+    {
+      "symbol": "rig_has_get_func",
+      "method": "hasGetFunc",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_has_get_level",
+      "method": "hasGetLevel",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_has_get_parm",
+      "method": "hasGetParm",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_has_scan",
+      "method": "hasScan",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_has_set_func",
+      "method": "hasSetFunc",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_has_set_level",
+      "method": "hasSetLevel",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_has_set_parm",
+      "method": "hasSetParm",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_has_vfo_op",
+      "method": "hasVfoOp",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_idx2setting",
+      "method": "idxToSetting",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_is_model",
+      "method": "isModel",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_levelagcstr",
+      "method": "levelAgcStr",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_levelagcvalue",
+      "method": "levelAgcValue",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_license",
+      "method": "license",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_lookup_mem_caps",
+      "method": "lookupMemCaps",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_mem_count",
+      "method": "memCount",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_func",
+      "method": "parseFunc",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_level",
+      "method": "parseLevel",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_mode",
+      "method": "parseMode",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_mtype",
+      "method": "parseMType",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_parm",
+      "method": "parseParm",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_rptr_shift",
+      "method": "parseRptrShift",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_scan",
+      "method": "parseScan",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_vfo",
+      "method": "parseVfo",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_parse_vfo_op",
+      "method": "parseVfoOp",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_passband_narrow",
+      "method": "passbandNarrow",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_passband_normal",
+      "method": "passbandNormal",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_passband_wide",
+      "method": "passbandWide",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_reset",
+      "method": "reset",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "reset"
+    },
+    {
+      "symbol": "rig_scan",
+      "method": "scan",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "scan"
+    },
+    {
+      "symbol": "rig_set_ant",
+      "method": "setAnt",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setAnt"
+    },
+    {
+      "symbol": "rig_set_bank",
+      "method": "setBank",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setBank"
+    },
+    {
+      "symbol": "rig_set_channel",
+      "method": "setChannel",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setChannel"
+    },
+    {
+      "symbol": "rig_set_clock",
+      "method": "setClock",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setClock"
+    },
+    {
+      "symbol": "rig_set_ctcss_sql",
+      "method": "setCtcssSql",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setCtcssSql"
+    },
+    {
+      "symbol": "rig_set_ctcss_tone",
+      "method": "setCtcssTone",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setCtcssTone"
+    },
+    {
+      "symbol": "rig_set_dcs_code",
+      "method": "setDcsCode",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setDcsCode"
+    },
+    {
+      "symbol": "rig_set_dcs_sql",
+      "method": "setDcsSql",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setDcsSql"
+    },
+    {
+      "symbol": "rig_set_ext_func",
+      "method": "setExtFunc",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setExtFunc"
+    },
+    {
+      "symbol": "rig_set_freq",
+      "method": "setFrequency",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setFrequency"
+    },
+    {
+      "symbol": "rig_set_func",
+      "method": "setFunc",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setFunc"
+    },
+    {
+      "symbol": "rig_set_level",
+      "method": "setLevel",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setLevel"
+    },
+    {
+      "symbol": "rig_set_mem",
+      "method": "setMem",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setMem"
+    },
+    {
+      "symbol": "rig_set_mode",
+      "method": "setMode",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setMode"
+    },
+    {
+      "symbol": "rig_set_parm",
+      "method": "setParm",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setParm"
+    },
+    {
+      "symbol": "rig_set_powerstat",
+      "method": "setPowerstat",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setPowerstat"
+    },
+    {
+      "symbol": "rig_set_rit",
+      "method": "setRit",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setRit"
+    },
+    {
+      "symbol": "rig_set_rptr_offs",
+      "method": "setRptrOffs",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setRptrOffs"
+    },
+    {
+      "symbol": "rig_set_rptr_shift",
+      "method": "setRptrShift",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setRptrShift"
+    },
+    {
+      "symbol": "rig_set_split_freq",
+      "method": "setSplitFreq",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setSplitFreq"
+    },
+    {
+      "symbol": "rig_set_split_freq_mode",
+      "method": "setSplitFreqMode",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setSplitFreqMode"
+    },
+    {
+      "symbol": "rig_set_split_mode",
+      "method": "setSplitMode",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setSplitMode"
+    },
+    {
+      "symbol": "rig_set_split_vfo",
+      "method": "setSplitVfo",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setSplitVfo"
+    },
+    {
+      "symbol": "rig_set_trn",
+      "method": "setTrn",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setTrn"
+    },
+    {
+      "symbol": "rig_set_ts",
+      "method": "setTs",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setTs"
+    },
+    {
+      "symbol": "rig_set_twiddle",
+      "method": "setTwiddle",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": null
+    },
+    {
+      "symbol": "rig_set_uplink",
+      "method": "setUplink",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": null
+    },
+    {
+      "symbol": "rig_set_vfo",
+      "method": "setVfo",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setVfo"
+    },
+    {
+      "symbol": "rig_set_xit",
+      "method": "setXit",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "setXit"
+    },
+    {
+      "symbol": "rig_setting2idx",
+      "method": "settingToIdx",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_stragclevel",
+      "method": "strAgcLevel",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strcommstatus",
+      "method": "strCommStatus",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strfunc",
+      "method": "strFunc",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strlevel",
+      "method": "strLevel",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strmtype",
+      "method": "strMType",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strparm",
+      "method": "strParm",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strptrshift",
+      "method": "strPtrShift",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strrmode",
+      "method": "strRmode",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strscan",
+      "method": "strScan",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strspectrummode",
+      "method": "strSpectrumMode",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strstatus",
+      "method": "strStatus",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strvfo",
+      "method": "strVfo",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_strvfop",
+      "method": "strVfoOp",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_valueagclevel",
+      "method": "valueAgcLevel",
+      "shape": "pure",
+      "result": "",
+      "capability": null
+    },
+    {
+      "symbol": "rig_vfo_op",
+      "method": "vfoOp",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "vfoOp"
+    }
+  ],
+  "refused": [
+    {
+      "symbol": "rig_band_changed",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_check_backend",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_cm108_get_bit",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_cm108_set_bit",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_cookie",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_data_pointer",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_date_strget",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_debug",
+      "reason": "variadic"
+    },
+    {
+      "symbol": "rig_flush",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_flush_force",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_get_cache",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_get_cache_freq",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_get_cache_timeout_ms",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_get_caps_cptr",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_get_caps_int",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_get_chan_all",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_get_chan_all_cb",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_get_conf",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_get_conf2",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_get_debug",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_get_function_ptr",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_get_lock_mode",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_get_mem_all",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_get_mem_all_cb",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_get_range",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_list_foreach_model",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_load_backend",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_lock",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_make_md5",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_mW2power",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_need_debug",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_no_restore_ai",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_password",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_password_generate_secret",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_power2mW",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_probe",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_probe_all",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_recv_dtmf",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_register",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_send_dtmf",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_send_morse",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_send_raw",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_send_voice_mem",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_set_cache_timeout_ms",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_set_chan_all",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_set_chan_all_cb",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_set_dcd_callback",
+      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
+    },
+    {
+      "symbol": "rig_set_debug_callback",
+      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
+    },
+    {
+      "symbol": "rig_set_debug_file",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_set_debug_time_stamp",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_set_freq_callback",
+      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
+    },
+    {
+      "symbol": "rig_set_lock_mode",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_set_mem_all",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_set_mem_all_cb",
+      "reason": "excluded: caller-owned array whose length the signature does not give"
+    },
+    {
+      "symbol": "rig_set_mode_callback",
+      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
+    },
+    {
+      "symbol": "rig_set_pltune_callback",
+      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
+    },
+    {
+      "symbol": "rig_set_ptt_callback",
+      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
+    },
+    {
+      "symbol": "rig_set_spectrum_callback",
+      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
+    },
+    {
+      "symbol": "rig_set_vfo_callback",
+      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
+    },
+    {
+      "symbol": "rig_set_vfo_opt",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_stop_morse",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_stop_voice_mem",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    },
+    {
+      "symbol": "rig_strrmodes",
+      "reason": "does not take exactly one RIG * handle"
+    },
+    {
+      "symbol": "rig_unregister",
+      "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_wait_morse",
+      "reason": "excluded by policy (threads, transport or unsafe surface)"
+    }
+  ]
+}

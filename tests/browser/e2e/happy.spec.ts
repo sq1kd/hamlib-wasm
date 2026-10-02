@@ -5,6 +5,7 @@
 import { expect, test } from '@playwright/test';
 
 import { TS480_LINE_SETTINGS, installFakeSerial, readFakeSerial } from '../fixtures';
+import { UPSTREAM_VERSION } from '../upstream';
 import { connectTs480 } from './helpers';
 
 test.beforeEach(async ({ page }) => {
@@ -12,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page.getByTestId('hamlib-version')).toHaveText(/4\.7\.2/);
+  await expect(page.getByTestId('hamlib-version')).toContainText(UPSTREAM_VERSION);
   await expect(page.getByTestId('web-serial-status')).toHaveAttribute(
     'data-state',
     'available',

@@ -11,6 +11,9 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: 'tests/browser',
+  /* The browser fixtures are injected as compiled text, so they are built
+   * before any spec (and its fixtures.ts import) is loaded. */
+  globalSetup: './tests/browser/fixtures/compile.ts',
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),

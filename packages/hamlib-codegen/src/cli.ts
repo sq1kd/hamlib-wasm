@@ -1,0 +1,441 @@
+#!/usr/bin/env node
+/**
+ * Regenerate the binding surface of packages/hamlib-web.
+ *
+ * Two inputs meet here:
+ *
+ *   - `hamlib.config.yaml` — the hand-authored config: the operations that need
+ *     a bespoke facade body, the value objects that cross the boundary, and the
+ *     renames for the generated surface.  Their upstream calls are recorded so
+ *     a signature change fails the build instead of changing behaviour
+ *     silently.
+ *   - the compiler AST of the pinned headers — everything else.  Every
+ *     remaining `rig_get_*`/`rig_set_*`/value-returning declaration is
+ *     classified into a shape and either generated or listed as a refusal with
+ *     a reason.
+ *
+ * Outputs: the generated C++ includes, the strict TypeScript contract and
+ * method classes, and a committed coverage report (coverage.json) recording
+ * which declarations are bound, which are refused, and the exact signature of
+ * every symbol a bespoke operation calls.
+ *
+ * The config itself is never rewritten: it belongs to the reader, and a tool
+ * that reformatted it would bury the review that an upstream bump needs.
+ *
+ * Run with `--update` to rewrite the generated files; run with `--check` to
+ * fail when they are stale; pass `--emitted` to additionally prove the linked
+ * module still exposes the allowlist.
+ *
+ * Authored as TypeScript and run directly by Node's type stripping, so this
+ * file must stay erasable (no enums, namespaces or parameter properties).
+ */
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
+
+import { loadAst, type AstIndex } from './ast.ts';
+import { classifyAll } from './classify.ts';
+import { loadConfig, type Model } from './config.ts';
+import {
+  embindArity,
+  emitCapabilities,
+  emitContract,
+  emitEmbind,
+  emitMethodFiles,
+  emitOperations,
+  emitResults,
+} from './emit.ts';
+import { createProjectionResolver } from './project.ts';
+
+function fail(message: string): never {
+  process.stderr.write(`[codegen] error: ${message}\n`);
+  process.exit(1);
+}
+
+function log(message: string): void {
+  process.stdout.write(`[codegen] ${message}\n`);
+}
+
+interface Options {
+  readonly update: boolean;
+  readonly config: string;
+  readonly packageDir: string;
+  readonly headers: string;
+  readonly emitted: string | null;
+}
+
+function parseArgs(argv: readonly string[]): Options {
+  const values = new Map<string, string>();
+  let update = false;
+
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index] as string;
+
+    if (arg === '--update') {
+      update = true;
+    } else if (arg === '--check') {
+      update = false;
+    } else if (arg === '--config' || arg === '--package' || arg === '--headers' || arg === '--emitted') {
+      const value = argv[++index];
+
+      if (value === undefined) {
+        fail(`${arg} needs a value`);
+      }
+
+      values.set(arg, value);
+    } else {
+      fail(`unknown argument ${arg}`);
+    }
+  }
+
+  for (const required of ['--config', '--package', '--headers']) {
+    if (!values.has(required)) {
+      fail(`${required} is required`);
+    }
+  }
+
+  return {
+    update,
+    config: values.get('--config') as string,
+    packageDir: values.get('--package') as string,
+    headers: values.get('--headers') as string,
+    emitted: values.get('--emitted') ?? null,
+  };
+}
+
+interface Outputs {
+  readonly files: readonly (readonly [string, string])[];
+  readonly generated: readonly { readonly method: string; readonly arity: number }[];
+}
+
+/** Where the generated artifacts live inside the package. */
+interface GeneratedPaths {
+  readonly coverage: string;
+  readonly embind: string;
+  readonly results: string;
+  readonly operations: string;
+  readonly capabilities: string;
+  readonly contract: string;
+  readonly methodsDir: string;
+}
+
+function outputPaths(packageDir: string): GeneratedPaths {
+  const generated = path.join(packageDir, 'native', 'generated');
+  const contract = path.join(packageDir, 'src', 'native', 'generated');
+
+  return {
+    coverage: path.join(packageDir, 'coverage.json'),
+    embind: path.join(generated, 'embind.inc'),
+    results: path.join(generated, 'results.inc'),
+    operations: path.join(generated, 'operations.inc'),
+    capabilities: path.join(generated, 'capabilities.inc'),
+    contract: path.join(contract, 'operations.ts'),
+    methodsDir: path.join(contract, 'methods'),
+  };
+}
+
+/** `struct rig_caps` function-pointer member names, for capability gating. */
+function capsMembers(ast: AstIndex): Set<string> {
+  const caps = ast.records.get('rig_caps');
+  const names = new Set<string>();
+
+  for (const field of caps?.fields ?? []) {
+    if (field.qualType.includes('(*)')) {
+      names.add(field.name);
+    }
+  }
+
+  return names;
+}
+
+/** The upstream symbols a bespoke facade body calls; each is pinned by signature. */
+function calledSymbols(model: Model): string[] {
+  const symbols = new Set<string>();
+
+  for (const operation of model.operations) {
+    for (const symbol of operation.calls) {
+      symbols.add(symbol);
+    }
+  }
+
+  return [...symbols].sort();
+}
+
+function signatureOf(ast: AstIndex, symbol: string): string[] {
+  return (ast.functions.get(symbol) ?? [])
+    .map((fn) => {
+      const params = fn.params.map((param) => param.qualType).join(', ');
+
+      return `${fn.result} ${symbol}(${params.length === 0 ? 'void' : params})`;
+    })
+    .sort();
+}
+
+interface CoverageReport {
+  readonly signatures?: Readonly<Record<string, readonly string[]>>;
+}
+
+function readSignatures(file: string): Readonly<Record<string, readonly string[]>> | null {
+  if (!existsSync(file)) {
+    return null;
+  }
+
+  const report = JSON.parse(readFileSync(file, 'utf8')) as CoverageReport;
+  const signatures = report.signatures;
+
+  return typeof signatures === 'object' && signatures !== null ? signatures : null;
+}
+
+interface Drift {
+  readonly symbol: string;
+  readonly expected: readonly string[];
+  readonly actual: readonly string[];
+}
+
+/**
+ * Compare every recorded signature with what the AST now says.  A change is a
+ * behavioural change and must be reviewed, so `--check` fails and `--update`
+ * records the new shape.
+ */
+function checkSignatures(
+  ast: AstIndex,
+  recorded: Readonly<Record<string, readonly string[]>>,
+  symbols: readonly string[],
+): Drift[] {
+  const drift: Drift[] = [];
+
+  for (const symbol of symbols) {
+    const expected = [...(recorded[symbol] ?? [])].sort();
+    const actual = signatureOf(ast, symbol);
+
+    if (expected.join(' | ') !== actual.join(' | ')) {
+      drift.push({ symbol, expected, actual });
+    }
+  }
+
+  return drift;
+}
+
+interface EmittedOperation {
+  readonly arity: number;
+}
+
+function parseEmitted(declaration: string): Map<string, EmittedOperation> {
+  const operations = new Map<string, EmittedOperation>();
+  const interfaceMatch = /interface EmbindModule \{([\s\S]*?)\n\}/.exec(declaration);
+
+  if (!interfaceMatch) {
+    fail('the emitted declaration has no EmbindModule interface');
+  }
+
+  for (const line of (interfaceMatch[1] as string).split('\n')) {
+    const match = /^\s{2}(\w+)\((.*)\): (.+);$/.exec(line.trimEnd());
+
+    if (!match) {
+      continue;
+    }
+
+    const params = (match[2] as string).trim();
+    const arity = params.length === 0
+      ? 0
+      : params.replace(/_\d+: /g, '').split(',').length;
+
+    operations.set(match[1] as string, { arity });
+  }
+
+  return operations;
+}
+
+function verifyEmitted(
+  packageDir: string,
+  model: Model,
+  generated: readonly { method: string; arity: number }[],
+  emittedPath: string,
+): void {
+  const emitted = parseEmitted(readFileSync(emittedPath, 'utf8'));
+  const problems: string[] = [];
+
+  for (const operation of model.operations) {
+    const declared = emitted.get(operation.name);
+
+    if (!declared) {
+      problems.push(`the built module does not export "${operation.name}"`);
+    } else if (declared.arity !== operation.args.length) {
+      problems.push(
+        `"${operation.name}" took ${declared.arity} arguments in the built module, `
+        + `the config declares ${operation.args.length}`,
+      );
+    }
+  }
+
+  for (const operation of generated) {
+    const declared = emitted.get(operation.method);
+
+    if (!declared) {
+      problems.push(`the built module does not export "${operation.method}"`);
+    } else if (declared.arity !== operation.arity) {
+      problems.push(
+        `"${operation.method}" took ${declared.arity} arguments in the built module, `
+        + `the generator declares ${operation.arity}`,
+      );
+    }
+  }
+
+  if (problems.length > 0) {
+    fail(
+      'the built bindings no longer match the config:\n  - '
+      + `${problems.join('\n  - ')}\n`
+      + 'Update the config (and the facade implementation) deliberately.',
+    );
+  }
+
+  log(
+    `verified ${model.operations.length + generated.length} operations against `
+    + `${path.relative(packageDir, emittedPath)}`,
+  );
+}
+
+function render(
+  paths: GeneratedPaths,
+  options: Options,
+  model: Model,
+  release: string,
+  ast: AstIndex,
+): Outputs {
+  const symbols = calledSymbols(model);
+  const recorded = readSignatures(paths.coverage);
+
+  if (!options.update && recorded === null) {
+    fail(
+      `the coverage report is missing at ${path.relative(options.packageDir, paths.coverage)}; `
+      + 'run `mise run generate` to write it.',
+    );
+  }
+
+  const drift = checkSignatures(ast, recorded ?? {}, options.update ? [] : symbols);
+
+  if (drift.length > 0) {
+    fail(
+      `${drift.map((entry) => `${entry.symbol}: recorded as [${entry.expected.join(' | ')}] `
+        + `but now [${entry.actual.join(' | ')}]`).join('\n  - ')}\n`
+      + 'A signature change is a behavioural change: review it, then run '
+      + '`mise run generate` to record it.',
+    );
+  }
+
+  const members = capsMembers(ast);
+  const { operations, rejections } = classifyAll(
+    ast.functions,
+    new Set(model.operations.flatMap((operation) => operation.calls)),
+    createProjectionResolver(ast, model.overrides?.projections ?? {}),
+    model.overrides?.operations ?? {},
+  );
+
+  const signatures: Record<string, readonly string[]> = {};
+
+  for (const symbol of symbols) {
+    signatures[symbol] = signatureOf(ast, symbol);
+  }
+
+  const coverage = {
+    $comment:
+      'Generated coverage report: which upstream declarations this generator binds and '
+      + 'which it refuses, and why, plus the pinned signature of every symbol a bespoke '
+      + 'operation calls.  Diff it on an upstream bump to see what changed.',
+    release,
+    summary: {
+      bespoke: model.operations.length,
+      generated: operations.length,
+      refused: rejections.length,
+    },
+    signatures,
+    generated: [...operations]
+      .map((operation) => ({
+        symbol: operation.symbol,
+        method: operation.method,
+        shape: operation.shape,
+        result: operation.result,
+        capability: members.has(operation.symbol.slice(4)) && operation.shape !== 'pure'
+          ? operation.method
+          : null,
+      }))
+      .sort((a, b) => a.symbol.localeCompare(b.symbol)),
+    refused: [...rejections]
+      .map((rejection) => ({ symbol: rejection.symbol, reason: rejection.reason }))
+      .sort((a, b) => a.symbol.localeCompare(b.symbol)),
+  };
+
+  const methodFiles = emitMethodFiles(model, operations, members);
+  const files: (readonly [string, string])[] = [
+    [paths.results, emitResults(operations)],
+    [paths.operations, emitOperations(operations)],
+    [paths.capabilities, emitCapabilities(operations, members)],
+    [paths.embind, emitEmbind(model, operations)],
+    [paths.contract, emitContract(model, operations)],
+    [paths.coverage, `${JSON.stringify(coverage, null, 2)}\n`],
+    ...methodFiles.map(
+      ([relative, content]) => [path.join(paths.methodsDir, relative), content] as const,
+    ),
+  ];
+
+  return {
+    files,
+    generated: operations.map((operation) => ({
+      method: operation.method,
+      arity: embindArity(operation),
+    })),
+  };
+}
+
+function main(): void {
+  const options = parseArgs(process.argv.slice(2));
+  const packageDir = path.resolve(options.packageDir);
+  const paths = outputPaths(packageDir);
+  const { model, release } = loadConfig(path.resolve(options.config));
+  const ast = loadAst(path.resolve(options.headers));
+  const built = render(paths, options, model, release, ast);
+  const files = built.files;
+
+  /* Method files are regrouped as operations move between families, so a file
+   * that is no longer emitted is stale and must go. */
+  const emittedFiles = new Set(files.map(([file]) => file));
+  const extraMethods = existsSync(paths.methodsDir)
+    ? readdirSync(paths.methodsDir)
+      .filter((name) => name.endsWith('.ts'))
+      .map((name) => path.join(paths.methodsDir, name))
+      .filter((file) => !emittedFiles.has(file))
+    : [];
+
+  if (options.update) {
+    for (const [file, content] of files) {
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, content);
+    }
+
+    for (const file of extraMethods) {
+      unlinkSync(file);
+    }
+
+    log(`wrote ${files.length} generated files`);
+  } else {
+    const stale = files
+      .filter(([file, content]) => !existsSync(file) || readFileSync(file, 'utf8') !== content)
+      .map(([file]) => path.relative(packageDir, file));
+
+    if (stale.length > 0 || extraMethods.length > 0) {
+      const extra = extraMethods.map((file) => path.relative(packageDir, file));
+      fail(
+        `generated files are out of date: ${[...stale, ...extra].join(', ')}\n`
+        + 'Run `mise run generate`, then rebuild.',
+      );
+    }
+
+    log('generated files are current');
+  }
+
+  if (options.emitted) {
+    verifyEmitted(packageDir, model, built.generated, path.resolve(options.emitted));
+  }
+}
+
+main();

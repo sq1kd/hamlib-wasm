@@ -11,7 +11,7 @@
  * The page never requests a port on its own and never stores a SerialPort.
  */
 import { createHamlib, HamlibError } from 'hamlib-web';
-import type { Hamlib, PttState, Rig, RigModel } from 'hamlib-web';
+import type { Hamlib, Rig, RigModel } from 'hamlib-web';
 
 import './style.css';
 
@@ -159,22 +159,25 @@ async function interact(action: () => Promise<void>): Promise<void> {
 }
 
 async function refreshStatus(current: Rig): Promise<void> {
-  const status = await current.getStatus();
+  /* Two generated operations: the library no longer composes them into one
+   * call, so a UI that wants both reads both. */
+  const frequency = await current.getFrequency();
+  const mode = await current.getMode();
 
-  dom.statusFrequency.textContent = String(status.frequency);
-  dom.statusMode.textContent = status.mode;
-  dom.statusPassband.textContent = String(status.passband);
+  dom.statusFrequency.textContent = String(frequency);
+  dom.statusMode.textContent = mode.mode;
+  dom.statusPassband.textContent = String(mode.passband);
 
   if (dom.frequencyInput.value === '') {
-    dom.frequencyInput.value = String(status.frequency);
+    dom.frequencyInput.value = String(frequency);
   }
 
   if (dom.modeInput.value === '') {
-    dom.modeInput.value = status.mode;
+    dom.modeInput.value = mode.mode;
   }
 
   if (dom.passbandInput.value === '') {
-    dom.passbandInput.value = String(status.passband);
+    dom.passbandInput.value = String(mode.passband);
   }
 
   if (current.model.canGetPtt) {
@@ -310,13 +313,16 @@ dom.frequencySet.addEventListener('click', () => {
 dom.modeSet.addEventListener('click', () => {
   const current = rig;
   const mode = dom.modeInput.value.trim();
-  const passband = dom.passbandInput.value === ''
-    ? undefined
-    : Number(dom.passbandInput.value);
 
   if (current) {
     void interact(async () => {
-      await current.setMode(mode, passband);
+      /* An empty box means "the rig's normal passband for this mode", which is
+       * its own generated operation. */
+      const width = dom.passbandInput.value === ''
+        ? await current.passbandNormal(mode)
+        : Number(dom.passbandInput.value);
+
+      await current.setMode(mode, width);
       await refreshStatus(current);
     });
   }
@@ -324,7 +330,9 @@ dom.modeSet.addEventListener('click', () => {
 
 dom.pttSet.addEventListener('click', () => {
   const current = rig;
-  const state = dom.pttSelect.value as PttState;
+  /* `setPtt` takes Hamlib's own state name and the facade reports an unknown
+   * one as an error, so the select value is passed through unchanged. */
+  const state = dom.pttSelect.value;
 
   if (current) {
     void interact(async () => {

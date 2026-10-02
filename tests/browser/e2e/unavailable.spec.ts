@@ -4,6 +4,8 @@
  */
 import { expect, test } from '@playwright/test';
 
+import { UPSTREAM_VERSION } from '../upstream';
+
 test('reports that Web Serial is unavailable and keeps connect disabled', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'serial', {
@@ -20,7 +22,7 @@ test('reports that Web Serial is unavailable and keeps connect disabled', async 
   await expect(status).toContainText('not available');
 
   /* Hamlib still loads and its version is shown. */
-  await expect(page.getByTestId('hamlib-version')).toHaveText(/4\.7\.2/);
+  await expect(page.getByTestId('hamlib-version')).toContainText(UPSTREAM_VERSION);
 
   await expect(page.getByTestId('connect-button')).toBeDisabled();
   await expect(page.getByTestId('refresh-button')).toBeDisabled();

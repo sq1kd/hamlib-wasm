@@ -1,8 +1,10 @@
 /**
  * hamlib-web - Hamlib CAT control in the browser over Web Serial.
  *
- * The package wraps a WebAssembly build of Hamlib 4.7.2 whose serial transport
- * talks to the Web Serial API.  Radio backends are upstream Hamlib code and
+ * The package wraps a WebAssembly build of Hamlib whose serial transport
+ * talks to the Web Serial API.  The pinned release is described by
+ * `packages/hamlib-web/hamlib.config.yaml`, never by a literal here.  Radio
+ * backends are upstream Hamlib code and
  * are unmodified; only the common port layer is replaced.
  *
  * Every operation is asynchronous and is serialized on one internal promise
@@ -15,6 +17,31 @@
 
 import createNativeModule from './native/hamlib-web.mjs';
 import type { MainModule } from './native/hamlib-web.mjs';
+
+import {
+  describeLineSettingsLimitation,
+  findUnusableModel,
+  findVerifiedModel,
+} from './browser-support.js';
+import type { BrowserSupport, DeclaredLineSettings } from './browser-support.js';
+import { FLAG_GATED_OPERATIONS } from './native/generated/operations.js';
+import type {
+  GeneratedPublicOperations,
+  NativeOperations,
+} from './native/generated/operations.js';
+import { GeneratedRigMethods } from './native/generated/methods/index.js';
+
+export {
+  UNUSABLE_MODELS,
+  VERIFIED_MODELS,
+  describeLineSettingsLimitation,
+} from './browser-support.js';
+export type {
+  BrowserSupport,
+  UnusableModel,
+  VerifiedModel,
+} from './browser-support.js';
+export type { RigConfparam } from './native/confparams.js';
 
 type NativeModule = MainModule;
 
@@ -49,14 +76,6 @@ const HAMLIB_ERROR_MESSAGES: Readonly<Record<number, string>> = {
   20: 'rig not powered on',
   21: 'limit exceeded',
   22: 'access denied',
-};
-
-/** PTT states accepted by {@link Rig.setPtt}, mapped to Hamlib's four states. */
-const PTT_STATE_BY_NAME: Readonly<Record<PttState, true>> = {
-  'off': true,
-  'on': true,
-  'on-mic': true,
-  'on-data': true,
 };
 
 /** Stable error codes reported by {@link HamlibError}. */
@@ -137,6 +156,37 @@ export interface RigModel extends RigCapabilities {
   serialRateMin: number;
   /** Highest baud rate the backend advertises. */
   serialRateMax: number;
+  /** Serial data bits the backend declares. */
+  serialDataBits: number;
+  /** Serial stop bits the backend declares. */
+  serialStopBits: number;
+  /** Serial parity the backend declares. */
+  serialParity: SerialParity;
+  /** Serial flow control the backend declares. */
+  serialHandshake: SerialHandshake;
+  /**
+   * `"verified"` when a browser test in this package drives the model through
+   * the Web Serial double; `"candidate"` when only Hamlib's
+   * `RIG_PORT_SERIAL` classification backs it.
+   *
+   * This never claims hardware testing - see {@link VERIFIED_MODELS}.
+   */
+  support: BrowserSupport;
+  /**
+   * Names of the generated operations this model implements, from its
+   * `rig_caps` function pointers.  Absent means the matching generated method
+   * on {@link Rig} is refused with `UNSUPPORTED_OPERATION` before reaching Wasm.
+   */
+  readonly capabilities: readonly string[];
+  /**
+   * Why the browser build cannot drive the model, when it cannot.
+   *
+   * Set when the backend declares line settings Web Serial cannot express - an
+   * open then fails with `-RIG_ECONF` before the port is touched - or when a
+   * recorded reason applies, which may instead fail during the open.  Either
+   * way it fails predictably rather than half working.
+   */
+  limitation?: string;
 }
 
 /**
@@ -147,17 +197,11 @@ export interface RigModel extends RigCapabilities {
  */
 export type RigMode = string;
 
-/** Push-to-talk state, mapping Hamlib's four PTT states. */
-export type PttState = 'off' | 'on' | 'on-mic' | 'on-data';
+/** Serial parity a backend declares. */
+export type SerialParity = 'none' | 'odd' | 'even' | 'mark' | 'space';
 
-/** Frequency, mode and passband read in one operation. */
-export interface RigStatus {
-  /** Frequency in Hz. */
-  frequency: number;
-  mode: RigMode;
-  /** Passband width in Hz. */
-  passband: number;
-}
+/** Serial flow control a backend declares. */
+export type SerialHandshake = 'none' | 'xon-xoff' | 'hardware';
 
 /** Mode and passband as reported by the rig. */
 export interface RigModeState {
@@ -190,20 +234,19 @@ export interface OpenRigOptions {
   baudRate?: number;
 }
 
-/** A connected rig. */
-export interface Rig {
+/**
+ * A connected rig.
+ *
+ * Every CAT operation is a generated method (see
+ * `src/native/generated/methods`); this interface only adds the ownership
+ * facts the generated surface cannot know: which model was opened, whether it
+ * is still open, and how to release it.
+ */
+export interface Rig extends GeneratedPublicOperations {
   /** The model this rig was opened with. */
   readonly model: RigModel;
   /** `false` once {@link Rig.close} has completed. */
   readonly connected: boolean;
-  /** Read frequency, mode and passband in one round trip. */
-  getStatus(): Promise<RigStatus>;
-  getFrequency(): Promise<number>;
-  setFrequency(frequency: number): Promise<void>;
-  getMode(): Promise<RigModeState>;
-  setMode(mode: RigMode, passband?: number): Promise<void>;
-  getPtt(): Promise<PttState>;
-  setPtt(state: PttState): Promise<void>;
   /** Close the rig.  Idempotent; safe to call after a failure. */
   close(): Promise<void>;
 }
@@ -267,10 +310,6 @@ function transportError(cause: unknown, operation: string): HamlibError {
   });
 }
 
-function isPttState(value: string): value is PttState {
-  return Object.hasOwn(PTT_STATE_BY_NAME, value);
-}
-
 /* ------------------------------------------------------------------ */
 /* serialization                                                      */
 /* ------------------------------------------------------------------ */
@@ -331,7 +370,7 @@ interface RigContext {
   forget(rig: RigHandle): void;
 }
 
-class RigHandle implements Rig {
+class RigHandle extends GeneratedRigMethods implements Rig {
   readonly #context: RigContext;
   readonly #path: string;
   readonly #model: RigModel;
@@ -345,6 +384,7 @@ class RigHandle implements Rig {
     model: RigModel,
     handle: number,
   ) {
+    super();
     this.#context = context;
     this.#path = path;
     this.#model = model;
@@ -359,153 +399,30 @@ class RigHandle implements Rig {
     return !this.#closed;
   }
 
-  async getStatus(): Promise<RigStatus> {
+  /* --- plumbing the generated method classes call --------------------- */
+
+  protected native(): NativeOperations {
+    return this.#context.native;
+  }
+
+  protected handle(): number {
+    return this.#handle;
+  }
+
+  protected serialized<T>(operation: string, work: () => Promise<T>): Promise<T> {
+    return this.#call(operation, work);
+  }
+
+  protected available(operation: string): void {
     this.#requireCapability(
-      this.#model.canGetFrequency && this.#model.canGetMode,
-      'getStatus',
-      'read frequency and mode',
+      this.#model.capabilities.includes(operation),
+      operation,
+      `use ${operation}`,
     );
-
-    return this.#call('getStatus', async () => {
-      const result = await this.#context.native.getStatus(this.#handle);
-
-      if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'getStatus');
-      }
-
-      return {
-        frequency: result.frequency,
-        mode: String(result.mode),
-        passband: result.passband,
-      };
-    });
   }
 
-  async getFrequency(): Promise<number> {
-    this.#requireCapability(
-      this.#model.canGetFrequency,
-      'getFrequency',
-      'read the frequency',
-    );
-
-    return this.#call('getFrequency', async () => {
-      const result = await this.#context.native.getFrequency(this.#handle);
-
-      if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'getFrequency');
-      }
-
-      return result.frequency;
-    });
-  }
-
-  async setFrequency(frequency: number): Promise<void> {
-    this.#requireCapability(
-      this.#model.canSetFrequency,
-      'setFrequency',
-      'set the frequency',
-    );
-
-    if (!Number.isFinite(frequency) || frequency <= 0) {
-      throw new HamlibError(
-        `frequency must be a finite positive number, got ${frequency}`,
-        { code: 'INVALID_ARGUMENT', operation: 'setFrequency' },
-      );
-    }
-
-    await this.#call('setFrequency', async () => {
-      const result = await this.#context.native.setFrequency(this.#handle, frequency);
-
-      if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'setFrequency');
-      }
-    });
-  }
-
-  async getMode(): Promise<RigModeState> {
-    this.#requireCapability(this.#model.canGetMode, 'getMode', 'read the mode');
-
-    return this.#call('getMode', async () => {
-      const result = await this.#context.native.getMode(this.#handle);
-
-      if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'getMode');
-      }
-
-      return { mode: String(result.mode), passband: result.passband };
-    });
-  }
-
-  async setMode(mode: RigMode, passband?: number): Promise<void> {
-    this.#requireCapability(this.#model.canSetMode, 'setMode', 'set the mode');
-
-    if (typeof mode !== 'string' || mode.length === 0) {
-      throw new HamlibError('mode must be a non-empty Hamlib mode name', {
-        code: 'INVALID_ARGUMENT',
-        operation: 'setMode',
-      });
-    }
-
-    if (passband !== undefined && (!Number.isFinite(passband) || passband < 0)) {
-      throw new HamlibError(
-        `passband must be a finite non-negative number, got ${passband}`,
-        { code: 'INVALID_ARGUMENT', operation: 'setMode' },
-      );
-    }
-
-    await this.#call('setMode', async () => {
-      const result = await this.#context.native.setMode(
-        this.#handle,
-        mode,
-        passband ?? 0,
-      );
-
-      if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'setMode');
-      }
-    });
-  }
-
-  async getPtt(): Promise<PttState> {
-    this.#requireCapability(this.#model.canGetPtt, 'getPtt', 'read PTT');
-
-    return this.#call('getPtt', async () => {
-      const result = await this.#context.native.getPtt(this.#handle);
-
-      if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'getPtt');
-      }
-
-      const state = String(result.ptt);
-
-      if (!isPttState(state)) {
-        throw new HamlibError(`rig reported an unknown PTT state "${state}"`, {
-          code: 'HAMLIB_ERROR',
-          operation: 'getPtt',
-        });
-      }
-
-      return state;
-    });
-  }
-
-  async setPtt(state: PttState): Promise<void> {
-    this.#requireCapability(this.#model.canSetPtt, 'setPtt', 'set PTT');
-
-    if (!isPttState(state)) {
-      throw new HamlibError(`unknown PTT state "${String(state)}"`, {
-        code: 'INVALID_ARGUMENT',
-        operation: 'setPtt',
-      });
-    }
-
-    await this.#call('setPtt', async () => {
-      const result = await this.#context.native.setPtt(this.#handle, state);
-
-      if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'setPtt');
-      }
-    });
+  protected failed(result: { code: number; error: unknown }, operation: string): Error {
+    return hamlibError(result, operation);
   }
 
   async close(): Promise<void> {
@@ -628,7 +545,65 @@ function assertBaudRate(baudRate: number, model: RigModel): void {
   }
 }
 
-function collectModels(list: NativeModelList): RigModel[] {
+const SERIAL_PARITIES: readonly SerialParity[] = ['none', 'odd', 'even', 'mark', 'space'];
+const SERIAL_HANDSHAKES: readonly SerialHandshake[] = ['none', 'xon-xoff', 'hardware'];
+
+function toParity(value: unknown): SerialParity {
+  const text = String(value);
+  return SERIAL_PARITIES.find((parity) => parity === text) ?? 'none';
+}
+
+function toHandshake(value: unknown): SerialHandshake {
+  const text = String(value);
+  return SERIAL_HANDSHAKES.find((handshake) => handshake === text) ?? 'none';
+}
+
+/**
+ * Work out how far a model is supported here, and why it is not when it is not.
+ *
+ * The line settings come from the backend's own capabilities, so a model that
+ * declares something Web Serial cannot express is labelled before the caller
+ * wastes a user gesture on it.
+ */
+function classifyModel(
+  manufacturer: string,
+  model: string,
+  settings: DeclaredLineSettings,
+): { support: BrowserSupport; limitation?: string } {
+  if (findVerifiedModel(manufacturer, model)) {
+    return { support: 'verified' };
+  }
+
+  const unusable = findUnusableModel(manufacturer, model);
+
+  if (unusable) {
+    return { support: 'candidate', limitation: unusable.reason };
+  }
+
+  const limitation = describeLineSettingsLimitation(settings);
+
+  return limitation ? { support: 'candidate', limitation } : { support: 'candidate' };
+}
+
+/**
+ * The generated operations a model implements.  `rig_caps` describes all but
+ * the flag-gated bespoke ones: a backend that drives push-to-talk over the
+ * serial RTS/DTR line declares no `get_ptt`/`set_ptt` function pointer, so the
+ * catalogue entry carries that capability itself.
+ */
+function collectCapabilities(model: NativeModel, native: NativeModule): string[] {
+  const capabilities = Array.from(native.capabilities(model.id));
+
+  for (const [operation, flag] of FLAG_GATED_OPERATIONS) {
+    if (model[flag]) {
+      capabilities.push(operation);
+    }
+  }
+
+  return capabilities;
+}
+
+function collectModels(list: NativeModelList, native: NativeModule): RigModel[] {
   const models: RigModel[] = [];
 
   try {
@@ -639,14 +614,31 @@ function collectModels(list: NativeModelList): RigModel[] {
         continue;
       }
 
+      const manufacturer = String(model.manufacturer);
+      const name = String(model.model);
+      const settings = {
+        serialDataBits: model.serialDataBits,
+        serialStopBits: model.serialStopBits,
+        serialParity: toParity(model.serialParity),
+        serialHandshake: toHandshake(model.serialHandshake),
+      };
+      const { support, limitation } = classifyModel(manufacturer, name, settings);
+
       models.push({
         id: model.id,
-        manufacturer: String(model.manufacturer),
-        model: String(model.model),
+        manufacturer,
+        model: name,
         backendVersion: String(model.backendVersion),
         status: model.status,
         serialRateMin: model.serialRateMin,
         serialRateMax: model.serialRateMax,
+        serialDataBits: settings.serialDataBits,
+        serialStopBits: settings.serialStopBits,
+        serialParity: settings.serialParity,
+        serialHandshake: settings.serialHandshake,
+        support,
+        ...(limitation === undefined ? {} : { limitation }),
+        capabilities: collectCapabilities(model, native),
         canGetFrequency: model.canGetFrequency,
         canSetFrequency: model.canSetFrequency,
         canGetMode: model.canGetMode,
@@ -716,7 +708,7 @@ class HamlibInstance implements Hamlib, RigContext {
       throw hamlibError(initialization, 'initialize');
     }
 
-    const models = collectModels(await native.listModels());
+    const models = collectModels(await native.listModels(), native);
 
     return new HamlibInstance(native, registry, models, await native.version());
   }
@@ -794,6 +786,10 @@ class HamlibInstance implements Hamlib, RigContext {
       });
     }
 
+    /* Track the path before queueing so dispose() can always see and release
+     * an accepted open, even when disposal races with it. */
+    this.#paths.add(path);
+
     try {
       const rig = await this.queue.enqueue<RigHandle>('open', async () => {
         const registered = await this.#native.registerPort(path, token);
@@ -808,11 +804,23 @@ class HamlibInstance implements Hamlib, RigContext {
           throw hamlibError(opened, 'open');
         }
 
-        return new RigHandle(this, path, model, opened.handle);
+        /* Register inside the queued work: dispose() drains the chain before
+         * it snapshots the live rigs, so this rig is always reachable. */
+        const rig = new RigHandle(this, path, model, opened.handle);
+        this.#rigs.add(rig);
+        return rig;
       });
 
-      this.#paths.add(path);
-      this.#rigs.add(rig);
+      if (this.#disposed) {
+        /* Disposal was accepted while this open waited in the queue.  Hand
+         * the rig over closed instead of letting an open survive it. */
+        await rig.close();
+        throw new HamlibError('Hamlib instance has been disposed', {
+          code: 'DISPOSED',
+          operation: 'open',
+        });
+      }
+
       return rig;
     } catch (error) {
       /* Opening failed: the logical path must not stay registered.  The
@@ -837,6 +845,10 @@ class HamlibInstance implements Hamlib, RigContext {
     this.queue.close();
 
     const failures: unknown[] = [];
+
+    /* Every accepted open runs on the shared chain.  A barrier here waits for
+     * them, so the snapshot below covers every rig and port they created. */
+    await this.queue.drain(() => {});
 
     for (const rig of [...this.#rigs]) {
       try {
@@ -867,6 +879,8 @@ class HamlibInstance implements Hamlib, RigContext {
       if (result.code !== RIG_OK) {
         throw hamlibError(result, 'dispose');
       }
+
+      this.#paths.delete(path);
     });
   }
 

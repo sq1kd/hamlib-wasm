@@ -1,152 +1,26 @@
---- a/src/iofunc.c
-+++ b/src/iofunc.c
-@@ -46,6 +46,9 @@
- #include "misc.h"
+--- a/src/rig.c
++++ b/src/rig.c
+@@ -1609,6 +1609,15 @@
+     }
  
- #include "serial.h"
-+#ifdef __EMSCRIPTEN__
-+#  include "web_serial.h"
-+#endif
- #include "parallel.h"
- #include "usb_port.h"
- #include "network.h"
-@@ -810,6 +813,20 @@
- {
-     int fd = direct ? p->fd : p->fd_sync_read;
- 
+     // Some models don't support CW so don't need morse handler
 +#ifdef __EMSCRIPTEN__
 +
 +    /*
-+     * Web serial transport: the browser build replaces src/serial.c, so
-+     * direct reads on a serial port are served from the JavaScript RX queue.
-+     * webserial_read() also applies the 7 data bit masking below.
++     * The browser build has no pthreads, so the Morse worker cannot start.
++     * Only that worker is skipped: the rest of rig_open(), including the
++     * retry restore, the port state copies and the initial state read, still
++     * runs.
 +     */
-+    if (direct && p->type.rig == RIG_PORT_SERIAL)
-+    {
-+        return webserial_read(p, buf, count);
-+    }
-+
-+#endif
-+
-     if (p->type.rig == RIG_PORT_SERIAL && p->parm.serial.data_bits == 7)
++#else
+     if (rig->caps->send_morse)
      {
-         unsigned char *pbuf = buf;
-@@ -833,8 +850,48 @@
- }
- 
- //! @cond Doxygen_Suppress
-+#ifdef __EMSCRIPTEN__
-+
-+/*
-+ * Web serial transport: writes and readiness checks on a serial port go to
-+ * the browser transport (Web Serial write()/waitReadable()) instead of
-+ * write()/select(), which have no descriptor to work on.
-+ */
-+static ssize_t port_write(hamlib_port_t *p, const void *buf, size_t count)
-+{
-+    if (p->type.rig == RIG_PORT_SERIAL)
-+    {
-+        return webserial_write(p, buf, count);
-+    }
-+
-+    return write(p->fd, buf, count);
-+}
-+
-+static int port_select(hamlib_port_t *p, int n, fd_set *readfds,
-+                       fd_set *writefds, fd_set *exceptfds,
-+                       struct timeval *timeout, int direct)
-+{
-+    /*
-+     * select() always clears writefds/exceptfds and rewrites readfds.  The
-+     * browser transport has no exceptional conditions, so leaving those bits
-+     * set would make port_wait_for_data_direct() report a spurious EIO.
-+     */
-+    if (exceptfds) { FD_ZERO(exceptfds); }
-+
-+    if (writefds) { FD_ZERO(writefds); }
-+
-+    if (direct && p->type.rig == RIG_PORT_SERIAL)
-+    {
-+        return webserial_select(p, readfds, timeout);
-+    }
-+
-+    return select(n, readfds, writefds, exceptfds, timeout);
-+}
-+
-+#else
- #define port_write(p,b,c) write((p)->fd,(b),(c))
- #define port_select(p,n,r,w,e,t,d) select((n),(r),(w),(e),(t))
+         status = morse_data_handler_start(rig);
+@@ -1621,6 +1630,7 @@
+             RETURNFUNC2(status);
+         }
+     }
 +#endif
- //! @endcond
  
- static int port_read_sync_data_error_code(hamlib_port_t *p, int fd, int direct)
---- a/src/sleep.c
-+++ b/src/sleep.c
-@@ -40,6 +40,10 @@
- #include <pthread.h>
- #include "sleep.h"
- 
-+#ifdef __EMSCRIPTEN__
-+#  include <emscripten.h>
-+#endif
-+
- #ifdef  __cplusplus
- extern "C" {
- #endif
-@@ -48,6 +52,20 @@
- 
- int hl_usleep(rig_useconds_t usec)
- {
-+#ifdef __EMSCRIPTEN__
-+
-+    /*
-+     * Asyncify: hand control back to the browser event loop so pending Web
-+     * Serial promises can settle while the requested delay elapses.  The
-+     * native path below would block the event loop for the whole delay.
-+     */
-+    if (usec > 0)
-+    {
-+        emscripten_sleep((unsigned int)((usec + 999) / 1000));
-+    }
-+
-+    return 0;
-+#else
-     double sleep_time = usec / 1e6;
-     struct timespec tv1;
-     double delay = sleep_time;
-@@ -104,6 +122,7 @@
- 
- #endif
-     return 0;
-+#endif
- }
- 
- #if 0
-@@ -137,7 +156,26 @@
- #endif
- 
- 
--#ifdef HAVE_NANOSLEEP
-+#ifdef __EMSCRIPTEN__
-+
-+#ifndef HAVE_SLEEP
-+/**
-+ * \brief sleep
-+ * \param secs is seconds to sleep
-+ * Asyncify-safe replacement: the delay must yield to the browser event loop.
-+ */
-+unsigned int sleep(unsigned int secs)
-+{
-+    if (secs > 0)
-+    {
-+        emscripten_sleep(secs * 1000u);
-+    }
-+
-+    return 0;
-+}
-+#endif
-+
-+#elif defined(HAVE_NANOSLEEP)
- #ifndef HAVE_SLEEP
- /**
-  * \brief sleep
+     if (rs->auto_disable_screensaver)
+     {

@@ -6,6 +6,7 @@
 import { expect, test } from '@playwright/test';
 
 import { installFakeSerial, setEmulatorSilent } from '../fixtures';
+import { UPSTREAM_VERSION } from '../upstream';
 import { connectTs480 } from './helpers';
 
 test.beforeEach(async ({ page }) => {
@@ -13,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page.getByTestId('hamlib-version')).toHaveText(/4\.7\.2/);
+  await expect(page.getByTestId('hamlib-version')).toContainText(UPSTREAM_VERSION);
 });
 
 test('reports a Hamlib timeout and recovers on the next refresh', async ({ page }) => {
@@ -39,8 +40,8 @@ test('reports a Hamlib timeout and recovers on the next refresh', async ({ page 
   const detail = page.getByTestId('error-detail');
 
   await expect(message).toContainText('communication timed out', { timeout: 30_000 });
-  await expect(message).toContainText('getStatus');
-  await expect(detail).toContainText('operation: getStatus');
+  await expect(message).toContainText('getFrequency');
+  await expect(detail).toContainText('operation: getFrequency');
   await expect(detail).toContainText('code: HAMLIB_ERROR');
   /* -RIG_ETIMEOUT */
   await expect(detail).toContainText('hamlib: -5 (communication timed out)');

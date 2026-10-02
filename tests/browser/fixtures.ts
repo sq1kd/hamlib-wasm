@@ -1,20 +1,34 @@
 /**
  * Shared Playwright helpers.
  *
- * The Web Serial double lives in ./fixtures/fake-serial.js and is injected as
- * text; these helpers give the specs a typed view of its control surface.
+ * The fixtures live in ./fixtures/*.ts and are compiled to plain scripts in
+ * ./fixtures/generated/ by the fixtures' own tsconfig.json, which the
+ * Playwright globalSetup (./fixtures/compile.ts) runs before any spec loads.
+ * The compiled text is what gets injected, so nothing transpiles it in the page
+ * and no bundler helper can leak into it.
+ *
+ * These helpers give the specs a typed view of the double's control surface.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 
-const FAKE_SERIAL_SOURCE = readFileSync(
-  fileURLToPath(new URL('./fixtures/fake-serial.js', import.meta.url)),
+const RIGS_SOURCE = readFileSync(
+  fileURLToPath(new URL('./fixtures/generated/rigs.js', import.meta.url)),
   'utf8',
 );
 
+const TRANSPORT_SOURCE = readFileSync(
+  fileURLToPath(new URL('./fixtures/generated/fake-serial.js', import.meta.url)),
+  'utf8',
+);
+
+/* The rig registry has to be installed before the transport reads it, and both
+ * are injected as text so nothing transpiles them. */
+const FAKE_SERIAL_SOURCE = `${RIGS_SOURCE}\n${TRANSPORT_SOURCE}`;
+
 const TEST_HELPERS_SOURCE = readFileSync(
-  fileURLToPath(new URL('./fixtures/helpers.js', import.meta.url)),
+  fileURLToPath(new URL('./fixtures/generated/helpers.js', import.meta.url)),
   'utf8',
 );
 
@@ -43,6 +57,8 @@ export interface FakeRigState {
 export interface FakeSerialControl {
   /** The single fake device the fixture exposes. */
   port: SerialPort;
+  /** The protocol currently driving the emulator. */
+  rigName: string;
   openedOptions: FakeSerialOptions | null;
   openCount: number;
   closeCount: number;
@@ -53,12 +69,17 @@ export interface FakeSerialControl {
   outputSignals: Record<string, boolean> | null;
   commands: string[];
   state: FakeRigState;
+  /** Switch the emulated radio; only valid while the port is closed. */
+  useRig(name: FakeRigName): void;
   removeWebSerial(): void;
   /** Inject bytes into the readable stream without a write. */
   pushRaw(text: string): void;
   /** Fail the readable stream, as a device unplug would. */
   errorReadable(name: string): void;
 }
+
+/** The emulated radios the fixture can drive. */
+export type FakeRigName = 'kenwood-ts480' | 'icom-ic703' | 'yaesu-ft757gx2';
 
 declare global {
   interface Window {
@@ -67,12 +88,14 @@ declare global {
 }
 
 export interface FakeSerialSnapshot {
+  rigName: string;
   openedOptions: FakeSerialOptions | null;
   openCount: number;
   closeCount: number;
   isOpen: boolean;
   closedWithLockedStreams: boolean;
   setSignalsCalls: number;
+  outputSignals: Record<string, boolean> | null;
   commands: string[];
   state: FakeRigState;
 }
@@ -101,6 +124,19 @@ export async function removeWebSerial(page: Page): Promise<void> {
 
     window.__fakeSerial.removeWebSerial();
   });
+}
+
+/** Select the emulated radio the fixture should answer as. */
+export async function useRig(page: Page, name: FakeRigName): Promise<void> {
+  await page.evaluate((rigName: string) => {
+    if (!window.__fakeSerial) {
+      throw new Error('the fake Web Serial fixture is not installed');
+    }
+
+    window.__fakeSerial.useRig(rigName as Parameters<
+      typeof window.__fakeSerial.useRig
+    >[0]);
+  }, name);
 }
 
 /** Make the emulator stop answering, so Hamlib runs into its timeout. */
@@ -135,12 +171,14 @@ export async function readFakeSerial(page: Page): Promise<FakeSerialSnapshot> {
     }
 
     return {
+      rigName: control.rigName,
       openedOptions: control.openedOptions,
       openCount: control.openCount,
       closeCount: control.closeCount,
       isOpen: control.isOpen,
       closedWithLockedStreams: control.closedWithLockedStreams,
       setSignalsCalls: control.setSignalsCalls,
+      outputSignals: control.outputSignals,
       commands: [...control.commands],
       state: {
         frequency: control.state.frequency,

@@ -1,0 +1,40 @@
+{
+  "catalogue": {
+    "count": 278,
+    "sha256": "1462ba79789daaf53f6a015c37525bee4d70b19c0b35087ef1e84488b153c473"
+  },
+  "ts480": {
+    "id": 2028,
+    "manufacturer": "Kenwood",
+    "model": "TS-480",
+    "backendVersion": "20250515.3",
+    "status": 3,
+    "serialRateMin": 4800,
+    "serialRateMax": 115200,
+    "canGetFrequency": true,
+    "canSetFrequency": true,
+    "canGetMode": true,
+    "canSetMode": true,
+    "canGetPtt": true,
+    "canSetPtt": true,
+    "wire": [
+      "PS",
+      "ID",
+      "PS",
+      "IF",
+      "AI",
+      "FA",
+      "MD",
+      "FW",
+      "FA00007074000",
+      "ID",
+      "MD3",
+      "ID",
+      "FW0500",
+      "ID",
+      "TX",
+      "ID",
+      "RX"
+    ]
+  }
+}

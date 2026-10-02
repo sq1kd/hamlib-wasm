@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "none",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    /* The fixtures are plain DOM code, injected into a page.  Nothing may leak
+     * globals in from an @types package (notably @types/node's ReadableStream),
+     * so no types are pulled in automatically. */
+    "types": [],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    /* `strict` is here for the type checking.  The generated scripts are
+     * injected into the page as text and used to run as sloppy-mode scripts, so
+     * a leading "use strict" would change what the page executes. */
+    "alwaysStrict": false,
+    "noEmitOnError": true,
+    "outDir": "generated"
+  },
+  "include": ["rigs.ts", "fake-serial.ts", "helpers.ts", "fixtures-globals.d.ts"]
+}
