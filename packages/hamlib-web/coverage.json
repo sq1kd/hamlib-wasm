@@ -3,8 +3,8 @@
   "release": "4.7.2",
   "summary": {
     "bespoke": 19,
-    "generated": 110,
-    "refused": 65
+    "generated": 89,
+    "refused": 87
   },
   "signatures": {
     "rig_cleanup": [
@@ -36,9 +36,6 @@
     ],
     "rig_get_rig_info": [
       "int rig_get_rig_info(RIG *, char *, int)"
-    ],
-    "rig_get_vfo_list": [
-      "int rig_get_vfo_list(RIG *, char *, int)"
     ],
     "rig_init": [
       "RIG * rig_init(rig_model_t)"
@@ -79,20 +76,6 @@
   },
   "generated": [
     {
-      "symbol": "rig_confparam_lookup",
-      "method": "confparamLookup",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_copyright",
-      "method": "copyright",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
       "symbol": "rig_ext_lookup",
       "method": "extLookup",
       "shape": "pure",
@@ -102,13 +85,6 @@
     {
       "symbol": "rig_ext_lookup_tok",
       "method": "extLookupTok",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_ext_token_lookup",
-      "method": "extTokenLookup",
       "shape": "pure",
       "result": "",
       "capability": null
@@ -233,13 +209,6 @@
       "capability": "getPowerstat"
     },
     {
-      "symbol": "rig_get_resolution",
-      "method": "getResolution",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
       "symbol": "rig_get_rit",
       "method": "getRit",
       "shape": "get",
@@ -287,13 +256,6 @@
       "shape": "get",
       "result": "GetSplitVfoResult",
       "capability": "getSplitVfo"
-    },
-    {
-      "symbol": "rig_get_trn",
-      "method": "getTrn",
-      "shape": "get",
-      "result": "NumberResult",
-      "capability": "getTrn"
     },
     {
       "symbol": "rig_get_ts",
@@ -394,43 +356,8 @@
       "capability": null
     },
     {
-      "symbol": "rig_is_model",
-      "method": "isModel",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_levelagcstr",
-      "method": "levelAgcStr",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_levelagcvalue",
-      "method": "levelAgcValue",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_license",
-      "method": "license",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
       "symbol": "rig_lookup_mem_caps",
       "method": "lookupMemCaps",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_mem_count",
-      "method": "memCount",
       "shape": "pure",
       "result": "",
       "capability": null
@@ -452,13 +379,6 @@
     {
       "symbol": "rig_parse_mode",
       "method": "parseMode",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_parse_mtype",
-      "method": "parseMType",
       "shape": "pure",
       "result": "",
       "capability": null
@@ -695,13 +615,6 @@
       "capability": "setSplitVfo"
     },
     {
-      "symbol": "rig_set_trn",
-      "method": "setTrn",
-      "shape": "set",
-      "result": "CodeResult",
-      "capability": "setTrn"
-    },
-    {
       "symbol": "rig_set_ts",
       "method": "setTs",
       "shape": "set",
@@ -744,43 +657,8 @@
       "capability": null
     },
     {
-      "symbol": "rig_stragclevel",
-      "method": "strAgcLevel",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_strcommstatus",
-      "method": "strCommStatus",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_strfunc",
-      "method": "strFunc",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
       "symbol": "rig_strlevel",
       "method": "strLevel",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_strmtype",
-      "method": "strMType",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_strparm",
-      "method": "strParm",
       "shape": "pure",
       "result": "",
       "capability": null
@@ -800,20 +678,6 @@
       "capability": null
     },
     {
-      "symbol": "rig_strscan",
-      "method": "strScan",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_strspectrummode",
-      "method": "strSpectrumMode",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
       "symbol": "rig_strstatus",
       "method": "strStatus",
       "shape": "pure",
@@ -823,20 +687,6 @@
     {
       "symbol": "rig_strvfo",
       "method": "strVfo",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_strvfop",
-      "method": "strVfoOp",
-      "shape": "pure",
-      "result": "",
-      "capability": null
-    },
-    {
-      "symbol": "rig_valueagclevel",
-      "method": "valueAgcLevel",
       "shape": "pure",
       "result": "",
       "capability": null
@@ -867,8 +717,16 @@
       "reason": "excluded by policy (threads, transport or unsafe surface)"
     },
     {
+      "symbol": "rig_confparam_lookup",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
       "symbol": "rig_cookie",
       "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_copyright",
+      "reason": "excluded: not called by the upstream rigctl reference client"
     },
     {
       "symbol": "rig_data_pointer",
@@ -881,6 +739,10 @@
     {
       "symbol": "rig_debug",
       "reason": "variadic"
+    },
+    {
+      "symbol": "rig_ext_token_lookup",
+      "reason": "excluded: not called by the upstream rigctl reference client"
     },
     {
       "symbol": "rig_flush",
@@ -951,6 +813,34 @@
       "reason": "excluded: caller-owned array whose length the signature does not give"
     },
     {
+      "symbol": "rig_get_resolution",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_get_trn",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_get_vfo_list",
+      "reason": "output of type char * is not mappable"
+    },
+    {
+      "symbol": "rig_is_model",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_levelagcstr",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_levelagcvalue",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_license",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
       "symbol": "rig_list_foreach_model",
       "reason": "excluded: machine-local, raw-bus or credential surface"
     },
@@ -967,6 +857,10 @@
       "reason": "excluded: machine-local, raw-bus or credential surface"
     },
     {
+      "symbol": "rig_mem_count",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
       "symbol": "rig_mW2power",
       "reason": "excluded by policy (threads, transport or unsafe surface)"
     },
@@ -977,6 +871,10 @@
     {
       "symbol": "rig_no_restore_ai",
       "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_parse_mtype",
+      "reason": "excluded: not called by the upstream rigctl reference client"
     },
     {
       "symbol": "rig_password",
@@ -1083,6 +981,10 @@
       "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
     },
     {
+      "symbol": "rig_set_trn",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
       "symbol": "rig_set_vfo_callback",
       "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
     },
@@ -1099,12 +1001,48 @@
       "reason": "excluded by policy (threads, transport or unsafe surface)"
     },
     {
+      "symbol": "rig_stragclevel",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_strcommstatus",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_strfunc",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_strmtype",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_strparm",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
       "symbol": "rig_strrmodes",
       "reason": "does not take exactly one RIG * handle"
     },
     {
+      "symbol": "rig_strscan",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_strspectrummode",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
+      "symbol": "rig_strvfop",
+      "reason": "excluded: not called by the upstream rigctl reference client"
+    },
+    {
       "symbol": "rig_unregister",
       "reason": "excluded: machine-local, raw-bus or credential surface"
+    },
+    {
+      "symbol": "rig_valueagclevel",
+      "reason": "excluded: not called by the upstream rigctl reference client"
     },
     {
       "symbol": "rig_wait_morse",

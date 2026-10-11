@@ -52,30 +52,23 @@ test('exposes the generated capability matrix and drives a generated operation',
 
     /* Pure generated operations read rig_caps only - no CAT traffic - so they
      * exercise the generated facade without depending on the emulator. */
-    const resolution = await rig.getResolution('USB');
     const wide = await rig.passbandWide('USB');
-    const license = await rig.license();
-    const isTs480 = await rig.isModel(ts480.id);
-    const confparam = await rig.confparamLookup('rig_pathname');
-    const memoryCount = await rig.memCount();
+    const narrow = await rig.passbandNarrow('USB');
 
     /* The str/parse codec crosses the token as a number, so a round trip
      * returns the name it parsed instead of echoing a name it was given. */
     const codec = {
-      roundTrip: await rig.strVfo(await rig.parseVfo('VFOA')),
+      vfo: await rig.strVfo(await rig.parseVfo('VFOA')),
+      mode: await rig.strRmode(await rig.parseMode('USB')),
       hasAgc: await rig.hasGetLevel('AGC'),
-      agcOff: await rig.valueAgcLevel(0),
-      miss: await rig.extLookup('not_a_real_ext_param'),
     };
 
-    /* The table walkers return the whole `confparams` projection; the ext
-     * lookups turn a name back into a token and a token back into metadata. */
-    const tokens = await rig.tokenForeach();
-    const extLevels = await rig.extLevelForeach();
-    const firstName = extLevels.length > 0 ? extLevels[0]?.name ?? '' : '';
-    const extToken = firstName ? await rig.extTokenLookup(firstName) : 0;
-    const extLookupTok = firstName ? await rig.extLookupTok(extToken) : null;
-    const vfoList = await rig.getVfoList();
+    /* `rig_ext_lookup` crosses as a projected `RigConfparam`: a name that is
+     * not an extension parameter comes back as an empty projection rather than
+     * a raw Embind value object. */
+    const miss = await rig.extLookup('not_a_real_ext_param');
+    const missTok = await rig.extLookupTok(0);
+    const setting = await rig.idxToSetting(await rig.settingToIdx(0));
 
     /* A generated getter the TS-480 backend does not implement is gated by the
      * capability matrix, so it never reaches Wasm. */
@@ -86,19 +79,12 @@ test('exposes the generated capability matrix and drives a generated operation',
 
     return {
       capabilities,
-      resolution,
       wide,
-      license,
-      isTs480,
-      confparam,
-      memoryCount,
+      narrow,
       codec,
-      tokens,
-      extLevels,
-      extToken,
-      extLookupTok,
-      vfoList,
-      firstName,
+      miss,
+      missTok,
+      setting,
       gated,
     };
   }));
@@ -143,37 +129,23 @@ test('exposes the generated capability matrix and drives a generated operation',
     expect(result.capabilities).not.toContain(absent);
   }
 
-  expect(Number.isFinite(result.resolution)).toBe(true);
-  expect(result.resolution).toBeGreaterThanOrEqual(0);
+  /* Two pure helpers that read `rig_caps` and answer with a width; the values
+   * themselves are a backend fact, so only the shape is asserted. */
   expect(Number.isFinite(result.wide)).toBe(true);
+  expect(Number.isFinite(result.narrow)).toBe(true);
+  expect(result.wide).toBeGreaterThanOrEqual(0);
+  expect(result.narrow).toBeGreaterThanOrEqual(0);
 
-  /* Pure helpers added with the numeric fallbacks: a string-returning helper
-   * and an int predicate that is not an error code. */
-  expect(typeof result.license).toBe('string');
-  expect(result.license.length).toBeGreaterThan(0);
-  expect(result.isTs480).toBe(1);
-
-  /* A struct projection crosses as a value object; a memory count is a pure
-   * int that is not an error code. */
-  expect(typeof result.confparam.name).toBe('string');
-  expect(typeof result.memoryCount).toBe('number');
-
-  /* The token-side codec and the mask/lookup helpers. */
-  expect(result.codec.roundTrip).toBe('VFOA');
+  /* The token-side codec and the mask helpers. */
+  expect(result.codec.vfo).toBe('VFOA');
+  expect(result.codec.mode).toBe('USB');
   expect(typeof result.codec.hasAgc).toBe('number');
-  expect(result.codec.agcOff).toBe(0);
-  expect(result.codec.miss.name).toBe('');
 
-  /* A table walker returns projected confparams; the ext lookups round trip
-   * the name through the token. */
-  expect(result.tokens.map((entry) => entry.name)).toContain('rig_pathname');
-  expect(Array.isArray(result.extLevels)).toBe(true);
-  if (result.firstName) {
-    expect(result.extToken).toBeGreaterThan(0);
-    expect(result.extLookupTok?.name).toBe(result.firstName);
-  }
-
-  expect(typeof result.vfoList).toBe('string');
+  /* A struct projection crosses as a value object with plain string fields. */
+  expect(typeof result.miss.name).toBe('string');
+  expect(result.miss.name).toBe('');
+  expect(result.missTok.name).toBe('');
+  expect(typeof result.setting).toBe('number');
 
   /* `get_ant` is one of the functions the TS-480 declares. */
   expect(result.capabilities).toContain('getAnt');

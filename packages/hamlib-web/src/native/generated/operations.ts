@@ -34,7 +34,7 @@ export type Asyncify<T> = T | Promise<T>;
  * The low-level operation surface of the Wasm module, derived from the
  * allowlist and the upstream AST rather than from the emitted declaration.
  *
- * `src/index.ts` asserts that the built module satisfies this contract, so a
+ * `src/native.ts` asserts that the built module satisfies this contract, so a
  * binding that drifts from the allowlist fails the typecheck.
  */
 export interface NativeOperations {
@@ -51,6 +51,8 @@ export interface NativeOperations {
   /** Bound to the bespoke facade body in native/facade.cpp. */
   openRig(modelId: number, logicalPath: string, baudRate: number): Asyncify<OpenResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
+  probeBaudRate(modelId: number, logicalPath: string, baudRate: number): Asyncify<CodeResult>;
+  /** Bound to the bespoke facade body in native/facade.cpp. */
   closeRig(handle: number): Asyncify<CodeResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
   getPtt(handle: number): Asyncify<PttResult>;
@@ -58,8 +60,6 @@ export interface NativeOperations {
   setPtt(handle: number, state: string): Asyncify<PttResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
   getRigInfo(handle: number): Asyncify<TextResult>;
-  /** Bound to the bespoke facade body in native/facade.cpp. */
-  getVfoList(handle: number): Asyncify<TextResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
   getExtLevel(handle: number, token: number): Asyncify<NumberResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
@@ -144,8 +144,6 @@ export interface NativeOperations {
   setTs(handle: number, arg0: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getTs(handle: number): Asyncify<NumberResult>;
-  /** Pure computation: no transport access. */
-  getResolution(handle: number, arg0: string): Asyncify<number>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setLevel(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -168,10 +166,6 @@ export interface NativeOperations {
   extLookup(handle: number, arg0: string): Asyncify<RigConfparams>;
   /** Pure computation: no transport access. */
   extLookupTok(handle: number, arg0: number): Asyncify<RigConfparams>;
-  /** Pure computation: no transport access. */
-  extTokenLookup(handle: number, arg0: string): Asyncify<number>;
-  /** Pure computation: no transport access. */
-  confparamLookup(handle: number, arg0: string): Asyncify<RigConfparams>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setAnt(handle: number, arg0: number, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -201,23 +195,17 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   vfoOp(handle: number, arg0: string): Asyncify<CodeResult>;
   /** Pure computation: no transport access. */
-  hasVfoOp(handle: number, arg0: string): Asyncify<string>;
+  hasVfoOp(handle: number, arg0: string): Asyncify<number>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   scan(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
   /** Pure computation: no transport access. */
-  hasScan(handle: number, arg0: string): Asyncify<string>;
+  hasScan(handle: number, arg0: string): Asyncify<number>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setChannel(handle: number, arg0: RigChannel): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getChannel(handle: number, arg0: number): Asyncify<GetChannelResult>;
   /** Pure computation: no transport access. */
   lookupMemCaps(handle: number, arg0: number): Asyncify<RigChanList>;
-  /** Pure computation: no transport access. */
-  memCount(handle: number): Asyncify<number>;
-  /** Can suspend: the result is a promise when the transport has to wait. */
-  setTrn(handle: number, arg0: number): Asyncify<CodeResult>;
-  /** Can suspend: the result is a promise when the transport has to wait. */
-  getTrn(handle: number): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setTwiddle(handle: number, arg0: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -241,33 +229,11 @@ export interface NativeOperations {
   /** Pure computation: no transport access. */
   strVfo(arg0: number): Asyncify<string>;
   /** Pure computation: no transport access. */
-  strFunc(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
   strLevel(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
-  strParm(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
-  strAgcLevel(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
-  levelAgcStr(arg0: string): Asyncify<number>;
-  /** Pure computation: no transport access. */
-  levelAgcValue(arg0: number): Asyncify<number>;
-  /** Pure computation: no transport access. */
-  valueAgcLevel(arg0: number): Asyncify<number>;
   /** Pure computation: no transport access. */
   strPtrShift(arg0: number): Asyncify<string>;
   /** Pure computation: no transport access. */
-  strVfoOp(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
-  strScan(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
   strStatus(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
-  strMType(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
-  strSpectrumMode(arg0: number): Asyncify<string>;
-  /** Pure computation: no transport access. */
-  strCommStatus(arg0: number): Asyncify<string>;
   /** Pure computation: no transport access. */
   parseMode(arg0: string): Asyncify<number>;
   /** Pure computation: no transport access. */
@@ -284,18 +250,10 @@ export interface NativeOperations {
   parseScan(arg0: string): Asyncify<number>;
   /** Pure computation: no transport access. */
   parseRptrShift(arg0: string): Asyncify<number>;
-  /** Pure computation: no transport access. */
-  parseMType(arg0: string): Asyncify<number>;
-  /** Pure computation: no transport access. */
-  license(): Asyncify<string>;
-  /** Pure computation: no transport access. */
-  copyright(): Asyncify<string>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setClock(handle: number, arg0: number, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number, arg6: number, arg7: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getClock(handle: number): Asyncify<GetClockResult>;
-  /** Pure computation: no transport access. */
-  isModel(handle: number, arg0: number): Asyncify<number>;
 
   /**
    * The generated-op names a rig model supports, from `struct rig_caps`.
@@ -322,7 +280,7 @@ type Expect<T extends true> = T;
 export type RigFlag = 'canGetFrequency' | 'canSetFrequency' | 'canGetMode' | 'canSetMode' | 'canGetPtt' | 'canSetPtt';
 
 /**
- * Operations gated on one of those flags, so `src/index.ts` can fold them
+ * Operations gated on one of those flags, so `src/native.ts` can fold them
  * into the capability list it builds for a model.
  */
 export const FLAG_GATED_OPERATIONS: readonly (readonly [string, RigFlag])[] = [
@@ -333,7 +291,7 @@ export const FLAG_GATED_OPERATIONS: readonly (readonly [string, RigFlag])[] = [
 /**
  * Every generated operation as a method.  `GeneratedRigMethods`
  * (`methods/index.ts`) implements it with a real method per operation, and
- * `src/index.ts` extends that class, so a new operation is callable without
+ * `src/native.ts` extends that class, so a new operation is callable without
  * any hand-written method and without a string-keyed dispatcher.
  */
 export interface GeneratedPublicOperations {
@@ -371,7 +329,6 @@ export interface GeneratedPublicOperations {
   getXit(): Promise<number>;
   setTs(ts: number): Promise<void>;
   getTs(): Promise<number>;
-  getResolution(mode: string): Promise<number>;
   setLevel(level: string, val: number): Promise<void>;
   getLevel(level: string): Promise<number>;
   setParm(parm: string, val: number): Promise<void>;
@@ -381,10 +338,8 @@ export interface GeneratedPublicOperations {
   reset(reset: number): Promise<void>;
   setExtFunc(token: number, status: number): Promise<void>;
   getExtFunc(token: number): Promise<number>;
-  extLookup(name: string): Promise<RigConfparams>;
-  extLookupTok(token: number): Promise<RigConfparams>;
-  extTokenLookup(name: string): Promise<number>;
-  confparamLookup(name: string): Promise<RigConfparams>;
+  extLookup(name: string): Promise<RigConfparam>;
+  extLookupTok(token: number): Promise<RigConfparam>;
   setAnt(ant: number, option: number): Promise<void>;
   getAnt(ant: number): Promise<{ option: number; antCurr: number; antTx: number; antRx: number }>;
   hasGetLevel(level: string): Promise<number>;
@@ -399,15 +354,12 @@ export interface GeneratedPublicOperations {
   setMem(ch: number): Promise<void>;
   getMem(): Promise<number>;
   vfoOp(op: string): Promise<void>;
-  hasVfoOp(op: string): Promise<string>;
+  hasVfoOp(op: string): Promise<number>;
   scan(scan: string, ch: number): Promise<void>;
-  hasScan(scan: string): Promise<string>;
+  hasScan(scan: string): Promise<number>;
   setChannel(chan: RigChannel): Promise<void>;
   getChannel(readOnly: number): Promise<{ channelNum: number; bankNum: number; vfo: string; ant: number; freq: number; mode: string; width: number; txFreq: number; txMode: string; txWidth: number; split: number; txVfo: string; rptrShift: string; rptrOffs: number; tuningStep: number; rit: number; xit: number; funcs: number; ctcssTone: number; ctcssSql: number; dcsCode: number; dcsSql: number; scanGroup: number; flags: number; channelDesc: string; tag: string }>;
   lookupMemCaps(ch: number): Promise<RigChanList>;
-  memCount(): Promise<number>;
-  setTrn(trn: number): Promise<void>;
-  getTrn(): Promise<number>;
   setTwiddle(seconds: number): Promise<void>;
   getTwiddle(): Promise<number>;
   setUplink(val: number): Promise<void>;
@@ -419,20 +371,9 @@ export interface GeneratedPublicOperations {
   idxToSetting(i: number): Promise<number>;
   strRmode(mode: number): Promise<string>;
   strVfo(vfo: number): Promise<string>;
-  strFunc(func: number): Promise<string>;
   strLevel(level: number): Promise<string>;
-  strParm(parm: number): Promise<string>;
-  strAgcLevel(level: number): Promise<string>;
-  levelAgcStr(agcString: string): Promise<number>;
-  levelAgcValue(agcValue: number): Promise<number>;
-  valueAgcLevel(agcLevel: number): Promise<number>;
   strPtrShift(shift: number): Promise<string>;
-  strVfoOp(op: number): Promise<string>;
-  strScan(scan: number): Promise<string>;
   strStatus(status: number): Promise<string>;
-  strMType(mtype: number): Promise<string>;
-  strSpectrumMode(mode: number): Promise<string>;
-  strCommStatus(vfo: number): Promise<string>;
   parseMode(s: string): Promise<number>;
   parseVfo(s: string): Promise<number>;
   parseFunc(s: string): Promise<number>;
@@ -441,16 +382,11 @@ export interface GeneratedPublicOperations {
   parseVfoOp(s: string): Promise<number>;
   parseScan(s: string): Promise<number>;
   parseRptrShift(s: string): Promise<number>;
-  parseMType(s: string): Promise<number>;
-  license(): Promise<string>;
-  copyright(): Promise<string>;
   setClock(year: number, month: number, day: number, hour: number, min: number, sec: number, msec: number, utcOffset: number): Promise<void>;
   getClock(): Promise<{ year: number; month: number; day: number; hour: number; min: number; sec: number; msec: number; utcOffset: number }>;
-  isModel(model: number): Promise<number>;
   getPtt(): Promise<string>;
   setPtt(state: string): Promise<string>;
   getRigInfo(): Promise<string>;
-  getVfoList(): Promise<string>;
   getExtLevel(token: number): Promise<number>;
   setExtLevel(token: number, value: number): Promise<void>;
   getExtParm(token: number): Promise<number>;

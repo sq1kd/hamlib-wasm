@@ -19,10 +19,18 @@
       "default": "./dist/index.js"
     },
     "./native": {
+      "types": "./dist/native.d.ts",
+      "default": "./dist/native.js"
+    },
+    "./wasm": {
       "types": "./dist/native/hamlib-web.d.mts",
       "default": "./dist/native/hamlib-web.mjs"
     },
-    "./native/hamlib-web.wasm": "./dist/native/hamlib-web.wasm",
+    "./wasm/hamlib-web.wasm": "./dist/native/hamlib-web.wasm",
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
     "./third_party/*": "./dist/third_party/*"
   },
   "files": [
@@ -32,6 +40,14 @@
   "dependencies": {
     "@types/w3c-web-serial": "1.0.8"
   },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "scripts": {
     "build": "node build/package.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -40,6 +56,8 @@
     "node": ">=24"
   },
   "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "19.3.0",
     "yaml": "2.9.1"
   }
 }

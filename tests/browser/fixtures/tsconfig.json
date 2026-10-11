@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "none",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     /* The fixtures are plain DOM code, injected into a page.  Nothing may leak
      * globals in from an @types package (notably @types/node's ReadableStream),
      * so no types are pulled in automatically. */

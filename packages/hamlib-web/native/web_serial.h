@@ -60,11 +60,20 @@ extern "C" {
 /* True when fd is a handle this transport handed out and has not closed. */
 int webserial_owns_fd(int fd);
 
-/* Record a freshly opened handle.  No-op when the table is full. */
-void webserial_register_handle(int fd);
+/* Record a freshly opened handle for `path`.  No-op when the table is full. */
+void webserial_register_handle(int fd, const char *path);
 
 /* Forget a handle.  No-op for unknown values, so it is safe to call twice. */
 void webserial_unregister_handle(int fd);
+
+/* Bytes the rig has sent on `path` since the port was opened, or -1 when
+ * `path` is not an open handle.
+ *
+ * rig_open() reads the rig's state and discards the result, so a line that
+ * never answered still looks opened.  This counter is the ground truth behind
+ * that: it is never cleared by a read, so it answers "has anything at all
+ * arrived from this rig", which is what the facade asks after opening. */
+long webserial_rx_bytes(const char *path);
 
 /* --- byte primitives ---------------------------------------------------- */
 

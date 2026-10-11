@@ -29,6 +29,16 @@ interface FakeRig {
   /** The protocol name, for diagnostics. */
   name: string;
   state: FakeRigState;
+  /**
+   * The rate this rig's own menu is set to, when it has one.
+   *
+   * A rig behind a real UART hears one rate only: opened at any other, it
+   * receives framing errors and stays silent rather than answering with an
+   * error.  Emulators that set this are silent at every other rate - which is
+   * what a scan has to cope with.  Omitted (a USB CDC interface, which ignores
+   * the line rate entirely) the emulator answers at whatever is asked.
+   */
+  baudRate?: number;
   /** Every request the emulator decoded, as readable text. */
   commands: string[];
   /** Forget the partial frame, keeping the state. */
@@ -47,7 +57,10 @@ interface FakeRig {
 interface FakeRigRegistry {
   'kenwood-ts480': () => FakeRig;
   'icom-ic703': () => FakeRig;
+  'icom-ic746': () => FakeRig;
+  'yaesu-ft710': () => FakeRig;
   'yaesu-ft757gx2': () => FakeRig;
+  'yaesu-frg100': () => FakeRig;
   [name: string]: (() => FakeRig) | undefined;
 }
 
@@ -118,6 +131,20 @@ interface FakeSerialControlBase {
   isOpen: boolean;
   /** Set to a DOMException name to make the next open() fail. */
   failNextOpen: string | null;
+  /**
+   * When true, the next `open()` parks until `releaseOpen()` runs.  The
+   * controlled gate a spec uses instead of a sleep to hold a connection
+   * attempt at its first asynchronous boundary.
+   */
+  holdNextOpen: boolean;
+  /** True while a held `open()` is parked. */
+  openPending: boolean;
+  /** Release the parked `open()`, completing it. */
+  releaseOpen(): void;
+  /** Delay applied to every emulator reply, in milliseconds. */
+  replyDelayMs: number;
+  /** When true, every host write is refused. */
+  failWrites: boolean;
   /** True when close() found a locked stream, i.e. the transport leaked. */
   closedWithLockedStreams: boolean;
   /** Every command the emulator decoded, without its framing. */
@@ -179,6 +206,7 @@ type CapturedView<T> = { ok: true; value: T } | { ok: false; error: HamlibErrorV
 interface TestHelpersView {
   describeError(value: unknown): HamlibErrorView;
   capture<T>(action: () => T | Promise<T>): Promise<CapturedView<Awaited<T>>>;
+  sleep(ms: number): Promise<void>;
 }
 
 interface Window {

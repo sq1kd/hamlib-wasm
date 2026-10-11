@@ -60,16 +60,11 @@
         if (caps->scan != NULL) { available.push_back("scan"); }
         if (caps->set_channel != NULL) { available.push_back("setChannel"); }
         if (caps->get_channel != NULL) { available.push_back("getChannel"); }
-        if (caps->set_trn != NULL) { available.push_back("setTrn"); }
-        if (caps->get_trn != NULL) { available.push_back("getTrn"); }
         if (caps->set_clock != NULL) { available.push_back("setClock"); }
         if (caps->get_clock != NULL) { available.push_back("getClock"); }
         available.push_back("getVfoInfo");
-        available.push_back("getResolution");
         available.push_back("extLookup");
         available.push_back("extLookupTok");
-        available.push_back("extTokenLookup");
-        available.push_back("confparamLookup");
         available.push_back("hasGetLevel");
         available.push_back("hasSetLevel");
         available.push_back("hasGetParm");
@@ -79,7 +74,6 @@
         available.push_back("hasVfoOp");
         available.push_back("hasScan");
         available.push_back("lookupMemCaps");
-        available.push_back("memCount");
         available.push_back("setTwiddle");
         available.push_back("getTwiddle");
         available.push_back("setUplink");
@@ -91,20 +85,9 @@
         available.push_back("idxToSetting");
         available.push_back("strRmode");
         available.push_back("strVfo");
-        available.push_back("strFunc");
         available.push_back("strLevel");
-        available.push_back("strParm");
-        available.push_back("strAgcLevel");
-        available.push_back("levelAgcStr");
-        available.push_back("levelAgcValue");
-        available.push_back("valueAgcLevel");
         available.push_back("strPtrShift");
-        available.push_back("strVfoOp");
-        available.push_back("strScan");
         available.push_back("strStatus");
-        available.push_back("strMType");
-        available.push_back("strSpectrumMode");
-        available.push_back("strCommStatus");
         available.push_back("parseMode");
         available.push_back("parseVfo");
         available.push_back("parseFunc");
@@ -113,10 +96,6 @@
         available.push_back("parseVfoOp");
         available.push_back("parseScan");
         available.push_back("parseRptrShift");
-        available.push_back("parseMType");
-        available.push_back("license");
-        available.push_back("copyright");
-        available.push_back("isModel");
 
         return available;
     }

@@ -8,8 +8,37 @@ and exposes the compiled CAT operations as promise based TypeScript methods.
 Radio backends are upstream Hamlib code and are not modified, so ordinary
 serial CAT rigs work without per-model browser code.
 
+Three entry points, so it is always clear which surface is in use:
+
+| Import | What it is |
+| --- | --- |
+| `hamlib-web` | The easy surface: `createEasy`, a state snapshot, events, booleans |
+| `hamlib-web/native` | The 1:1 surface: `createHamlib`, a method per upstream Hamlib call |
+| `hamlib-web/react` | React hooks over the easy surface (`hamlib-web/react` needs `react`) |
+
 ```ts
-import { createHamlib } from 'hamlib-web';
+import { createEasy } from 'hamlib-web';
+
+const hamlib = await createEasy();
+const rig = await hamlib.open({ modelId });       // asks for the port: user gesture
+
+const { frequency, mode, passband } = await rig.refresh();  // only advertised fields
+await rig.setFrequency(14_074_000);
+await rig.setMode('USB');                         // passband filled in from the model
+await rig.setPtt(true);                           // an explicit on command, not a toggle
+
+rig.on('state', console.log);                     // or rig.watch(1000) to poll
+await rig.close();
+await hamlib.dispose();
+```
+
+The 1:1 entry adds no behaviour of its own: every CAT operation is a generated
+method on `Rig`, named after the upstream Hamlib call it binds, and a composite
+read is as many calls as it takes.  `Rig` carries the whole generated surface,
+so anything the easy entry does not cover is still one call away.
+
+```ts
+import { createHamlib } from 'hamlib-web/native';
 
 const hamlib = await createHamlib();
 const port = await hamlib.requestPort();          // needs a user gesture
@@ -25,24 +54,24 @@ await rig.close();
 await hamlib.dispose();
 ```
 
-Every CAT operation is a generated method on `Rig`, named after the upstream
-Hamlib call it binds; the library adds no convenience wrappers of its own.
-
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
-| `packages/hamlib-web` | The package: native sources, build scripts, public TypeScript API |
+| `packages/hamlib-web` | The package: native sources, build scripts, the three entry points (`src/index.ts`, `src/native.ts`, `src/react.ts`) |
 | `packages/hamlib-web/hamlib.config.yaml` | The one config: the pinned release (version, archive URL + SHA-256, patches) and the binding surface |
 | `packages/hamlib-web/coverage.json` | Generated coverage report: bound vs refused declarations, with reasons |
 | `packages/hamlib-web/build` | Native build, package build, audits and the generator wrapper |
 | `packages/hamlib-codegen` | The AST-driven generator: classifies upstream declarations and emits the binding surface |
 | `packages/hamlib-web/native` | Browser serial transport (TypeScript, compiled to the Emscripten JS library), link-time POSIX wrappers, Embind facade, `pthread` shim |
 | `packages/hamlib-web/baseline/baseline.json` | Recorded catalogue digest and CAT trace for the pinned release |
-| `examples/basic` | Vanilla TypeScript/Vite example application |
-| `tests/browser` | Playwright Web Serial double, emulated TS-480/Icom/Yaesu rigs and scenarios |
-| `tests/harness` | Page that publishes the built package for the transport specs |
+| `examples/basic` | Vanilla TypeScript/Vite example of the 1:1 surface |
+| `examples/react` | React landing page and demo: one graphical rig, the easy and native backends side by side |
+| `tests/browser` | Playwright Web Serial double with emulated rigs (Kenwood TS-480, Icom CI-V IC-703/IC-746, Yaesu FT-757GXII and FRG-100) and the scenarios driving them |
+| `tests/hooks` | `vitest` + jsdom: the React hook state machine against a stubbed package boundary |
+| `tests/harness` | Pages that publish the built package (`index.html`) and drive the React hooks (`hooks.html`) for the specs |
 | `tests/consumer` | External consumer fixture, typechecked against the packed tarball |
+| `.github/workflows/pages.yml` | Builds `examples/react` and publishes it to GitHub Pages |
 | `docs` | Investigation notes, the implementation plan and the implementation record |
 
 Build products live in `.cache/hamlib/<version>` (downloaded upstream source and
@@ -55,15 +84,17 @@ emsdk 6.0.10):
 
 ```sh
 mise install && mise run bootstrap   # toolchain, locked npm deps, Playwright Chromium
-mise run build                       # Hamlib wasm, package, example
+mise run build                       # Hamlib wasm, package, both examples
 mise run fetch-native                # fetch, verify, patch and extract the pinned release
 mise run generate                    # regenerate the binding surface from the config + upstream AST
 mise run baseline:record             # re-record the upstream behavioural baseline
 mise run typecheck                   # every project, including the packed-consumer fixture
-mise run test                        # deterministic transport checks + browser scenarios
+mise run test                        # hook unit tests + deterministic transport/browser scenarios
+mise run test:hooks                  # only the DOM-less React hook unit tests
 mise run refresh                     # the whole upstream refresh path, end to end
 mise run pack:check                  # verify the published package contents
-mise run dev                         # example dev server
+mise run dev                         # Vanilla example dev server
+mise run dev:react                   # React landing page dev server
 ```
 
 `mise run build` is reproducible: it reads
@@ -134,10 +165,40 @@ graph TD
   passes around.
 * **One queue per module** - every native call runs on a single promise chain,
   because Asyncify can only have one suspended call at a time. Several `Rig`
-  objects still work; their calls are serialized in order.
+  objects still work; their calls are serialized in order. This includes the
+  `pure` helpers that read only `rig_caps`: they make no CAT traffic, but they
+  still enter the Wasm module, which must not be re-entered while a call is
+  suspended.
+* **Compound operations** - an easy method that needs several native calls (the
+  passband lookup plus write of `setMode()`, the mode read plus write of
+  `setPassband()`, every read of `refresh()`) takes one queue slot, so a raw
+  call, another rig's call or a later easy call cannot run between its steps.
+  The guarantee covers the commands the library issues; it cannot see someone
+  turning the radio's physical controls between two CAT replies. `refresh()`
+  reads only the getters the model advertises, so a snapshot may omit a field,
+  and a read that fails leaves the previous snapshot in place instead of
+  publishing a partial one.
+* **Owned connections** - an easy instance tracks every rig it opened and
+  invalidates superseded connection attempts, so `dispose()`, unmount and a
+  replacement connection cannot leave an obsolete attempt owning the port:
+  what it opened is closed again instead of published. Polling is
+  subscription-based, so several consumers can watch one rig; the last
+  unsubscribe, `close()` and `dispose()` each stop the scheduler.
 * **Hamlib's cache is left intact** - its setters keep the 500 ms cache
   coherent, so a read after a write reports what was just written (notably for
   PTT, where the Kenwood backend additionally caches its `IF` response).
+* **An open means the rig answered** - the rate a rig answers at is a setting on
+  the rig, and Hamlib defaults to the *highest* rate a model advertises
+  (`caps->serial_rate_max`). A rig behind a real UART hears one rate only, so
+  opening it at another produces silence, not an error - and `rig_open()` reads
+  the rig state blind, discarding the result, so the silence used to surface as
+  a "connected" rig whose every read failed. A model whose open performs that
+  read (`get_freq`) must therefore have sent something back; when the transport
+  saw not a byte on the path, the open is rejected with the rate it tried and
+  the range the model declares. `detectBaudRate()` searches the declared range
+  for a rig whose rate is unknown, and `Rig.baudRate` reports the rate in use so
+  a reconnect can pass it straight back: the rate is either stated or searched,
+  never guessed into a success.
 * **Single threaded** - the module is built without `-pthread`, with `async`,
   `poll_interval` and `auto_power_on`/`auto_power_off` forced to zero through
   Hamlib's public configuration, so no polling thread, async data handler or
@@ -150,12 +211,27 @@ graph TD
   and the handful of operations whose C++ body a signature cannot describe.
   Handwritten: the transport, resource ownership serialization and the module
   lifecycle.
+* **The reference client decides the surface** - a declaration is bound because
+  the upstream `rigctl`/`rigctld` sources call it, and one they never call is
+  refused with that reason. Today that is 89 generated operations plus 11 whose
+  C++ body is hand-written (the caller-buffer, table-walker, extended-setting
+  and PTT shapes): 100 methods on `Rig`, against 87 refusals.
+  `docs/implementation.md` lists which refusals are irreducible (credentials, a
+  second thread, a caller-owned array) and which are this build's policy.
 
 ## Supported
 
 Web Serial CAT control in a secure context desktop Chromium family browser:
 frequency, mode, passband and PTT for the models Hamlib reports as
 `RIG_PORT_SERIAL`, including CAT based PTT and serial RTS/DTR PTT.
+
+What the entries cover:
+
+| Entry | Surface |
+| --- | --- |
+| `hamlib-web` | `createEasy`, `EasyRig` (`refresh`, `setFrequency`, `setMode`, `setPassband`, `setPtt`, `baudRate`, `on`, `watch`), `detectBaudRate` and `EasyRig.raw` for everything below; `refresh` returns only the fields the model advertises and `watch` registers composable polls |
+| `hamlib-web/native` | 100 methods on `Rig`, one per bound Hamlib operation, plus `baudRate`, `detectBaudRate`, the catalogue and the error type |
+| `hamlib-web/react` | `HamlibProvider`, `useModels`, `useEasyRig`, `useRigState`, `useRigError` |
 
 Not represented: Firefox/Safari, raw USB/HID, network rigs, rotators,
 amplifiers, audio, GPIO and parallel ports. Web Serial cannot express 5/6 data
@@ -167,7 +243,7 @@ Every model carries a support level: `"verified"` when a browser test in
 `tests/browser` drives it through the Web Serial double, otherwise
 `"candidate"`. `VERIFIED_MODELS` and `UNUSABLE_MODELS` in
 `packages/hamlib-web/src/browser-support.ts` hold the evidence and the recorded
-reasons. Two limitations are worth knowing:
+reasons. Three limitations are worth knowing:
 
 * a backend that needs a worker thread (AnyTone D578A) fails at open rather
   than degrading quietly;
@@ -175,11 +251,18 @@ reasons. Two limitations are worth knowing:
   FT-757GXII) cannot open at all: it reads a 75 octet status block through a
   helper whose retry count Hamlib has already zeroed. The DTR/RTS signal path
   itself is still covered at the transport seam by
-  `tests/browser/transport-primitives.spec.ts`.
+  `tests/browser/transport-primitives.spec.ts`;
+* a rig behind a real UART answers at one rate only - the rate its own menu is
+  set to, which no model metadata carries - so opening it at anything else
+  opens a port nothing answers on, and the open is rejected rather than
+  reported as a connection. `detectBaudRate()` tries the rates the model
+  declares; a rig whose interface ignores the line rate (a USB CDC-ACM one, such
+  as the QRP Labs QMX+) is unaffected either way.
 
 Verified models are covered by `tests/browser/baseline.spec.ts`,
-`transport.spec.ts`, `protocols.spec.ts` (Kenwood TS-480 and Icom CI-V) and the
-example-driven scenarios in `tests/browser/e2e`.
+`transport.spec.ts`, `protocols.spec.ts` and `baud-rate.spec.ts` (Kenwood
+TS-480, Icom CI-V and Yaesu newcat) and the example-driven scenarios in
+`tests/browser/e2e`.
 
 ## Licensing
 

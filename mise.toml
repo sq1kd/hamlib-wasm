@@ -38,14 +38,19 @@ description = "Build the Vanilla TypeScript/Vite example"
 depends = ["build:package"]
 run = "npm run build --workspace examples/basic"
 
+[tasks."build:react-example"]
+description = "Build the React landing page and demo application"
+depends = ["build:package"]
+run = "npm run build --workspace examples/react"
+
 [tasks."build:harness"]
 description = "Build the browser test harness app"
 depends = ["build:package"]
 run = "npm run build --workspace tests/harness"
 
 [tasks.build]
-description = "Full reproducible build: native Wasm, package, example"
-depends = ["build:example"]
+description = "Full reproducible build: native Wasm, package, examples"
+depends = ["build:example", "build:react-example"]
 
 [tasks."typecheck:consumer"]
 description = "Pack the package and install the tarball into the consumer fixture"
@@ -70,7 +75,9 @@ tsc -p packages/hamlib-web/tsconfig.json --noEmit
 tsc -p packages/hamlib-web/tsconfig.build.json --noEmit
 tsc -p packages/hamlib-web/native/tsconfig.library.json --noEmit
 tsc -p examples/basic/tsconfig.json --noEmit
+tsc -p examples/react/tsconfig.json --noEmit
 tsc -p tests/harness/tsconfig.json --noEmit
+tsc -p tests/hooks/tsconfig.json --noEmit
 tsc -p tests/browser/tsconfig.json --noEmit
 tsc -p tests/browser/fixtures/tsconfig.json --noEmit
 tsc -p tests/consumer/tsconfig.json --noEmit
@@ -80,19 +87,24 @@ tsc -p tests/consumer/tsconfig.json --noEmit
 description = "Typecheck every workspace project, including the packed-package consumer fixture"
 depends = ["typecheck:projects"]
 
+[tasks."test:hooks"]
+description = "Run the DOM-less React hook unit tests against a stubbed package boundary"
+depends = ["build:package"]
+run = "npx vitest run --config tests/hooks/vitest.config.ts"
+
 [tasks.test]
-description = "Run deterministic transport/lifecycle checks and the Playwright scenarios"
-depends = ["build:example", "build:harness"]
+description = "Run the hook unit tests, the transport/lifecycle checks and the Playwright scenarios"
+depends = ["build:example", "build:react-example", "build:harness", "test:hooks"]
 run = "npx playwright test"
 
 [tasks."test:browser"]
 description = "Run only the example-driven Playwright browser scenarios"
-depends = ["build:example", "build:harness"]
+depends = ["build:example", "build:harness", "build:react-example"]
 run = "npx playwright test tests/browser/e2e"
 
 [tasks."baseline:record"]
 description = "Re-record the upstream behavioural baseline from the current build"
-depends = ["build:example", "build:harness"]
+depends = ["build:example", "build:harness", "build:react-example"]
 run = "HAMLIBS_WEB_RECORD_BASELINE=1 npx playwright test tests/browser/baseline.spec.ts"
 
 [tasks."audit:backends"]
@@ -114,6 +126,11 @@ depends = ["build:package"]
 run = "npm pack --dry-run --workspace packages/hamlib-web"
 
 [tasks.dev]
-description = "Run the example dev server on a localhost URL"
+description = "Run the Vanilla example dev server on a localhost URL"
 depends = ["build:package"]
 run = "npm run dev --workspace examples/basic"
+
+[tasks."dev:react"]
+description = "Run the React landing page dev server on a localhost URL"
+depends = ["build:package"]
+run = "npm run dev --workspace examples/react"

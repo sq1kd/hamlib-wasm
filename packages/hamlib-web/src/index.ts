@@ -1,838 +1,642 @@
 /**
- * hamlib-web - Hamlib CAT control in the browser over Web Serial.
+ * hamlib-web - the default, TypeScript-shaped entry point.
  *
- * The package wraps a WebAssembly build of Hamlib whose serial transport
- * talks to the Web Serial API.  The pinned release is described by
- * `packages/hamlib-web/hamlib.config.yaml`, never by a literal here.  Radio
- * backends are upstream Hamlib code and
- * are unmodified; only the common port layer is replaced.
+ * This is the surface an application should reach for first: one rig object,
+ * a state snapshot, events, and booleans instead of Hamlib's enums.  It is a
+ * thin façade over `hamlib-web/native`, which keeps a method per upstream
+ * Hamlib call for anything this entry does not cover (see {@link EasyRig.raw}).
  *
- * Every operation is asynchronous and is serialized on one internal promise
- * chain, because the Wasm module runs on the main thread and Emscripten's
- * Asyncify can only have one suspended native call at a time.  Multiple
- * {@link Rig} objects are still supported: their calls are queued in order.
+ * What "easy" means here, concretely:
  *
- * This module never exposes C pointers, Hamlib structures or Wasm memory.
+ *  - `refresh()` composes the reads a UI always wants (frequency, mode,
+ *    passband, and PTT when the model reports it) into one awaited snapshot,
+ *    and remembers it as {@link EasyRig.state}.
+ *  - `setMode(mode)` fills in the model's normal passband through Hamlib's own
+ *    `passband_normal`, so a caller does not have to know its width.
+ *  - `setPtt(true)` and {@link PttState} replace the string vocabulary.
+ *  - `on()`/`watch()` give a UI an event stream without polling by hand; the
+ *    calls still serialize on the module's single queue.
+ *  - {@link EasyRig.capabilities} answers "can this model do X" as booleans,
+ *    derived from the same `rig_caps` matrix the catalogue exposes.
+ *
+ * It composes; it never fakes.  A write does not invent state (Hamlib's own
+ * cache decides what a following read reports), and a read the model cannot
+ * perform still fails with the native `UNSUPPORTED_OPERATION` error.
  */
 
-import createNativeModule from './native/hamlib-web.mjs';
-import type { MainModule } from './native/hamlib-web.mjs';
-
-import {
-  describeLineSettingsLimitation,
-  findUnusableModel,
-  findVerifiedModel,
-} from './browser-support.js';
-import type { BrowserSupport, DeclaredLineSettings } from './browser-support.js';
-import { FLAG_GATED_OPERATIONS } from './native/generated/operations.js';
+import { HamlibError, createHamlib } from './native.js';
 import type {
-  GeneratedPublicOperations,
-  NativeOperations,
-} from './native/generated/operations.js';
-import { GeneratedRigMethods } from './native/generated/methods/index.js';
+  DetectBaudRateOptions,
+  Hamlib,
+  HamlibOptions,
+  Rig,
+  RigMode,
+  RigModeState,
+  RigModel,
+} from './native.js';
+import type { CompoundHost } from './native/seam.js';
 
 export {
   UNUSABLE_MODELS,
   VERIFIED_MODELS,
   describeLineSettingsLimitation,
-} from './browser-support.js';
+  HamlibError,
+} from './native.js';
 export type {
   BrowserSupport,
+  DetectBaudRateOptions,
+  HamlibErrorCode,
+  HamlibOptions,
+  RigCapabilities,
+  RigConfparam,
+  RigMode,
+  RigModeState,
+  RigModel,
+  SerialHandshake,
+  SerialParity,
   UnusableModel,
   VerifiedModel,
-} from './browser-support.js';
-export type { RigConfparam } from './native/confparams.js';
+} from './native.js';
 
-type NativeModule = MainModule;
+/** Push-to-talk states Hamlib reports and accepts. */
+export type PttState = 'off' | 'on' | 'on-mic' | 'on-data';
 
-type NativeModelList = ReturnType<NativeModule['listModels']>;
-type NativeModel = NonNullable<ReturnType<NativeModelList['get']>>;
+const PTT_STATES: readonly PttState[] = ['off', 'on', 'on-mic', 'on-data'];
 
-/** Hamlib's RIG_OK. */
-const RIG_OK = 0;
+/**
+ * One of Hamlib's own passband helpers, selected by name.
+ *
+ * `normal` is the width the model advertises for a mode; `narrow` and `wide`
+ * are the backend's own narrower and wider choices.
+ */
+export type PassbandSelector = 'normal' | 'narrow' | 'wide';
 
-/** Human readable text for Hamlib's `enum rig_errcode_e`. */
-const HAMLIB_ERROR_MESSAGES: Readonly<Record<number, string>> = {
-  0: 'no error',
-  1: 'invalid parameter',
-  2: 'invalid configuration',
-  3: 'memory shortage',
-  4: 'function not implemented',
-  5: 'communication timed out',
-  6: 'I/O error',
-  7: 'internal Hamlib error',
-  8: 'protocol error',
-  9: 'command rejected by the rig',
-  10: 'command performed, but argument truncated',
-  11: 'function not available',
-  12: 'VFO not targetable',
-  13: 'error talking on the bus',
-  14: 'collision on the bus',
-  15: 'invalid pointer parameter',
-  16: 'invalid VFO',
-  17: 'argument out of domain',
-  18: 'function deprecated',
-  19: 'security error',
-  20: 'rig not powered on',
-  21: 'limit exceeded',
-  22: 'access denied',
-};
-
-/** Stable error codes reported by {@link HamlibError}. */
-export type HamlibErrorCode =
-  /** `navigator.serial` is missing (not a Web Serial capable browser). */
-  | 'WEB_SERIAL_UNAVAILABLE'
-  /** The user dismissed the port chooser or blocked the port. */
-  | 'PORT_PERMISSION_DENIED'
-  /** Web Serial raised a DOM exception. */
-  | 'TRANSPORT_FAILURE'
-  /** Hamlib returned a negative error code. */
-  | 'HAMLIB_ERROR'
-  /** A bound was violated before reaching Wasm. */
-  | 'INVALID_ARGUMENT'
-  /** The selected model cannot perform the requested operation. */
-  | 'UNSUPPORTED_OPERATION'
-  /** The rig has been closed. */
-  | 'RIG_CLOSED'
-  /** The Hamlib instance has been disposed. */
-  | 'DISPOSED';
-
-export interface HamlibErrorOptions {
-  /** Stable machine readable code. */
-  code: HamlibErrorCode;
-  /** Stable operation name, e.g. `"open"` or `"getFrequency"`. */
-  operation: string;
-  /** Underlying DOM exception or error, when there is one. */
-  cause?: unknown;
-  /** Negative Hamlib error code, when `code` is `"HAMLIB_ERROR"`. */
-  hamlibCode?: number;
-  /** Text of the Hamlib error code. */
-  hamlibMessage?: string;
+/** Narrow a Hamlib PTT string to the public union. */
+function toPttState(value: string): PttState {
+  return PTT_STATES.find((state) => state === value) ?? 'off';
 }
 
 /**
- * Every failure reported by this package is a `HamlibError`.
+ * A snapshot of what the rig reported, not of what was asked of it.
  *
- * Transport context is preserved: Web Serial failures keep the DOM exception
- * as `cause`, and Hamlib failures carry `hamlibCode`/`hamlibMessage`.
+ * Every field is optional because a model may implement only part of the easy
+ * telemetry surface: `refresh()` reads exactly the getters the model
+ * advertises and omits the rest rather than inventing a value.  `mode` and
+ * `passband` always appear together or not at all.
+ *
+ * {@link EasyRig.state} and the `state` event only ever carry a snapshot from a
+ * *completed* refresh: when a supported read fails, the previous successful
+ * snapshot stays in place and no partial one is published.
  */
-export class HamlibError extends Error {
-  readonly code: HamlibErrorCode;
-  readonly operation: string;
-  readonly hamlibCode?: number;
-  readonly hamlibMessage?: string;
+export interface RigState {
+  /** Frequency in Hz; absent when the model cannot read frequency. */
+  frequency?: number;
+  /** Mode; absent (together with `passband`) when the model cannot read mode. */
+  mode?: RigMode;
+  /** Passband width in Hz; present exactly when `mode` is. */
+  passband?: number;
+  /** Present only when the model can read PTT. */
+  ptt?: PttState;
+}
 
-  constructor(message: string, options: HamlibErrorOptions) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
-    this.name = 'HamlibError';
-    this.code = options.code;
-    this.operation = options.operation;
-    this.hamlibCode = options.hamlibCode;
-    this.hamlibMessage = options.hamlibMessage;
+/** The operations a model supports, as booleans a UI can test. */
+export interface EasyCapabilities {
+  getFrequency: boolean;
+  setFrequency: boolean;
+  getMode: boolean;
+  setMode: boolean;
+  getPtt: boolean;
+  setPtt: boolean;
+}
+
+/** The events an {@link EasyRig} emits. */
+export interface EasyRigEvents {
+  /** A completed {@link EasyRig.refresh}. */
+  state: RigState;
+  frequency: number;
+  mode: RigModeState;
+  ptt: PttState;
+  /** A call that failed; the same error is thrown to its caller. */
+  error: HamlibError;
+}
+
+type Listener<T> = (value: T) => void;
+
+/** Minimal typed emitter: no dependency, no wildcard, no replay. */
+class Emitter<Events> {
+  readonly #listeners = new Map<keyof Events, Set<Listener<never>>>();
+  readonly #live: () => boolean;
+
+  constructor(live: () => boolean) {
+    this.#live = live;
+  }
+
+  on<K extends keyof Events>(event: K, listener: Listener<Events[K]>): () => void {
+    const listeners = this.#listeners.get(event) ?? new Set<Listener<never>>();
+
+    listeners.add(listener as Listener<never>);
+    this.#listeners.set(event, listeners);
+
+    return () => {
+      listeners.delete(listener as Listener<never>);
+    };
+  }
+
+  emit<K extends keyof Events>(event: K, value: Events[K]): void {
+    for (const listener of this.#listeners.get(event) ?? []) {
+      if (!this.#live()) {
+        return;
+      }
+
+      (listener as Listener<Events[K]>)(value);
+    }
   }
 }
 
-/** What a rig model can do over the browser transport. */
-export interface RigCapabilities {
-  canGetFrequency: boolean;
-  canSetFrequency: boolean;
-  canGetMode: boolean;
-  canSetMode: boolean;
-  canGetPtt: boolean;
-  canSetPtt: boolean;
-}
-
-/** A rig model supported over Web Serial, sorted by manufacturer then model. */
-export interface RigModel extends RigCapabilities {
-  /** Hamlib model id, pass this to {@link Hamlib.open}. */
-  id: number;
-  manufacturer: string;
-  model: string;
-  /** Upstream backend version string. */
-  backendVersion: string;
-  /** Hamlib driver status bit field (`RIG_STATUS_*`). */
-  status: number;
-  /** Lowest baud rate the backend advertises. */
-  serialRateMin: number;
-  /** Highest baud rate the backend advertises. */
-  serialRateMax: number;
-  /** Serial data bits the backend declares. */
-  serialDataBits: number;
-  /** Serial stop bits the backend declares. */
-  serialStopBits: number;
-  /** Serial parity the backend declares. */
-  serialParity: SerialParity;
-  /** Serial flow control the backend declares. */
-  serialHandshake: SerialHandshake;
-  /**
-   * `"verified"` when a browser test in this package drives the model through
-   * the Web Serial double; `"candidate"` when only Hamlib's
-   * `RIG_PORT_SERIAL` classification backs it.
-   *
-   * This never claims hardware testing - see {@link VERIFIED_MODELS}.
-   */
-  support: BrowserSupport;
-  /**
-   * Names of the generated operations this model implements, from its
-   * `rig_caps` function pointers.  Absent means the matching generated method
-   * on {@link Rig} is refused with `UNSUPPORTED_OPERATION` before reaching Wasm.
-   */
-  readonly capabilities: readonly string[];
-  /**
-   * Why the browser build cannot drive the model, when it cannot.
-   *
-   * Set when the backend declares line settings Web Serial cannot express - an
-   * open then fails with `-RIG_ECONF` before the port is touched - or when a
-   * recorded reason applies, which may instead fail during the open.  Either
-   * way it fails predictably rather than half working.
-   */
-  limitation?: string;
-}
-
-/**
- * A Hamlib mode name, e.g. `"USB"`, `"CW"`, `"FM"`.
- *
- * The accepted set evolves with upstream Hamlib, so this is a plain string:
- * every setter value is validated by Hamlib's own `rig_parse_mode()`.
- */
-export type RigMode = string;
-
-/** Serial parity a backend declares. */
-export type SerialParity = 'none' | 'odd' | 'even' | 'mark' | 'space';
-
-/** Serial flow control a backend declares. */
-export type SerialHandshake = 'none' | 'xon-xoff' | 'hardware';
-
-/** Mode and passband as reported by the rig. */
-export interface RigModeState {
-  mode: RigMode;
-  /** Passband width in Hz. */
-  passband: number;
-}
-
-/** Options for {@link createHamlib}. */
-export interface HamlibOptions {
-  /**
-   * Resolve an Emscripten asset name (e.g. `hamlib-web.wasm`) to a URL.
-   *
-   * Defaults to resolving assets next to the installed module with
-   * `new URL(..., import.meta.url)`, so bundlers need no hard coded path.
-   */
-  locateFile?: (file: string) => string | URL;
-}
-
-/** Options for {@link Hamlib.open}. */
-export interface OpenRigOptions {
-  /** Model id taken from {@link RigModel.id}. */
+/** Options for {@link EasyHamlib.open}. */
+export interface OpenEasyRigOptions {
+  /** Model id taken from {@link EasyHamlib.models}. */
   modelId: number;
-  /** Port returned by {@link Hamlib.requestPort}, or by `navigator.serial`. */
-  port: SerialPort;
   /**
-   * Baud rate.  When omitted, the model's advertised default (the highest
-   * rate Hamlib supports for it) is used.
+   * Baud rate.  When omitted, the model's advertised default (the highest rate
+   * Hamlib supports for it) is used, and the open verifies that the rig answers
+   * at it; see {@link Rig.baudRate} and {@link EasyHamlib.detectBaudRate} for a
+   * rig whose rate is not known.
    */
   baudRate?: number;
+  /**
+   * An already granted port.  When omitted, {@link EasyHamlib.requestPort} runs
+   * first, so this must be called from a user gesture.
+   */
+  port?: SerialPort;
 }
 
 /**
- * A connected rig.
+ * A connected rig, with a state snapshot and events.
  *
- * Every CAT operation is a generated method (see
- * `src/native/generated/methods`); this interface only adds the ownership
- * facts the generated surface cannot know: which model was opened, whether it
- * is still open, and how to release it.
+ * Every method is one compound operation on the module's single call queue: a
+ * multi-call method like `setMode()` or `refresh()` occupies one queue slot, so
+ * nothing - a poll, a raw call, a call on another rig - can run between its
+ * steps.  Order is preserved, not raced.
  */
-export interface Rig extends GeneratedPublicOperations {
+export interface EasyRig {
   /** The model this rig was opened with. */
   readonly model: RigModel;
-  /** `false` once {@link Rig.close} has completed. */
+  /**
+   * The baud rate this rig was opened at; see {@link Rig.baudRate}.
+   *
+   * Worth keeping: passing it back to {@link EasyHamlib.open} skips both the
+   * guess and a {@link EasyHamlib.detectBaudRate} scan on the next connect.
+   */
+  readonly baudRate: number;
+  /** What this model can do, as booleans. */
+  readonly capabilities: EasyCapabilities;
+  /** `false` once `close()` has been called, or the underlying rig closed. */
   readonly connected: boolean;
-  /** Close the rig.  Idempotent; safe to call after a failure. */
+  /**
+   * The last snapshot a completed `refresh()` published, if any.  A failed
+   * refresh leaves it unchanged.
+   */
+  readonly state: RigState | undefined;
+  /**
+   * The underlying 1:1 rig, for the operations this entry does not cover
+   * (split, levels, memory, antenna, clock, …).  Its methods are gated exactly
+   * as `hamlib-web/native` documents.
+   */
+  readonly raw: Rig;
+
+  /** Set the frequency in Hz. */
+  setFrequency(hz: number): Promise<void>;
+  /**
+   * Set the mode, filling in the model's normal passband when `passband` is
+   * omitted.  At that point `passband` is the value the call actually used.
+   */
+  setMode(mode: RigMode, passband?: number): Promise<void>;
+  /**
+   * Read the current mode, apply one of Hamlib's own passband helpers for it,
+   * and write the mode and width back as one compound operation, so a mode
+   * change issued afterwards cannot be undone by the older passband action.
+   */
+  setPassband(kind: PassbandSelector): Promise<void>;
+  /** Set push-to-talk to on (`true`) or off (`false`). */
+  setPtt(on: boolean): Promise<void>;
+  /**
+   * Read the telemetry the model advertises - frequency, mode with passband,
+   * and PTT when the model can - as one compound operation, and remember it as
+   * {@link EasyRig.state}.  Fields the model cannot read are omitted, never
+   * invented; a read that fails throws and leaves the previous snapshot in
+   * place.
+   */
+  refresh(): Promise<RigState>;
+  /** Subscribe to one event; the returned function unsubscribes. */
+  on<K extends keyof EasyRigEvents>(event: K, listener: Listener<EasyRigEvents[K]>): () => void;
+  /**
+   * Poll every `intervalMs` while the returned function has not been called.
+   * Registrations compose: the smallest requested interval wins, removing one
+   * leaves the others polling, and removing the last stops the scheduler.  A
+   * tick that arrives while the previous poll is still in flight is skipped,
+   * so a slow rig cannot build a queue of reads.
+   */
+  watch(intervalMs: number): () => void;
+  /**
+   * Stop polling synchronously, then close the rig.  Idempotent; no snapshot
+   * or event is published once it has been called.
+   */
   close(): Promise<void>;
 }
 
-/** A loaded Hamlib instance. */
-export interface Hamlib {
+/** A loaded Hamlib instance, with the easy rig on top. */
+export interface EasyHamlib {
   /** Hamlib version string. */
   readonly version: string;
-  /** Every rig model reachable over Web Serial. */
+  /** Every rig model reachable over Web Serial, sorted by manufacturer then model. */
   readonly models: readonly RigModel[];
   /** Ask the user for a serial port.  Requires a user gesture. */
   requestPort(options?: SerialPortRequestOptions): Promise<SerialPort>;
-  /** Open a rig on a previously granted port. */
-  open(options: OpenRigOptions): Promise<Rig>;
+  /** Open a rig, optionally on an already granted port. */
+  open(options: OpenEasyRigOptions): Promise<EasyRig>;
   /**
-   * Close every open rig, unregister every port and reject further work.
-   * Idempotent.
+   * Find the baud rate a rig answers at, before opening it.
+   *
+   * The same search as {@link Hamlib.detectBaudRate}: the rates the model
+   * declares are tried in turn and the first one the rig replies at is
+   * returned, port closed.  Hand the result to {@link EasyHamlib.open}, or keep
+   * it - `easyRig.baudRate` reports the rate a live rig was opened at, and
+   * reconnecting with a known rate skips the scan.
+   *
+   * ```ts
+   * const port = await easy.requestPort();
+   * const baudRate = await easy.detectBaudRate({ modelId, port });
+   * const rig = await easy.open({ modelId, port, baudRate });
+   * ```
+   *
+   * Rejects with `RIG_UNRESPONSIVE` when no rate answered.
    */
+  detectBaudRate(options: DetectBaudRateOptions): Promise<number>;
+  /** Close every open rig and reject further work.  Idempotent. */
   dispose(): Promise<void>;
 }
 
-/** Shape shared by every native failure result. */
-interface NativeResult {
-  code: number;
-  error: unknown;
-}
-
-function hamlibError(result: NativeResult, operation: string): HamlibError {
-  const transport = typeof result.error === 'string' ? result.error : '';
-  /* Hamlib reports failures as negative codes (-RIG_EIO); the message table is
-   * keyed by the bare value. */
-  const code = Math.abs(result.code);
-  const description = HAMLIB_ERROR_MESSAGES[code] ?? `unknown Hamlib error ${result.code}`;
-  const message = transport
-    ? `${operation} failed: ${description} (${transport})`
-    : `${operation} failed: ${description}`;
-
-  return new HamlibError(message, {
-    code: 'HAMLIB_ERROR',
-    operation,
-    hamlibCode: result.code,
-    hamlibMessage: description,
-  });
-}
-
-function transportError(cause: unknown, operation: string): HamlibError {
-  if (cause instanceof Error && cause.name === 'NotFoundError') {
-    return new HamlibError('no serial port was selected', {
-      code: 'PORT_PERMISSION_DENIED',
-      operation,
-      cause,
-    });
-  }
-
-  const detail = cause instanceof Error ? cause.message : String(cause);
-
-  return new HamlibError(`${operation} failed: ${detail}`, {
-    code: 'TRANSPORT_FAILURE',
-    operation,
-    cause,
-  });
-}
-
-/* ------------------------------------------------------------------ */
-/* serialization                                                      */
-/* ------------------------------------------------------------------ */
-
 /**
- * One promise chain per Hamlib instance.
+ * Which of the operations {@link EasyRig} uses a model implements.
  *
- * Emscripten's Asyncify unwinds the C stack of the single in-flight native
- * call, so native calls must never overlap.  Queueing them also guarantees a
- * call never starts while another one is suspended.
+ * Exported because a caller driving `hamlib-web/native` directly still wants
+ * the same booleans: the catalogue's `capabilities` is the raw list of
+ * generated operation names, and this is the one interpretation of it the easy
+ * layer makes.
  */
-class Serializer {
-  #tail: Promise<unknown> = Promise.resolve();
-  #closed = false;
+export function capabilitiesOf(model: RigModel): EasyCapabilities {
+  const supported = new Set(model.capabilities);
 
-  /** Queue work for a live instance. */
-  enqueue<T>(operation: string, work: () => T | Promise<T>): Promise<T> {
-    if (this.#closed) {
-      return Promise.reject(
-        new HamlibError('Hamlib instance has been disposed', {
-          code: 'DISPOSED',
-          operation,
-        }),
-      );
-    }
-
-    return this.#chain(work);
-  }
-
-  /** Queue cleanup work, which stays possible after disposal. */
-  drain<T>(work: () => T | Promise<T>): Promise<T> {
-    return this.#chain(work);
-  }
-
-  close(): void {
-    this.#closed = true;
-  }
-
-  #chain<T>(work: () => T | Promise<T>): Promise<T> {
-    /* Run regardless of whether the previous operation failed. */
-    const result = this.#tail.then(work, work);
-    this.#tail = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
-  }
+  return {
+    getFrequency: supported.has('getFrequency'),
+    setFrequency: supported.has('setFrequency'),
+    getMode: supported.has('getMode'),
+    setMode: supported.has('setMode'),
+    getPtt: supported.has('getPtt'),
+    setPtt: supported.has('setPtt'),
+  };
 }
 
-/* ------------------------------------------------------------------ */
-/* rig                                                                */
-/* ------------------------------------------------------------------ */
+/** Wrap a thrown value as a `HamlibError`; the native layer always throws one. */
+function asHamlibError(error: unknown, operation: string): HamlibError {
+  if (error instanceof HamlibError) {
+    return error;
+  }
 
-/** What a rig handle needs from the Hamlib instance that owns it. */
-interface RigContext {
-  readonly native: NativeModule;
-  readonly queue: Serializer;
-  forget(rig: RigHandle): void;
+  return new HamlibError(
+    error instanceof Error ? error.message : String(error),
+    { code: 'TRANSPORT_FAILURE', operation, cause: error },
+  );
 }
 
-class RigHandle extends GeneratedRigMethods implements Rig {
-  readonly #context: RigContext;
-  readonly #path: string;
-  readonly #model: RigModel;
+/** One live polling registration; its identity is the unsubscribe handle. */
+interface PollSubscription {
+  readonly intervalMs: number;
+}
 
-  #handle: number;
+/** `RigHandle` also implements the compound seam (`src/native/seam.ts`). */
+type CompoundRig = Rig & CompoundHost;
+
+class EasyRigHandle implements EasyRig {
+  readonly #rig: CompoundRig;
+  readonly #events = new Emitter<EasyRigEvents>(() => this.#live());
+  readonly #capabilities: EasyCapabilities;
+  readonly #onClose: (rig: EasyRigHandle) => void;
+  readonly #subscriptions = new Set<PollSubscription>();
+
+  #state: RigState | undefined;
+  #timer: ReturnType<typeof setInterval> | undefined;
+  #intervalMs = 0;
+  #polling = false;
   #closed = false;
 
-  constructor(
-    context: RigContext,
-    path: string,
-    model: RigModel,
-    handle: number,
-  ) {
-    super();
-    this.#context = context;
-    this.#path = path;
-    this.#model = model;
-    this.#handle = handle;
+  constructor(rig: Rig, onClose: (rig: EasyRigHandle) => void) {
+    this.#rig = rig as CompoundRig;
+    this.#capabilities = capabilitiesOf(rig.model);
+    this.#onClose = onClose;
   }
 
   get model(): RigModel {
-    return this.#model;
+    return this.#rig.model;
+  }
+
+  get baudRate(): number {
+    return this.#rig.baudRate;
+  }
+
+  get capabilities(): EasyCapabilities {
+    return this.#capabilities;
   }
 
   get connected(): boolean {
-    return !this.#closed;
+    return !this.#closed && this.#rig.connected;
   }
 
-  /* --- plumbing the generated method classes call --------------------- */
-
-  protected native(): NativeOperations {
-    return this.#context.native;
+  get state(): RigState | undefined {
+    return this.#state;
   }
 
-  protected handle(): number {
-    return this.#handle;
+  get raw(): Rig {
+    return this.#rig;
   }
 
-  protected serialized<T>(operation: string, work: () => Promise<T>): Promise<T> {
-    return this.#call(operation, work);
+  async setFrequency(hz: number): Promise<void> {
+    return this.#call('setFrequency', () => this.#rig.runCompound('setFrequency', async (operations) => {
+      await operations.setFrequency(hz);
+    }));
   }
 
-  protected available(operation: string): void {
-    this.#requireCapability(
-      this.#model.capabilities.includes(operation),
-      operation,
-      `use ${operation}`,
-    );
+  async setMode(mode: RigMode, passband?: number): Promise<void> {
+    return this.#call('setMode', () => this.#rig.runCompound('setMode', async (operations) => {
+      const width = passband ?? await operations.passbandNormal(mode);
+
+      await operations.setMode(mode, width);
+    }));
   }
 
-  protected failed(result: { code: number; error: unknown }, operation: string): Error {
-    return hamlibError(result, operation);
+  async setPtt(on: boolean): Promise<void> {
+    return this.#call('setPtt', () => this.#rig.runCompound('setPtt', async (operations) => {
+      await operations.setPtt(on ? 'on' : 'off');
+    }));
+  }
+
+  async setPassband(kind: PassbandSelector): Promise<void> {
+    return this.#call('setPassband', () => this.#rig.runCompound('setPassband', async (operations) => {
+      /* The mode read, the width lookup and the write share this one queue
+       * slot, so a later mode selection cannot land between them and be
+       * overwritten by the older passband action. */
+      const { mode } = await operations.getMode();
+      const width = kind === 'narrow'
+        ? await operations.passbandNarrow(mode)
+        : kind === 'wide'
+          ? await operations.passbandWide(mode)
+          : await operations.passbandNormal(mode);
+
+      await operations.setMode(mode, width);
+    }));
+  }
+
+  async refresh(): Promise<RigState> {
+    return this.#call('refresh', () => this.#rig.runCompound('refresh', async (operations) => {
+      const state: RigState = {};
+
+      /* Read only what the model advertises; never invent a field. */
+      if (this.#capabilities.getFrequency) {
+        state.frequency = await operations.getFrequency();
+      }
+
+      if (this.#capabilities.getMode) {
+        const mode = await operations.getMode();
+
+        state.mode = mode.mode;
+        state.passband = mode.passband;
+      }
+
+      if (this.#capabilities.getPtt) {
+        state.ptt = toPttState(await operations.getPtt());
+      }
+
+      this.#publish(state);
+      return state;
+    }));
+  }
+
+  on<K extends keyof EasyRigEvents>(event: K, listener: Listener<EasyRigEvents[K]>): () => void {
+    return this.#events.on(event, listener);
+  }
+
+  watch(intervalMs: number): () => void {
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+      throw new HamlibError(
+        `watch interval must be a positive number of milliseconds, got ${String(intervalMs)}`,
+        { code: 'INVALID_ARGUMENT', operation: 'watch' },
+      );
+    }
+
+    const subscription: PollSubscription = { intervalMs };
+
+    this.#subscriptions.add(subscription);
+    this.#configureScheduler();
+
+    return () => {
+      /* Removing only this registration, once: another consumer's watcher and
+       * a repeated call of this function are both no-ops. */
+      if (this.#subscriptions.delete(subscription)) {
+        this.#configureScheduler();
+      }
+    };
   }
 
   async close(): Promise<void> {
-    if (this.#closed) {
-      return;
-    }
-
-    this.#closed = true;
-    this.#context.forget(this);
-
-    /* Cleanup must run even when the instance is already disposed; the native
-     * side releases the port even when rig_close reports an error. */
-    try {
-      await this.#context.queue.drain(async () => {
-        const result = await this.#context.native.closeRig(this.#handle);
-        this.#handle = 0;
-
-        if (result.code !== RIG_OK) {
-          throw hamlibError(result, 'close');
-        }
-      });
-    } catch (error) {
-      if (error instanceof HamlibError) {
-        throw error;
-      }
-
-      throw new HamlibError(
-        error instanceof Error ? error.message : String(error),
-        { code: 'TRANSPORT_FAILURE', operation: 'close', cause: error },
-      );
-    }
+    this.#shutdown();
+    await this.#rig.close();
   }
 
-  get path(): string {
-    return this.#path;
+  /** Stop polling and publication without touching the port (disposal path). */
+  abandon(): void {
+    this.#shutdown();
+  }
+
+  #shutdown(): void {
+    this.#closed = true;
+    this.#subscriptions.clear();
+    this.#stopScheduler();
+    this.#onClose(this);
   }
 
   /**
-   * Run one native call on the shared chain.
+   * Publish a completed snapshot.
    *
-   * Every bound native function is awaited: with Asyncify a call returns a
-   * promise whenever it suspended, and a plain value when it did not.
+   * A read that started before `close()` (or before the raw rig was closed)
+   * must not resurrect the wrapper: once closed, nothing is published.  A
+   * listener may itself close the rig while we are dispatching, so every
+   * delivery re-checks - no event follows a close.
    */
-  #call<T>(operation: string, work: () => Promise<T>): Promise<T> {
-    if (this.#closed) {
-      return Promise.reject(
-        new HamlibError('rig is closed', { code: 'RIG_CLOSED', operation }),
-      );
-    }
-
-    return this.#context.queue.enqueue<T>(operation, () => {
-      if (this.#closed) {
-        throw new HamlibError('rig is closed', { code: 'RIG_CLOSED', operation });
-      }
-
-      return work();
-    });
-  }
-
-  #requireCapability(allowed: boolean, operation: string, what: string): void {
-    if (allowed) {
+  #publish(state: RigState): void {
+    if (!this.#live()) {
       return;
     }
 
-    throw new HamlibError(
-      `${this.#model.manufacturer} ${this.#model.model} cannot ${what}`,
-      { code: 'UNSUPPORTED_OPERATION', operation },
-    );
-  }
-}
+    this.#state = state;
+    this.#events.emit('state', state);
 
-/* ------------------------------------------------------------------ */
-/* hamlib instance                                                    */
-/* ------------------------------------------------------------------ */
+    if (state.frequency !== undefined) {
+      this.#events.emit('frequency', state.frequency);
+    }
 
-/** The JavaScript side of the serial registry inside the Wasm module. */
-interface SerialRegistry {
-  storePort(port: SerialPort): number;
-  isSerialSupported(): boolean;
-}
+    if (state.mode !== undefined && state.passband !== undefined) {
+      this.#events.emit('mode', { mode: state.mode, passband: state.passband });
+    }
 
-function assertSerialPort(value: unknown, operation: string): asserts value is SerialPort {
-  const port = value as Partial<SerialPort> | null | undefined;
-
-  if (
-    !port
-    || typeof port.open !== 'function'
-    || typeof port.close !== 'function'
-    || typeof port.setSignals !== 'function'
-    || typeof port.getSignals !== 'function'
-    || typeof port.getInfo !== 'function'
-  ) {
-    throw new HamlibError('port must be a Web Serial SerialPort', {
-      code: 'INVALID_ARGUMENT',
-      operation,
-    });
-  }
-}
-
-function assertBaudRate(baudRate: number, model: RigModel): void {
-  if (!Number.isInteger(baudRate) || baudRate <= 0) {
-    throw new HamlibError(`baudRate must be a positive integer, got ${baudRate}`, {
-      code: 'INVALID_ARGUMENT',
-      operation: 'open',
-    });
-  }
-
-  /* Some backends leave the advertised range open; only enforce a range that
-   * is actually usable. */
-  if (
-    model.serialRateMin > 0
-    && model.serialRateMax >= model.serialRateMin
-    && (baudRate < model.serialRateMin || baudRate > model.serialRateMax)
-  ) {
-    throw new HamlibError(
-      `baudRate ${baudRate} is outside the ${model.serialRateMin}-${model.serialRateMax} `
-      + `range supported by ${model.manufacturer} ${model.model}`,
-      { code: 'INVALID_ARGUMENT', operation: 'open' },
-    );
-  }
-}
-
-const SERIAL_PARITIES: readonly SerialParity[] = ['none', 'odd', 'even', 'mark', 'space'];
-const SERIAL_HANDSHAKES: readonly SerialHandshake[] = ['none', 'xon-xoff', 'hardware'];
-
-function toParity(value: unknown): SerialParity {
-  const text = String(value);
-  return SERIAL_PARITIES.find((parity) => parity === text) ?? 'none';
-}
-
-function toHandshake(value: unknown): SerialHandshake {
-  const text = String(value);
-  return SERIAL_HANDSHAKES.find((handshake) => handshake === text) ?? 'none';
-}
-
-/**
- * Work out how far a model is supported here, and why it is not when it is not.
- *
- * The line settings come from the backend's own capabilities, so a model that
- * declares something Web Serial cannot express is labelled before the caller
- * wastes a user gesture on it.
- */
-function classifyModel(
-  manufacturer: string,
-  model: string,
-  settings: DeclaredLineSettings,
-): { support: BrowserSupport; limitation?: string } {
-  if (findVerifiedModel(manufacturer, model)) {
-    return { support: 'verified' };
-  }
-
-  const unusable = findUnusableModel(manufacturer, model);
-
-  if (unusable) {
-    return { support: 'candidate', limitation: unusable.reason };
-  }
-
-  const limitation = describeLineSettingsLimitation(settings);
-
-  return limitation ? { support: 'candidate', limitation } : { support: 'candidate' };
-}
-
-/**
- * The generated operations a model implements.  `rig_caps` describes all but
- * the flag-gated bespoke ones: a backend that drives push-to-talk over the
- * serial RTS/DTR line declares no `get_ptt`/`set_ptt` function pointer, so the
- * catalogue entry carries that capability itself.
- */
-function collectCapabilities(model: NativeModel, native: NativeModule): string[] {
-  const capabilities = Array.from(native.capabilities(model.id));
-
-  for (const [operation, flag] of FLAG_GATED_OPERATIONS) {
-    if (model[flag]) {
-      capabilities.push(operation);
+    if (state.ptt !== undefined) {
+      this.#events.emit('ptt', state.ptt);
     }
   }
 
-  return capabilities;
-}
-
-function collectModels(list: NativeModelList, native: NativeModule): RigModel[] {
-  const models: RigModel[] = [];
-
-  try {
-    for (let index = 0; index < list.size(); index++) {
-      const model: NativeModel | undefined = list.get(index);
-
-      if (!model) {
-        continue;
-      }
-
-      const manufacturer = String(model.manufacturer);
-      const name = String(model.model);
-      const settings = {
-        serialDataBits: model.serialDataBits,
-        serialStopBits: model.serialStopBits,
-        serialParity: toParity(model.serialParity),
-        serialHandshake: toHandshake(model.serialHandshake),
-      };
-      const { support, limitation } = classifyModel(manufacturer, name, settings);
-
-      models.push({
-        id: model.id,
-        manufacturer,
-        model: name,
-        backendVersion: String(model.backendVersion),
-        status: model.status,
-        serialRateMin: model.serialRateMin,
-        serialRateMax: model.serialRateMax,
-        serialDataBits: settings.serialDataBits,
-        serialStopBits: settings.serialStopBits,
-        serialParity: settings.serialParity,
-        serialHandshake: settings.serialHandshake,
-        support,
-        ...(limitation === undefined ? {} : { limitation }),
-        capabilities: collectCapabilities(model, native),
-        canGetFrequency: model.canGetFrequency,
-        canSetFrequency: model.canSetFrequency,
-        canGetMode: model.canGetMode,
-        canSetMode: model.canSetMode,
-        canGetPtt: model.canGetPtt,
-        canSetPtt: model.canSetPtt,
-      });
-    }
-  } finally {
-    /* The Embind vector owns Wasm memory. */
-    list.delete();
+  /** Whether this wrapper may still publish: not closed and the rig is live. */
+  #live(): boolean {
+    return !this.#closed && this.#rig.connected;
   }
 
-  return models;
+  /** Drive the one scheduler from the registrations currently held. */
+  #configureScheduler(): void {
+    if (this.#closed || !this.#rig.connected || this.#subscriptions.size === 0) {
+      this.#stopScheduler();
+      return;
+    }
+
+    let intervalMs = Number.POSITIVE_INFINITY;
+
+    for (const subscription of this.#subscriptions) {
+      intervalMs = Math.min(intervalMs, subscription.intervalMs);
+    }
+
+    if (this.#timer !== undefined && this.#intervalMs === intervalMs) {
+      return;
+    }
+
+    const starting = this.#timer === undefined;
+
+    this.#stopScheduler();
+    this.#intervalMs = intervalMs;
+    this.#timer = setInterval(() => {
+      void this.#tick();
+    }, intervalMs);
+
+    /* The first registration polls straight away, as a fresh watch() did. */
+    if (starting) {
+      void this.#tick();
+    }
+  }
+
+  #stopScheduler(): void {
+    if (this.#timer !== undefined) {
+      clearInterval(this.#timer);
+      this.#timer = undefined;
+    }
+  }
+
+  /** One poll tick: skip when the previous refresh has not settled yet. */
+  async #tick(): Promise<void> {
+    if (this.#polling) {
+      return;
+    }
+
+    if (this.#closed || !this.#rig.connected) {
+      /* The raw rig was closed behind the wrapper (or disposal ran): stop
+       * rather than leave a scheduler retaining the handle forever. */
+      this.#stopScheduler();
+      return;
+    }
+
+    this.#polling = true;
+
+    try {
+      await this.refresh();
+    } catch {
+      /* refresh() already emitted the error; the timer must keep running. */
+    } finally {
+      this.#polling = false;
+    }
+  }
+
+  async #call<T>(operation: string, work: () => Promise<T>): Promise<T> {
+    try {
+      return await work();
+    } catch (error) {
+      const failure = asHamlibError(error, operation);
+
+      /* A command that failed while the rig was being closed must not emit
+       * after the close either; the rejection still reaches its caller. */
+      this.#events.emit('error', failure);
+
+      throw failure;
+    }
+  }
 }
 
-class HamlibInstance implements Hamlib, RigContext {
-  readonly #native: NativeModule;
-  readonly #registry: SerialRegistry;
-  readonly #models: RigModel[];
-  readonly #modelsById: Map<number, RigModel>;
-  readonly #version: string;
-  readonly #rigs = new Set<RigHandle>();
-  readonly #paths = new Set<string>();
+class EasyHamlibInstance implements EasyHamlib {
+  readonly #hamlib: Hamlib;
+  readonly #rigs = new Set<EasyRigHandle>();
 
-  readonly queue = new Serializer();
-
-  #portCounter = 0;
   #disposed = false;
-  #disposePromise?: Promise<void>;
+  #disposePromise: Promise<void> | undefined;
 
-  private constructor(
-    native: NativeModule,
-    registry: SerialRegistry,
-    models: RigModel[],
-    version: string,
-  ) {
-    this.#native = native;
-    this.#registry = registry;
-    this.#models = models;
-    this.#modelsById = new Map(models.map((model) => [model.id, model]));
-    this.#version = version;
+  private constructor(hamlib: Hamlib) {
+    this.#hamlib = hamlib;
   }
 
-  static async create(options: HamlibOptions): Promise<HamlibInstance> {
-    const locate = options.locateFile
-      ?? ((file: string) => new URL(`./native/${file}`, import.meta.url));
-
-    const native = await createNativeModule({
-      locateFile: (file: string) => String(locate(file)),
-    });
-
-    const registry = native.HamlibWs as SerialRegistry;
-
-    if (typeof registry?.storePort !== 'function') {
-      throw new HamlibError(
-        'the WebAssembly module did not expose its serial registry',
-        { code: 'TRANSPORT_FAILURE', operation: 'createHamlib' },
-      );
-    }
-
-    /* Every bound native call is awaited: Asyncify returns a promise when the
-     * call suspended and a plain value when it did not. */
-    const initialization = await native.initialize();
-
-    if (initialization.code !== RIG_OK) {
-      throw hamlibError(initialization, 'initialize');
-    }
-
-    const models = collectModels(await native.listModels(), native);
-
-    return new HamlibInstance(native, registry, models, await native.version());
-  }
-
-  get native(): NativeModule {
-    return this.#native;
+  static async create(options: HamlibOptions): Promise<EasyHamlibInstance> {
+    return new EasyHamlibInstance(await createHamlib(options));
   }
 
   get version(): string {
-    return this.#version;
+    return this.#hamlib.version;
   }
 
   get models(): readonly RigModel[] {
-    return this.#models;
+    return this.#hamlib.models;
   }
 
-  forget(rig: RigHandle): void {
-    this.#rigs.delete(rig);
-  }
-
-  async requestPort(options?: SerialPortRequestOptions): Promise<SerialPort> {
+  requestPort(options?: SerialPortRequestOptions): Promise<SerialPort> {
     this.#assertLive('requestPort');
-
-    const serial = this.#serial();
-
-    if (!serial) {
-      throw new HamlibError('Web Serial is not available in this browser', {
-        code: 'WEB_SERIAL_UNAVAILABLE',
-        operation: 'requestPort',
-      });
-    }
-
-    try {
-      return await serial.requestPort(options);
-    } catch (error) {
-      throw transportError(error, 'requestPort');
-    }
+    return this.#hamlib.requestPort(options);
   }
 
-  async open(options: OpenRigOptions): Promise<Rig> {
+  detectBaudRate(options: DetectBaudRateOptions): Promise<number> {
+    this.#assertLive('detectBaudRate');
+    return this.#hamlib.detectBaudRate(options);
+  }
+
+  async open(options: OpenEasyRigOptions): Promise<EasyRig> {
     this.#assertLive('open');
 
-    const { modelId, port, baudRate } = options;
-    const serial = this.#serial();
+    const port = options.port ?? await this.requestPort();
 
-    if (!serial) {
-      throw new HamlibError('Web Serial is not available in this browser', {
-        code: 'WEB_SERIAL_UNAVAILABLE',
+    this.#assertLive('open');
+
+    const rig = await this.#hamlib.open({
+      modelId: options.modelId,
+      port,
+      baudRate: options.baudRate,
+    });
+    const easy = new EasyRigHandle(rig, (handle) => {
+      this.#rigs.delete(handle);
+    });
+
+    if (this.#disposed) {
+      /* Disposal was accepted while this open waited: hand the rig over closed
+       * instead of publishing a live wrapper. */
+      await easy.close();
+      throw new HamlibError('Hamlib instance has been disposed', {
+        code: 'DISPOSED',
         operation: 'open',
       });
     }
 
-    const model = this.#modelsById.get(modelId);
-
-    if (!model) {
-      throw new HamlibError(
-        `unknown rig model id ${String(modelId)}; use an id from hamlib.models`,
-        { code: 'INVALID_ARGUMENT', operation: 'open' },
-      );
-    }
-
-    if (baudRate !== undefined) {
-      assertBaudRate(baudRate, model);
-    }
-
-    assertSerialPort(port, 'open');
-
-    const path = `webserial/${++this.#portCounter}`;
-    const token = this.#registry.storePort(port);
-
-    if (token <= 0) {
-      throw new HamlibError('the selected port could not be registered', {
-        code: 'TRANSPORT_FAILURE',
-        operation: 'open',
-      });
-    }
-
-    /* Track the path before queueing so dispose() can always see and release
-     * an accepted open, even when disposal races with it. */
-    this.#paths.add(path);
-
-    try {
-      const rig = await this.queue.enqueue<RigHandle>('open', async () => {
-        const registered = await this.#native.registerPort(path, token);
-
-        if (registered.code !== RIG_OK) {
-          throw hamlibError(registered, 'open');
-        }
-
-        const opened = await this.#native.openRig(modelId, path, baudRate ?? 0);
-
-        if (opened.code !== RIG_OK) {
-          throw hamlibError(opened, 'open');
-        }
-
-        /* Register inside the queued work: dispose() drains the chain before
-         * it snapshots the live rigs, so this rig is always reachable. */
-        const rig = new RigHandle(this, path, model, opened.handle);
-        this.#rigs.add(rig);
-        return rig;
-      });
-
-      if (this.#disposed) {
-        /* Disposal was accepted while this open waited in the queue.  Hand
-         * the rig over closed instead of letting an open survive it. */
-        await rig.close();
-        throw new HamlibError('Hamlib instance has been disposed', {
-          code: 'DISPOSED',
-          operation: 'open',
-        });
-      }
-
-      return rig;
-    } catch (error) {
-      /* Opening failed: the logical path must not stay registered.  The
-       * original failure is the one the caller needs. */
-      try {
-        await this.#releasePath(path);
-      } catch {
-        /* dispose() reports leftover registrations. */
-      }
-
-      throw error;
-    }
+    this.#rigs.add(easy);
+    return easy;
   }
 
   dispose(): Promise<void> {
@@ -842,52 +646,15 @@ class HamlibInstance implements Hamlib, RigContext {
 
   async #dispose(): Promise<void> {
     this.#disposed = true;
-    this.queue.close();
 
-    const failures: unknown[] = [];
-
-    /* Every accepted open runs on the shared chain.  A barrier here waits for
-     * them, so the snapshot below covers every rig and port they created. */
-    await this.queue.drain(() => {});
-
+    /* Stop every scheduler and invalidate publication *before* delegating the
+     * native cleanup, so nothing this layer owns can publish afterwards. */
     for (const rig of [...this.#rigs]) {
-      try {
-        await rig.close();
-      } catch (error) {
-        failures.push(error);
-      }
+      rig.abandon();
     }
 
-    for (const path of [...this.#paths]) {
-      try {
-        await this.#releasePath(path);
-      } catch (error) {
-        failures.push(error);
-      }
-    }
-
-    if (failures.length > 0) {
-      throw failures[0];
-    }
-  }
-
-  /** Unregister one logical path; the native handle is already closed. */
-  async #releasePath(path: string): Promise<void> {
-    await this.queue.drain(async () => {
-      const result = await this.#native.unregisterPort(path);
-
-      if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'dispose');
-      }
-
-      this.#paths.delete(path);
-    });
-  }
-
-  #serial(): Serial | undefined {
-    if (typeof navigator === 'undefined') { return undefined; }
-
-    return navigator.serial;
+    this.#rigs.clear();
+    await this.#hamlib.dispose();
   }
 
   #assertLive(operation: string): void {
@@ -904,11 +671,19 @@ class HamlibInstance implements Hamlib, RigContext {
  * Load Hamlib and read its rig model catalogue.
  *
  * ```ts
- * const hamlib = await createHamlib();
- * const port = await hamlib.requestPort();
- * const rig = await hamlib.open({ modelId, port });
+ * const hamlib = await createEasy();
+ * const model = hamlib.models.find((entry) => entry.model === 'TS-480');
+ * const rig = await hamlib.open({ modelId: model.id });   // asks for the port
+ * console.log(await rig.refresh());                        // 14074000 USB 2400
+ * await rig.setFrequency(7_074_000);
+ * await rig.setPtt(true);
+ * await rig.close();
+ * await hamlib.dispose();
  * ```
+ *
+ * One instance owns one Wasm module and one call queue; a second instance is a
+ * second module with its own memory.
  */
-export async function createHamlib(options: HamlibOptions = {}): Promise<Hamlib> {
-  return HamlibInstance.create(options);
+export async function createEasy(options: HamlibOptions = {}): Promise<EasyHamlib> {
+  return EasyHamlibInstance.create(options);
 }

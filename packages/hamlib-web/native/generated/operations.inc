@@ -696,17 +696,6 @@
         return result;
     }
 
-    double getResolution(int handle, const std::string & arg0)
-    {
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return {}; }
-
-        rmode_t value0 = rig_parse_mode(arg0.c_str());
-
-        return (double) rig_get_resolution(rig, value0);
-    }
-
     CodeResult setLevel(int handle, const std::string & arg0, double arg1)
     {
         webserial_clear_error();
@@ -926,37 +915,6 @@
         hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
 
         const struct confparams *source = rig_ext_lookup_tok(rig, value0);
-        RigConfparams result{};
-        if (!source) { return result; }
-        result.token = (double) source->token;
-        result.name = source->name ? std::string(source->name) : std::string();
-        result.label = source->label ? std::string(source->label) : std::string();
-        result.tooltip = source->tooltip ? std::string(source->tooltip) : std::string();
-        result.dflt = source->dflt ? std::string(source->dflt) : std::string();
-        result.type = (double) source->type;
-        return result;
-    }
-
-    double extTokenLookup(int handle, const std::string & arg0)
-    {
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return {}; }
-
-        const char *value0 = arg0.c_str();
-
-        return (double) rig_ext_token_lookup(rig, value0);
-    }
-
-    RigConfparams confparamLookup(int handle, const std::string & arg0)
-    {
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return {}; }
-
-        const char *value0 = arg0.c_str();
-
-        const struct confparams *source = rig_confparam_lookup(rig, value0);
         RigConfparams result{};
         if (!source) { return result; }
         result.token = (double) source->token;
@@ -1204,17 +1162,15 @@
         return result;
     }
 
-    std::string hasVfoOp(int handle, const std::string & arg0)
+    double hasVfoOp(int handle, const std::string & arg0)
     {
         RIG *rig = lookupRig(handle);
 
-        if (!rig) { return std::string(); }
+        if (!rig) { return {}; }
 
         vfo_op_t value0 = rig_parse_vfo_op(arg0.c_str());
 
-        const auto result = rig_has_vfo_op(rig, value0);
-        const char *text = rig_strvfop(result);
-        return text ? std::string(text) : std::string();
+        return (double) rig_has_vfo_op(rig, value0);
     }
 
     CodeResult scan(int handle, const std::string & arg0, double arg1)
@@ -1239,17 +1195,15 @@
         return result;
     }
 
-    std::string hasScan(int handle, const std::string & arg0)
+    double hasScan(int handle, const std::string & arg0)
     {
         RIG *rig = lookupRig(handle);
 
-        if (!rig) { return std::string(); }
+        if (!rig) { return {}; }
 
         scan_t value0 = rig_parse_scan(arg0.c_str());
 
-        const auto result = rig_has_scan(rig, value0);
-        const char *text = rig_strscan(result);
-        return text ? std::string(text) : std::string();
+        return (double) rig_has_scan(rig, value0);
     }
 
     CodeResult setChannel(int handle, const RigChannel & arg0)
@@ -1362,54 +1316,6 @@
         result.startc = (double) source->startc;
         result.endc = (double) source->endc;
         result.type = (double) source->type;
-        return result;
-    }
-
-    double memCount(int handle)
-    {
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return {}; }
-
-
-        return (double) rig_mem_count(rig);
-    }
-
-    CodeResult setTrn(int handle, double arg0)
-    {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int value0 = static_cast<int>(arg0);
-        int rc = rig_set_trn(rig, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
-    }
-
-    NumberResult getTrn(int handle)
-    {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
-
-        int out0{};
-
-        int rc = rig_get_trn(rig, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
         return result;
     }
 
@@ -1543,58 +1449,12 @@
         return text ? std::string(text) : std::string();
     }
 
-    std::string strFunc(double arg0)
-    {
-        setting_t value0 = static_cast<setting_t>(arg0);
-
-        const char *text = rig_strfunc(value0);
-        return text ? std::string(text) : std::string();
-    }
-
     std::string strLevel(double arg0)
     {
         setting_t value0 = static_cast<setting_t>(arg0);
 
         const char *text = rig_strlevel(value0);
         return text ? std::string(text) : std::string();
-    }
-
-    std::string strParm(double arg0)
-    {
-        setting_t value0 = static_cast<setting_t>(arg0);
-
-        const char *text = rig_strparm(value0);
-        return text ? std::string(text) : std::string();
-    }
-
-    std::string strAgcLevel(double arg0)
-    {
-        enum agc_level_e value0 = static_cast<enum agc_level_e>(arg0);
-
-        const char *text = rig_stragclevel(value0);
-        return text ? std::string(text) : std::string();
-    }
-
-    double levelAgcStr(const std::string & arg0)
-    {
-        const char *value0 = arg0.c_str();
-
-        return (double) rig_levelagcstr(value0);
-    }
-
-    double levelAgcValue(double arg0)
-    {
-        int value0 = static_cast<int>(arg0);
-
-        return (double) rig_levelagcvalue(value0);
-    }
-
-    double valueAgcLevel(double arg0)
-    {
-        enum agc_level_e value0 = static_cast<enum agc_level_e>(arg0);
-
-        value_t result = rig_valueagclevel(value0);
-        return (double) result.i;
     }
 
     std::string strPtrShift(double arg0)
@@ -1605,51 +1465,11 @@
         return text ? std::string(text) : std::string();
     }
 
-    std::string strVfoOp(double arg0)
-    {
-        vfo_op_t value0 = static_cast<vfo_op_t>(arg0);
-
-        const char *text = rig_strvfop(value0);
-        return text ? std::string(text) : std::string();
-    }
-
-    std::string strScan(double arg0)
-    {
-        scan_t value0 = static_cast<scan_t>(arg0);
-
-        const char *text = rig_strscan(value0);
-        return text ? std::string(text) : std::string();
-    }
-
     std::string strStatus(double arg0)
     {
         enum rig_status_e value0 = static_cast<enum rig_status_e>(arg0);
 
         const char *text = rig_strstatus(value0);
-        return text ? std::string(text) : std::string();
-    }
-
-    std::string strMType(double arg0)
-    {
-        chan_type_t value0 = static_cast<chan_type_t>(arg0);
-
-        const char *text = rig_strmtype(value0);
-        return text ? std::string(text) : std::string();
-    }
-
-    std::string strSpectrumMode(double arg0)
-    {
-        enum rig_spectrum_mode_e value0 = static_cast<enum rig_spectrum_mode_e>(arg0);
-
-        const char *text = rig_strspectrummode(value0);
-        return text ? std::string(text) : std::string();
-    }
-
-    std::string strCommStatus(double arg0)
-    {
-        rig_comm_status_t value0 = static_cast<rig_comm_status_t>(arg0);
-
-        const char *text = rig_strcommstatus(value0);
         return text ? std::string(text) : std::string();
     }
 
@@ -1709,27 +1529,6 @@
         return (double) rig_parse_rptr_shift(value0);
     }
 
-    double parseMType(const std::string & arg0)
-    {
-        const char *value0 = arg0.c_str();
-
-        return (double) rig_parse_mtype(value0);
-    }
-
-    std::string license()
-    {
-
-        const char *text = rig_license();
-        return text ? std::string(text) : std::string();
-    }
-
-    std::string copyright()
-    {
-
-        const char *text = rig_copyright();
-        return text ? std::string(text) : std::string();
-    }
-
     CodeResult setClock(int handle, double arg0, double arg1, double arg2, double arg3, double arg4, double arg5, double arg6, double arg7)
     {
         webserial_clear_error();
@@ -1787,16 +1586,5 @@
         result.msec = (double) out6;
         result.utcOffset = (double) out7;
         return result;
-    }
-
-    double isModel(int handle, double arg0)
-    {
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return {}; }
-
-        rig_model_t value0 = static_cast<rig_model_t>(arg0);
-
-        return (double) rig_is_model(rig, value0);
     }
 

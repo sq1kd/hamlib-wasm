@@ -3,15 +3,25 @@
  *
  * This file is only typechecked (never executed).  It imports the package the
  * way a real application would - from the packed tarball through the published
- * exports map - and walks the complete documented flow, so a mismatch between
- * the generated declarations and the package exports fails `mise run
- * typecheck`.
+ * exports map - and walks both documented flows, so a mismatch between the
+ * generated declarations and the package exports fails `mise run typecheck`.
+ *
+ * Two entries are exercised: `hamlib-web`, the easy surface, and
+ * `hamlib-web/native`, the 1:1 Hamlib surface.
  */
-import { createHamlib, HamlibError } from 'hamlib-web';
+import { HamlibError, createEasy } from 'hamlib-web';
 import type {
-  Hamlib,
+  EasyCapabilities,
+  EasyHamlib,
+  EasyRig,
   HamlibErrorCode,
   HamlibOptions,
+  PttState,
+  RigState,
+} from 'hamlib-web';
+import { createHamlib } from 'hamlib-web/native';
+import type {
+  Hamlib,
   OpenRigOptions,
   Rig,
   RigCapabilities,
@@ -19,7 +29,7 @@ import type {
   RigMode,
   RigModeState,
   RigModel,
-} from 'hamlib-web';
+} from 'hamlib-web/native';
 
 export interface ConsumerSummary {
   version: string;
@@ -70,29 +80,21 @@ export async function runConsumerFlow(
     await rig.setPtt('on');
     const ptt: string = await rig.getPtt();
 
-    /* The operations whose C++ body is hand-written (the buffer, ext and
-     * walker shapes) are typed methods like every other generated one. */
-    const vfoList: string = await rig.getVfoList();
+    /* The operations whose C++ body is hand-written (the buffer, extended
+     * setting and PTT shapes) are typed methods like every other generated
+     * one.  An extended lookup crosses as the projected `RigConfparam`. */
     const rigInfo: string = await rig.getRigInfo();
-    const tokens: RigConfparam[] = await rig.tokenForeach();
-    const extLevels: RigConfparam[] = await rig.extLevelForeach();
-    await rig.extFuncForeach();
-    await rig.extParmForeach();
+    const extension: RigConfparam = await rig.extLookupTok(0);
+    const value: number = await rig.getExtLevel(extension.token);
 
-    const firstExt: RigConfparam | undefined = extLevels[0];
+    await rig.setExtLevel(extension.token, value);
 
-    if (firstExt) {
-      const value: number = await rig.getExtLevel(firstExt.token);
-      await rig.setExtLevel(firstExt.token, value);
-    }
+    const codec: number = await rig.parseVfo(await rig.strVfo(0));
+    const mask: number = await rig.hasGetLevel('AGC');
 
-    const firstToken: RigConfparam | undefined = tokens[0];
-    const agc: number = await rig.valueAgcLevel(0);
-
-    void vfoList;
     void rigInfo;
-    void firstToken;
-    void agc;
+    void codec;
+    void mask;
 
     summary = {
       version,
@@ -135,6 +137,66 @@ export async function runConsumerFlow(
   }
 
   return summary;
+}
+
+export interface EasySummary {
+  version: string;
+  state: RigState;
+  capabilities: EasyCapabilities;
+  ptt: PttState;
+}
+
+/** The easy flow: port request, one snapshot, events, a watch, the raw escape. */
+export async function runEasyFlow(
+  port: SerialPort,
+  locateFile: HamlibOptions['locateFile'],
+): Promise<EasySummary> {
+  const hamlib: EasyHamlib = await createEasy({ locateFile });
+  const version: string = hamlib.version;
+  const model: RigModel | undefined = hamlib.models.find(
+    (candidate: RigModel) => candidate.model === 'TS-480',
+  );
+
+  if (!model) {
+    await hamlib.dispose();
+    throw new Error('the TS-480 model is missing from the catalogue');
+  }
+
+  /* A granted port skips requestPort(), so no user gesture is needed here. */
+  const rig: EasyRig = await hamlib.open({
+    modelId: model.id,
+    port,
+    baudRate: model.serialRateMax,
+  });
+
+  const unsubscribe: () => void = rig.on('state', (state: RigState) => {
+    void state.frequency;
+  });
+  const stopWatching: () => void = rig.watch(1000);
+
+  unsubscribe();
+  stopWatching();
+
+  const state: RigState = await rig.refresh();
+  await rig.setFrequency(7_074_000);
+  await rig.setMode('CW');
+  await rig.setPtt(true);
+
+  const ptt: PttState = rig.state?.ptt ?? 'off';
+  const capabilities: EasyCapabilities = rig.capabilities;
+
+  /* Anything the easy surface does not cover is still reachable. */
+  const raw: Rig = rig.raw;
+  const mode: RigMode | undefined = state.mode;
+  const rawMode: RigModeState = await raw.getMode();
+
+  void mode;
+  void rawMode;
+
+  await rig.close();
+  await hamlib.dispose();
+
+  return { version, state, capabilities, ptt };
 }
 
 export function describeMode(mode: RigMode, passband: number): string {

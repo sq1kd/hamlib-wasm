@@ -9,7 +9,7 @@ export interface GeneratedCallResult {
 }
 
 /**
- * Shared plumbing for the generated rig methods.  `src/index.ts` supplies the
+ * Shared plumbing for the generated rig methods.  `src/native.ts` supplies the
  * implementation: the native module, the current handle, the single call queue,
  * the capability gate and the error conversion.
  */

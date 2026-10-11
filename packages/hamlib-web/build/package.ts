@@ -22,6 +22,8 @@ const GENERATED_DECLARATION = path.join(PACKAGE_DIR, 'src', 'native', 'hamlib-we
 const REQUIRED_OUTPUTS: readonly string[] = [
   path.join(PACKAGE_DIR, 'dist', 'index.js'),
   path.join(PACKAGE_DIR, 'dist', 'index.d.ts'),
+  path.join(PACKAGE_DIR, 'dist', 'native.js'),
+  path.join(PACKAGE_DIR, 'dist', 'native.d.ts'),
   path.join(PACKAGE_DIR, 'dist', 'native', 'hamlib-web.mjs'),
   path.join(PACKAGE_DIR, 'dist', 'native', 'hamlib-web.wasm'),
   path.join(PACKAGE_DIR, 'dist', 'native', 'hamlib-web.d.mts'),

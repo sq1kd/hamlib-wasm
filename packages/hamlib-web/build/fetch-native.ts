@@ -141,7 +141,19 @@ function extractAndPatch(): void {
   if (leftovers.length > 0) {
     fail(`patch application left rejects behind: ${leftovers.join(', ')}`);
   }
+}
 
+/*
+ * Install the project owned browser transport over upstream's `src/serial.c`.
+ *
+ * This runs on every invocation, not only when the tree is re-extracted: the
+ * stamp above tracks the pinned release, so an edit to `native/web_serial.c`
+ * or `native/web_serial.h` would otherwise leave the previous copy installed
+ * and the build would fail on a stale definition that no longer matches the
+ * new header.  Both files are small, so the copy is cheaper than the round of
+ * confusing errors it prevents.
+ */
+function installTransport(): void {
   log('installing the browser serial transport as src/serial.c');
   copyFileSync(
     path.join(NATIVE_DIR, 'web_serial.c'),
@@ -184,6 +196,8 @@ async function main(): Promise<void> {
     mkdirSync(CACHE_DIR, { recursive: true });
     writeFileSync(STAMP_PATH, `${JSON.stringify({ digest: extractedDigest() }, null, 2)}\n`);
   }
+
+  installTransport();
 
   log('upstream tree ready');
 }

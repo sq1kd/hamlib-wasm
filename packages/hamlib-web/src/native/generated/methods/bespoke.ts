@@ -7,7 +7,8 @@ import { GeneratedRigBase } from './base.js';
 
 /**
  * Operations whose C++ body is hand-written in `native/facade.cpp`:
- * buffers a signature cannot describe, the callback walkers and PTT.
+ * buffers a signature cannot describe, the table walkers, extended
+ * settings and PTT.
  * The method itself is generated from the config like every other.
  */
 export abstract class BespokeMethods extends GeneratedRigBase {
@@ -34,14 +35,6 @@ export abstract class BespokeMethods extends GeneratedRigBase {
     return this.serialized('getRigInfo', async () => {
       const result = await this.native().getRigInfo(this.handle());
       if (result.code !== 0) { throw this.failed(result, 'getRigInfo'); }
-      return String(result.value);
-    });
-  }
-
-  async getVfoList(): Promise<string> {
-    return this.serialized('getVfoList', async () => {
-      const result = await this.native().getVfoList(this.handle());
-      if (result.code !== 0) { throw this.failed(result, 'getVfoList'); }
       return String(result.value);
     });
   }

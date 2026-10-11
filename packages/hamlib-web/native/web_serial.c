@@ -51,6 +51,7 @@ extern int hamlibWsMatchesOpenOptions(int handle, int rate, int data_bits,
                                       int stop_bits, int parity,
                                       int flow_control);
 extern int hamlibWsRead(int handle, void *buf, int len);
+extern int hamlibWsBytesReceived(int handle);
 extern int hamlibWsWrite(int handle, const void *buf, int len);
 extern int hamlibWsWaitReadable(int handle, int timeout_ms);
 extern int hamlibWsFlush(int handle);
@@ -112,10 +113,17 @@ void webserial_clear_error(void)
 
 /*
  * The POSIX wrappers only receive a descriptor, so the transport keeps the
- * set of descriptors it owns.  Serial opens are rare and bounded, so a small
- * linear table beats any allocation.
+ * set of descriptors it owns, together with the logical path each was opened
+ * for.  Serial opens are rare and bounded, so a small linear table beats any
+ * allocation.
  */
-static int ws_handles[WEBSERIAL_MAX_HANDLES];
+struct ws_handle
+{
+    int fd;
+    char path[HAMLIB_FILPATHLEN];
+};
+
+static struct ws_handle ws_handles[WEBSERIAL_MAX_HANDLES];
 
 int webserial_owns_fd(int fd)
 {
@@ -123,21 +131,23 @@ int webserial_owns_fd(int fd)
 
     for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
     {
-        if (ws_handles[i] == fd) { return 1; }
+        if (ws_handles[i].fd == fd) { return 1; }
     }
 
     return 0;
 }
 
-void webserial_register_handle(int fd)
+void webserial_register_handle(int fd, const char *path)
 {
     if (fd <= 0 || webserial_owns_fd(fd)) { return; }
 
     for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
     {
-        if (ws_handles[i] == 0)
+        if (ws_handles[i].fd == 0)
         {
-            ws_handles[i] = fd;
+            ws_handles[i].fd = fd;
+            SNPRINTF(ws_handles[i].path, sizeof(ws_handles[i].path), "%s",
+                     path ? path : "");
             return;
         }
     }
@@ -149,8 +159,27 @@ void webserial_unregister_handle(int fd)
 {
     for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
     {
-        if (ws_handles[i] == fd) { ws_handles[i] = 0; }
+        if (ws_handles[i].fd == fd)
+        {
+            ws_handles[i].fd = 0;
+            ws_handles[i].path[0] = '\0';
+        }
     }
+}
+
+long webserial_rx_bytes(const char *path)
+{
+    if (!path || path[0] == '\0') { return -1; }
+
+    for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
+    {
+        if (ws_handles[i].fd > 0 && strcmp(ws_handles[i].path, path) == 0)
+        {
+            return (long) hamlibWsBytesReceived(ws_handles[i].fd);
+        }
+    }
+
+    return -1;
 }
 
 /* --- configuration validation ------------------------------------------ */
@@ -274,7 +303,7 @@ int HAMLIB_API serial_open(hamlib_port_t *rp)
         return ws_map_error(handle, -RIG_EIO);
     }
 
-    webserial_register_handle(handle);
+    webserial_register_handle(handle, rp->pathname);
     rp->fd = handle;
     return RIG_OK;
 }
@@ -355,7 +384,7 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
         return ws_map_error(handle, -RIG_EIO);
     }
 
-    webserial_register_handle(handle);
+    webserial_register_handle(handle, rp->pathname);
     rp->fd = handle;
     return RIG_OK;
 }
@@ -677,9 +706,9 @@ int webserial_select_fd(fd_set *readfds, struct timeval *timeout, int *handled)
 
     for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
     {
-        if (ws_handles[i] > 0 && FD_ISSET(ws_handles[i], readfds))
+        if (ws_handles[i].fd > 0 && FD_ISSET(ws_handles[i].fd, readfds))
         {
-            fd = ws_handles[i];
+            fd = ws_handles[i].fd;
             break;
         }
     }

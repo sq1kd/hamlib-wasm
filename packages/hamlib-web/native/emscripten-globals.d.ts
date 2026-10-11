@@ -44,6 +44,10 @@ interface PortState {
   writer: WritableStreamDefaultWriter<Uint8Array> | null;
   writeChain: Promise<number> | null;
   pumpPromise: Promise<void> | null;
+  /* Bytes the pump has delivered since this state was created, i.e. since the
+   * port was last opened.  A read does not clear it: it answers "did the rig
+   * ever speak", which is what the facade's reachability check asks. */
+  rxBytes: number;
   lastRts: number;
   lastDtr: number;
   rtsKnown: boolean;
@@ -129,6 +133,7 @@ interface HamlibWsApi {
     flowControl: number,
   ): number;
   read(handle: number, ptr: number, len: number): number;
+  bytesReceived(handle: number): number;
   write(handle: number, ptr: number, len: number): Promise<number>;
   waitReadable(handle: number, timeoutMs: number): Promise<number>;
   flush(handle: number): number;

@@ -40,27 +40,39 @@ export abstract class SettingsMethods extends ExtMethods {
   }
 
   async hasGetLevel(level: string): Promise<number> {
-    return this.native().hasGetLevel(this.handle(), level);
+    return this.serialized('hasGetLevel', async () => {
+      return this.native().hasGetLevel(this.handle(), level);
+    });
   }
 
   async hasSetLevel(level: string): Promise<number> {
-    return this.native().hasSetLevel(this.handle(), level);
+    return this.serialized('hasSetLevel', async () => {
+      return this.native().hasSetLevel(this.handle(), level);
+    });
   }
 
   async hasGetParm(parm: string): Promise<number> {
-    return this.native().hasGetParm(this.handle(), parm);
+    return this.serialized('hasGetParm', async () => {
+      return this.native().hasGetParm(this.handle(), parm);
+    });
   }
 
   async hasSetParm(parm: string): Promise<number> {
-    return this.native().hasSetParm(this.handle(), parm);
+    return this.serialized('hasSetParm', async () => {
+      return this.native().hasSetParm(this.handle(), parm);
+    });
   }
 
   async hasGetFunc(func: string): Promise<number> {
-    return this.native().hasGetFunc(this.handle(), func);
+    return this.serialized('hasGetFunc', async () => {
+      return this.native().hasGetFunc(this.handle(), func);
+    });
   }
 
   async hasSetFunc(func: string): Promise<number> {
-    return this.native().hasSetFunc(this.handle(), func);
+    return this.serialized('hasSetFunc', async () => {
+      return this.native().hasSetFunc(this.handle(), func);
+    });
   }
 
   async setFunc(func: string, status: number): Promise<void> {
@@ -78,17 +90,5 @@ export abstract class SettingsMethods extends ExtMethods {
       if (result.code !== 0) { throw this.failed(result, 'getFunc'); }
       return result.value;
     });
-  }
-
-  async levelAgcStr(agcString: string): Promise<number> {
-    return this.native().levelAgcStr(agcString);
-  }
-
-  async levelAgcValue(agcValue: number): Promise<number> {
-    return this.native().levelAgcValue(agcValue);
-  }
-
-  async valueAgcLevel(agcLevel: number): Promise<number> {
-    return this.native().valueAgcLevel(agcLevel);
   }
 }

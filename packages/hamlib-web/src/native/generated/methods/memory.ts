@@ -51,10 +51,8 @@ export abstract class MemoryMethods extends SettingsMethods {
   }
 
   async lookupMemCaps(ch: number): Promise<RigChanList> {
-    return this.native().lookupMemCaps(this.handle(), ch);
-  }
-
-  async memCount(): Promise<number> {
-    return this.native().memCount(this.handle());
+    return this.serialized('lookupMemCaps', async () => {
+      return this.native().lookupMemCaps(this.handle(), ch);
+    });
   }
 }

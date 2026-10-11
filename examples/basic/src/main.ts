@@ -10,8 +10,8 @@
  *
  * The page never requests a port on its own and never stores a SerialPort.
  */
-import { createHamlib, HamlibError } from 'hamlib-web';
-import type { Hamlib, Rig, RigModel } from 'hamlib-web';
+import { createHamlib, HamlibError } from 'hamlib-web/native';
+import type { Hamlib, Rig, RigModel } from 'hamlib-web/native';
 
 import './style.css';
 
@@ -30,6 +30,7 @@ const dom = {
   webSerialStatus: need<HTMLParagraphElement>('web-serial-status'),
   modelSelect: need<HTMLSelectElement>('model-select'),
   baudInput: need<HTMLInputElement>('baud-input'),
+  detectInput: need<HTMLInputElement>('detect-input'),
   connect: need<HTMLButtonElement>('connect-button'),
   disconnect: need<HTMLButtonElement>('disconnect-button'),
   connectionState: need<HTMLParagraphElement>('connection-state'),
@@ -74,7 +75,8 @@ function render(): void {
   dom.connect.disabled = busy || hamlib === null || !serial || connected;
   dom.disconnect.disabled = busy || !connected;
   dom.modelSelect.disabled = busy || connected;
-  dom.baudInput.disabled = busy || connected;
+  dom.baudInput.disabled = busy || connected || dom.detectInput.checked;
+  dom.detectInput.disabled = busy || connected;
 
   dom.refresh.disabled = busy || !connected;
 
@@ -192,11 +194,21 @@ async function connect(): Promise<void> {
     return;
   }
 
-  const baudRate = dom.baudInput.value === ''
-    ? undefined
-    : Number(dom.baudInput.value);
-
   const port = await hamlib.requestPort();
+
+  /* One gesture covers both steps: the port granted here is the port the search
+   * uses and the port the rig is then opened on.  A rig behind a real UART
+   * answers at the rate its own menu is set to, which no model declares. */
+  const baudRate = dom.detectInput.checked
+    ? await hamlib.detectBaudRate({ modelId: selected.id, port })
+    : dom.baudInput.value === ''
+      ? undefined
+      : Number(dom.baudInput.value);
+
+  if (dom.detectInput.checked) {
+    dom.baudInput.value = String(baudRate);
+  }
+
   const opened = await hamlib.open({
     modelId: selected.id,
     port,
@@ -279,6 +291,10 @@ async function start(): Promise<void> {
 
 dom.modelSelect.addEventListener('change', () => {
   model = selectedModel();
+  render();
+});
+
+dom.detectInput.addEventListener('change', () => {
   render();
 });
 

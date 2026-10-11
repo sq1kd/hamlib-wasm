@@ -65,6 +65,12 @@ export interface FakeSerialControl {
   isOpen: boolean;
   closedWithLockedStreams: boolean;
   failNextOpen: string | null;
+  /** True while a held `open()` is parked. */
+  openPending: boolean;
+  /** Delay applied to every emulator reply, in milliseconds. */
+  replyDelayMs: number;
+  /** When true, every host write is refused, as a device that rejects commands. */
+  failWrites: boolean;
   setSignalsCalls: number;
   outputSignals: Record<string, boolean> | null;
   commands: string[];
@@ -72,6 +78,10 @@ export interface FakeSerialControl {
   /** Switch the emulated radio; only valid while the port is closed. */
   useRig(name: FakeRigName): void;
   removeWebSerial(): void;
+  /** Hold the next `open()` until `releaseOpen()`. */
+  holdNextOpen: boolean;
+  /** Release a parked `open()`. */
+  releaseOpen(): void;
   /** Inject bytes into the readable stream without a write. */
   pushRaw(text: string): void;
   /** Fail the readable stream, as a device unplug would. */
@@ -79,7 +89,13 @@ export interface FakeSerialControl {
 }
 
 /** The emulated radios the fixture can drive. */
-export type FakeRigName = 'kenwood-ts480' | 'icom-ic703' | 'yaesu-ft757gx2';
+export type FakeRigName =
+  | 'kenwood-ts480'
+  | 'icom-ic703'
+  | 'icom-ic746'
+  | 'yaesu-ft710'
+  | 'yaesu-ft757gx2'
+  | 'yaesu-frg100';
 
 declare global {
   interface Window {
@@ -94,6 +110,7 @@ export interface FakeSerialSnapshot {
   closeCount: number;
   isOpen: boolean;
   closedWithLockedStreams: boolean;
+  openPending: boolean;
   setSignalsCalls: number;
   outputSignals: Record<string, boolean> | null;
   commands: string[];
@@ -161,6 +178,60 @@ export async function failNextPortOpen(page: Page, name: string): Promise<void> 
   }, name);
 }
 
+/** Park the next `SerialPort.open()` until {@link releasePortOpen} runs. */
+export async function holdNextPortOpen(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    if (!window.__fakeSerial) {
+      throw new Error('the fake Web Serial fixture is not installed');
+    }
+
+    window.__fakeSerial.holdNextOpen = true;
+  });
+}
+
+/** Wait until a held `open()` has actually parked. */
+export async function waitForPortOpenPending(page: Page): Promise<void> {
+  await page.waitForFunction(() => window.__fakeSerial?.openPending === true);
+}
+
+/** Release a parked `open()`, completing it. */
+export async function releasePortOpen(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    if (!window.__fakeSerial) {
+      throw new Error('the fake Web Serial fixture is not installed');
+    }
+
+    window.__fakeSerial.releaseOpen();
+  });
+}
+
+/** Delay every emulator reply, so a read stays in flight for the window. */
+export async function setReplyDelay(page: Page, milliseconds: number): Promise<void> {
+  await page.evaluate((delay: number) => {
+    if (!window.__fakeSerial) {
+      throw new Error('the fake Web Serial fixture is not installed');
+    }
+
+    window.__fakeSerial.replyDelayMs = delay;
+  }, milliseconds);
+}
+
+/**
+ * Make the emulator refuse every host write while still answering reads.
+ *
+ * A command-rejection that leaves telemetry working, so a write failure can be
+ * observed without a poll failure racing it for the same error slot.
+ */
+export async function setWritesFailing(page: Page, failing: boolean): Promise<void> {
+  await page.evaluate((value: boolean) => {
+    if (!window.__fakeSerial) {
+      throw new Error('the fake Web Serial fixture is not installed');
+    }
+
+    window.__fakeSerial.failWrites = value;
+  }, failing);
+}
+
 /** Read a serializable snapshot of the fake transport state. */
 export async function readFakeSerial(page: Page): Promise<FakeSerialSnapshot> {
   return page.evaluate(() => {
@@ -177,6 +248,7 @@ export async function readFakeSerial(page: Page): Promise<FakeSerialSnapshot> {
       closeCount: control.closeCount,
       isOpen: control.isOpen,
       closedWithLockedStreams: control.closedWithLockedStreams,
+      openPending: control.openPending,
       setSignalsCalls: control.setSignalsCalls,
       outputSignals: control.outputSignals,
       commands: [...control.commands],

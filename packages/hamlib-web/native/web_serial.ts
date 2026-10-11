@@ -242,6 +242,7 @@ addToLibrary({
             }
 
             if (result.value && result.value.length > 0) {
+              state.rxBytes += result.value.length;
               self.queuePush(state.queue, result.value);
               self.wake(state, 'data');
             }
@@ -272,6 +273,7 @@ addToLibrary({
         writer: null,
         writeChain: null,
         pumpPromise: null,
+        rxBytes: 0,
         lastRts: 0,
         lastDtr: 0,
         rtsKnown: false,
@@ -475,6 +477,24 @@ addToLibrary({
       }
 
       return this.queueRead(entry.state.queue, HEAPU8, ptr, len);
+    },
+
+    /*
+     * Bytes the rig has sent on this handle since the port was opened.
+     *
+     * Unlike the RX queue this is never drained, so it answers "did the rig
+     * ever speak" - the question the facade has to ask before it can believe
+     * that rig_open() really reached a radio.  A port that has received
+     * nothing has not been talked to by anything.
+     */
+    bytesReceived(handle: number): number {
+      const entry = this.handles.get(handle);
+
+      if (!entry) {
+        return this.WS_ERR_INVAL;
+      }
+
+      return entry.state.rxBytes;
     },
 
     write(handle: number, ptr: number, len: number): Promise<number> {
@@ -745,6 +765,11 @@ addToLibrary({
   hamlibWsRead__deps: ['$HamlibWs'],
   hamlibWsRead: function (handle: number, ptr: number, len: number): number {
     return HamlibWs.read(handle, ptr, len);
+  },
+
+  hamlibWsBytesReceived__deps: ['$HamlibWs'],
+  hamlibWsBytesReceived: function (handle: number): number {
+    return HamlibWs.bytesReceived(handle);
   },
 
   hamlibWsWrite__deps: ['$HamlibWs'],

@@ -1,16 +1,12 @@
 /**
  * `struct confparams` as the binding surface sees it.
  *
- * The C++ struct is declared in `native/facade.cpp` and the table walkers
- * return it as an Embind vector; the value-object fields come across as
- * `EmbindString`, so the collector is the one place that drains and narrows
- * them.  It lives outside `src/index.ts` because the generated method classes
- * call it and must not import the public entry point.
+ * The C++ struct is declared in `native/facade.cpp`; the value object crosses
+ * with every field typed `EmbindString`, so this is the one place that narrows
+ * one to the public shape.  It lives outside `src/index.ts` because the
+ * generated method classes call it and must not import the public entry point.
  */
-import type { MainModule } from './hamlib-web.mjs';
-
-type NativeConfparamList = Awaited<ReturnType<MainModule['tokenForeach']>>;
-type NativeConfparam = NonNullable<ReturnType<NativeConfparamList['get']>>;
+import type { RigConfparams, RigConfparamsList } from './hamlib-web.mjs';
 
 /**
  * One configuration or extension parameter, as `struct confparams` describes
@@ -31,26 +27,41 @@ export interface RigConfparam {
   type: number;
 }
 
-/** Drain one Embind vector of confparams, releasing the Wasm memory it owns. */
-export function collectConfparams(list: NativeConfparamList): RigConfparam[] {
+/**
+ * Narrow one native value object to the public shape.
+ *
+ * The emitted declaration types every `std::string` field as `EmbindString`, so
+ * this is also what makes the fields plain strings for a caller.
+ */
+export function projectConfparam(value: RigConfparams): RigConfparam {
+  return {
+    token: value.token,
+    name: String(value.name),
+    label: String(value.label),
+    tooltip: String(value.tooltip),
+    dflt: String(value.dflt),
+    type: value.type,
+  };
+}
+
+/**
+ * Drain one Embind vector of projected confparams, releasing the Wasm memory it
+ * owns.
+ *
+ * The table walkers (`tokenForeach` and the three `ext*Foreach` methods) return
+ * `std::vector<RigConfparams>`; the caller gets a plain array of the projected
+ * value objects, never the vector or its elements.
+ */
+export function collectConfparams(list: RigConfparamsList): RigConfparam[] {
   const entries: RigConfparam[] = [];
 
   try {
     for (let index = 0; index < list.size(); index++) {
-      const entry: NativeConfparam | undefined = list.get(index);
+      const entry = list.get(index);
 
-      if (!entry) {
-        continue;
+      if (entry) {
+        entries.push(projectConfparam(entry));
       }
-
-      entries.push({
-        token: entry.token,
-        name: String(entry.name),
-        label: String(entry.label),
-        tooltip: String(entry.tooltip),
-        dflt: String(entry.dflt),
-        type: entry.type,
-      });
     }
   } finally {
     /* The Embind vector owns Wasm memory. */

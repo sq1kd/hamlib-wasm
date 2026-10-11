@@ -174,8 +174,4 @@ export abstract class ControlMethods extends VfoMethods {
       return { year: result.year, month: result.month, day: result.day, hour: result.hour, min: result.min, sec: result.sec, msec: result.msec, utcOffset: result.utcOffset };
     });
   }
-
-  async isModel(model: number): Promise<number> {
-    return this.native().isModel(this.handle(), model);
-  }
 }

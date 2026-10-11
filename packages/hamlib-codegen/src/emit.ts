@@ -773,11 +773,46 @@ function manualResultType(model: Model, result: string): string {
 /* ------------------------------------------------------------------ */
 
 /**
- * The one bespoke result that crosses as an Embind vector.  `RigConfparams` is
- * declared in `native/facade.cpp` and `src/native/confparams.ts` owns both the
- * collector and the public element type, so neither can be derived from the
- * upstream headers.  A second such result should grow an entry here rather
- * than a second special case in the emitters.
+ * The projection a pure helper's `struct` result crosses through.
+ *
+ * `rig_ext_lookup`/`rig_ext_lookup_tok` return a `struct confparams *`, which
+ * the Embind declaration types as `RigConfparams` with `EmbindString` fields.
+ * `src/native/confparams.ts` owns the narrowed public shape, so the emitted
+ * method projects through it instead of handing the raw value object to a
+ * caller.
+ */
+const STRUCT_RESULTS: Readonly<Record<string, {
+  readonly element: string;
+  readonly project: string;
+  /** Import path from `src/native/generated`. */
+  readonly contractImport: string;
+  /** Import path from `src/native/generated/methods`. */
+  readonly methodImport: string;
+}>> = {
+  RigConfparams: {
+    element: 'RigConfparam',
+    project: 'projectConfparam',
+    contractImport: '../confparams.js',
+    methodImport: '../../confparams.js',
+  },
+};
+
+/** The projection a pure operation's struct result crosses through, if any. */
+function structProjection(operation: GeneratedOperation): (typeof STRUCT_RESULTS)[string] | undefined {
+  const binding = operation.pure;
+
+  return binding?.category === 'struct' ? STRUCT_RESULTS[binding.ts] : undefined;
+}
+
+/**
+ * The projection a bespoke vector result crosses through.
+ *
+ * `tokenForeach` and the three `ext*Foreach` walkers return
+ * `std::vector<RigConfparams>`; the element type is the same projected
+ * `struct confparams` the lookups return, so it drains through the module that
+ * owns the narrowed public shape, one `projectConfparam` per entry, and the
+ * native vector is freed.  A second such result should grow an entry here
+ * rather than a second special case in the emitters.
  */
 const VECTOR_RESULTS: Readonly<Record<string, {
   readonly element: string;
@@ -847,7 +882,8 @@ function bespokeParameters(operation: ModelOperation): { readonly parameters: st
 /**
  * One bespoke method body.  The shape follows the declared result, so a config
  * entry needs no hand-written TypeScript: a code-only result returns `void`, a
- * single-value result unwraps its field, a vector result is collected.
+ * single-value result unwraps its field, a vector result is collected into a
+ * plain array and the native vector is freed.
  */
 function bespokeMethodLines(model: Model, operation: ModelOperation): string[] {
   const { parameters, call } = bespokeParameters(operation);
@@ -917,7 +953,8 @@ function bespokeFile(model: Model, operations: readonly ModelOperation[]): strin
   lines.push('');
   lines.push('/**');
   lines.push(' * Operations whose C++ body is hand-written in `native/facade.cpp`:');
-  lines.push(' * buffers a signature cannot describe, the callback walkers and PTT.');
+  lines.push(' * buffers a signature cannot describe, the table walkers, extended');
+  lines.push(' * settings and PTT.');
   lines.push(' * The method itself is generated from the config like every other.');
   lines.push(' */');
   lines.push('export abstract class BespokeMethods extends GeneratedRigBase {');
@@ -940,7 +977,9 @@ function publicResultType(operation: GeneratedOperation): string {
   }
 
   if (operation.shape === 'pure') {
-    return (operation.pure as TypeBinding).ts;
+    const projected = structProjection(operation);
+
+    return projected?.element ?? (operation.pure as TypeBinding).ts;
   }
 
   if (operation.outputs.length === 1 && operation.outputs[0]?.binding.category !== 'struct') {
@@ -1006,15 +1045,25 @@ export function emitContract(
 
   const lines: string[] = [CONTRACT_HEADER, ''];
   const bespoke = bespokeOperations(model);
-  const bespokeImports = new Set<string>();
+  const projectionImports = new Set<string>();
 
+  for (const operation of operations) {
+    const projected = structProjection(operation);
+
+    if (projected) {
+      projectionImports.add(`import type { ${projected.element} } from '${projected.contractImport}';`);
+    }
+  }
+
+  /* A bespoke operation's vector result is declared as an array of the same
+   * projected element type, so the contract names it too. */
   for (const operation of bespoke) {
     const vector = operation.result.endsWith('[]')
       ? VECTOR_RESULTS[operation.result]
       : undefined;
 
     if (vector) {
-      bespokeImports.add(`import type { ${vector.element} } from '${vector.contractImport}';`);
+      projectionImports.add(`import type { ${vector.element} } from '${vector.contractImport}';`);
     }
   }
 
@@ -1022,7 +1071,7 @@ export function emitContract(
     lines.push(`import type { ${name} } from '../hamlib-web.mjs';`);
   }
 
-  for (const statement of bespokeImports) {
+  for (const statement of projectionImports) {
     lines.push(statement);
   }
 
@@ -1038,7 +1087,7 @@ export function emitContract(
   lines.push(' * The low-level operation surface of the Wasm module, derived from the');
   lines.push(' * allowlist and the upstream AST rather than from the emitted declaration.');
   lines.push(' *');
-  lines.push(' * `src/index.ts` asserts that the built module satisfies this contract, so a');
+  lines.push(' * `src/native.ts` asserts that the built module satisfies this contract, so a');
   lines.push(' * binding that drifts from the allowlist fails the typecheck.');
   lines.push(' */');
   lines.push('export interface NativeOperations {');
@@ -1104,7 +1153,7 @@ export function emitContract(
   );
   lines.push('');
   lines.push('/**');
-  lines.push(' * Operations gated on one of those flags, so `src/index.ts` can fold them');
+  lines.push(' * Operations gated on one of those flags, so `src/native.ts` can fold them');
   lines.push(' * into the capability list it builds for a model.');
   lines.push(' */');
   lines.push('export const FLAG_GATED_OPERATIONS: readonly (readonly [string, RigFlag])[] = [');
@@ -1118,7 +1167,7 @@ export function emitContract(
   lines.push('/**');
   lines.push(' * Every generated operation as a method.  `GeneratedRigMethods`');
   lines.push(' * (`methods/index.ts`) implements it with a real method per operation, and');
-  lines.push(' * `src/index.ts` extends that class, so a new operation is callable without');
+  lines.push(' * `src/native.ts` extends that class, so a new operation is callable without');
   lines.push(' * any hand-written method and without a string-keyed dispatcher.');
   lines.push(' */');
   lines.push('export interface GeneratedPublicOperations {');
@@ -1224,7 +1273,9 @@ function signatureImports(operations: readonly GeneratedOperation[]): string[] {
     }
 
     if (operation.shape === 'pure' && operation.pure && !PRIMITIVE_TS.has(operation.pure.ts)) {
-      names.add(operation.pure.ts);
+      if (!structProjection(operation)) {
+        names.add(operation.pure.ts);
+      }
     }
   }
 
@@ -1236,7 +1287,7 @@ const PRIMITIVE_GETTER = (operation: GeneratedOperation): boolean =>
   && operation.outputs.length === 1
   && operation.outputs[0]?.binding.category !== 'struct';
 
-/** One concrete method body: `pure` returns directly, `get`/`set` unwrap. */
+/** One concrete method body; every shape runs inside `serialized`. */
 function methodLines(
   operation: GeneratedOperation,
   capsMembers: ReadonlySet<string>,
@@ -1260,7 +1311,17 @@ function methodLines(
   }
 
   if (operation.shape === 'pure') {
-    lines.push(`    return ${call};`);
+    const projected = structProjection(operation);
+
+    /* A "pure" helper still enters the Wasm module, so it must take the queue
+     * slot: calling it while another native call is suspended would re-enter
+     * the unwound Asyncify stack.  Inside a compound the scope runs this
+     * directly, because the body already owns the slot. */
+    lines.push(`    return this.serialized('${operation.method}', async () => {`);
+    lines.push(projected
+      ? `      return ${projected.project}(await ${call});`
+      : `      return ${call};`);
+    lines.push('    });');
     lines.push('  }');
     return lines;
   }
@@ -1308,7 +1369,7 @@ export interface GeneratedCallResult {
 }
 
 /**
- * Shared plumbing for the generated rig methods.  \`src/index.ts\` supplies the
+ * Shared plumbing for the generated rig methods.  \`src/native.ts\` supplies the
  * implementation: the native module, the current handle, the single call queue,
  * the capability gate and the error conversion.
  */
@@ -1338,13 +1399,33 @@ function familyFile(
   capsMembers: ReadonlySet<string>,
 ): string {
   const imports = signatureImports(operations);
+  const projectionValues = new Set<string>();
+  const projectionTypes = new Set<string>();
+
+  for (const operation of operations) {
+    const projected = structProjection(operation);
+
+    if (projected) {
+      projectionValues.add(`import { ${projected.project} } from '${projected.methodImport}';`);
+      projectionTypes.add(`import type { ${projected.element} } from '${projected.methodImport}';`);
+    }
+  }
+
   const lines = [METHOD_HEADER, ''];
 
   for (const name of imports) {
     lines.push(`import type { ${name} } from '../../hamlib-web.mjs';`);
   }
 
-  if (imports.length > 0) {
+  for (const statement of projectionValues) {
+    lines.push(statement);
+  }
+
+  for (const statement of projectionTypes) {
+    lines.push(statement);
+  }
+
+  if (imports.length > 0 || projectionValues.size > 0 || projectionTypes.size > 0) {
     lines.push('');
   }
 

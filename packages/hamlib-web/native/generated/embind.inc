@@ -209,6 +209,11 @@
         return facade().openRig(modelId, logicalPath, baudRate);
     });
 
+    emscripten::function("probeBaudRate", +[](int modelId, const std::string & logicalPath, int baudRate)
+    {
+        return facade().probeBaudRate(modelId, logicalPath, baudRate);
+    });
+
     emscripten::function("closeRig", +[](int handle)
     {
         return facade().closeRig(handle);
@@ -227,11 +232,6 @@
     emscripten::function("getRigInfo", +[](int handle)
     {
         return facade().getRigInfo(handle);
-    });
-
-    emscripten::function("getVfoList", +[](int handle)
-    {
-        return facade().getVfoList(handle);
     });
 
     emscripten::function("getExtLevel", +[](int handle, int token)
@@ -444,11 +444,6 @@
         return facade().getTs(handle);
     });
 
-    emscripten::function("getResolution", +[](int handle, const std::string & arg0)
-    {
-        return facade().getResolution(handle, arg0);
-    });
-
     emscripten::function("setLevel", +[](int handle, const std::string & arg0, double arg1)
     {
         return facade().setLevel(handle, arg0, arg1);
@@ -502,16 +497,6 @@
     emscripten::function("extLookupTok", +[](int handle, double arg0)
     {
         return facade().extLookupTok(handle, arg0);
-    });
-
-    emscripten::function("extTokenLookup", +[](int handle, const std::string & arg0)
-    {
-        return facade().extTokenLookup(handle, arg0);
-    });
-
-    emscripten::function("confparamLookup", +[](int handle, const std::string & arg0)
-    {
-        return facade().confparamLookup(handle, arg0);
     });
 
     emscripten::function("setAnt", +[](int handle, double arg0, double arg1)
@@ -614,21 +599,6 @@
         return facade().lookupMemCaps(handle, arg0);
     });
 
-    emscripten::function("memCount", +[](int handle)
-    {
-        return facade().memCount(handle);
-    });
-
-    emscripten::function("setTrn", +[](int handle, double arg0)
-    {
-        return facade().setTrn(handle, arg0);
-    });
-
-    emscripten::function("getTrn", +[](int handle)
-    {
-        return facade().getTrn(handle);
-    });
-
     emscripten::function("setTwiddle", +[](int handle, double arg0)
     {
         return facade().setTwiddle(handle, arg0);
@@ -684,39 +654,9 @@
         return facade().strVfo(arg0);
     });
 
-    emscripten::function("strFunc", +[](double arg0)
-    {
-        return facade().strFunc(arg0);
-    });
-
     emscripten::function("strLevel", +[](double arg0)
     {
         return facade().strLevel(arg0);
-    });
-
-    emscripten::function("strParm", +[](double arg0)
-    {
-        return facade().strParm(arg0);
-    });
-
-    emscripten::function("strAgcLevel", +[](double arg0)
-    {
-        return facade().strAgcLevel(arg0);
-    });
-
-    emscripten::function("levelAgcStr", +[](const std::string & arg0)
-    {
-        return facade().levelAgcStr(arg0);
-    });
-
-    emscripten::function("levelAgcValue", +[](double arg0)
-    {
-        return facade().levelAgcValue(arg0);
-    });
-
-    emscripten::function("valueAgcLevel", +[](double arg0)
-    {
-        return facade().valueAgcLevel(arg0);
     });
 
     emscripten::function("strPtrShift", +[](double arg0)
@@ -724,34 +664,9 @@
         return facade().strPtrShift(arg0);
     });
 
-    emscripten::function("strVfoOp", +[](double arg0)
-    {
-        return facade().strVfoOp(arg0);
-    });
-
-    emscripten::function("strScan", +[](double arg0)
-    {
-        return facade().strScan(arg0);
-    });
-
     emscripten::function("strStatus", +[](double arg0)
     {
         return facade().strStatus(arg0);
-    });
-
-    emscripten::function("strMType", +[](double arg0)
-    {
-        return facade().strMType(arg0);
-    });
-
-    emscripten::function("strSpectrumMode", +[](double arg0)
-    {
-        return facade().strSpectrumMode(arg0);
-    });
-
-    emscripten::function("strCommStatus", +[](double arg0)
-    {
-        return facade().strCommStatus(arg0);
     });
 
     emscripten::function("parseMode", +[](const std::string & arg0)
@@ -794,21 +709,6 @@
         return facade().parseRptrShift(arg0);
     });
 
-    emscripten::function("parseMType", +[](const std::string & arg0)
-    {
-        return facade().parseMType(arg0);
-    });
-
-    emscripten::function("license", +[]()
-    {
-        return facade().license();
-    });
-
-    emscripten::function("copyright", +[]()
-    {
-        return facade().copyright();
-    });
-
     emscripten::function("setClock", +[](int handle, double arg0, double arg1, double arg2, double arg3, double arg4, double arg5, double arg6, double arg7)
     {
         return facade().setClock(handle, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
@@ -817,9 +717,4 @@
     emscripten::function("getClock", +[](int handle)
     {
         return facade().getClock(handle);
-    });
-
-    emscripten::function("isModel", +[](int handle, double arg0)
-    {
-        return facade().isModel(handle, arg0);
     });

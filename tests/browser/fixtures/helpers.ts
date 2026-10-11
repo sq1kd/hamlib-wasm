@@ -43,5 +43,18 @@
         return { ok: false, error: describeError(error) };
       }
     },
+    /**
+     * Wait `ms` inside the page.
+     *
+     * Some scenarios need a window in which polling either continues or stops;
+     * this keeps that wait in the page, where the counters live, instead of
+     * round-tripping through the driver between samples.
+     */
+    sleep: function (ms: number): Promise<void> {
+      var gate = Promise.withResolvers<void>();
+
+      setTimeout(gate.resolve, ms);
+      return gate.promise;
+    },
   };
 })();

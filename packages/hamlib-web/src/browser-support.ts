@@ -56,6 +56,13 @@ export const VERIFIED_MODELS: readonly VerifiedModel[] = [
       'tests/browser/protocols.spec.ts: binary CI-V frames, ACK/NAK, frequency and mode',
     ],
   },
+  {
+    manufacturer: 'Yaesu',
+    model: 'FT-710',
+    evidence: [
+      'tests/browser/baud-rate.spec.ts: the recorded newcat protocol, the rate the rig answers at, and the search that finds it',
+    ],
+  },
 ];
 
 /**

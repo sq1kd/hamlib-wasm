@@ -164,3 +164,77 @@ test('a later instance can use the same port after a raced disposal', async ({ p
   expect(transport.isOpen).toBe(false);
   expect(transport.closedWithLockedStreams).toBe(false);
 });
+
+for (const action of ['close', 'dispose'] as const) {
+  test(`${action} from a state listener cancels remaining listeners and field events`, async ({ page }) => {
+    const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
+      const hamlib = await window.__hamlibHarness.createEasy({});
+      const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
+
+      if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+
+      const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
+      const events: string[] = [];
+      let stopping: Promise<void> | undefined;
+
+      rig.on('state', () => {
+        events.push('state:first');
+        stopping = action === 'close' ? rig.close() : hamlib.dispose();
+      });
+      rig.on('state', () => { events.push('state:second'); });
+      rig.on('frequency', () => { events.push('frequency'); });
+      rig.on('mode', () => { events.push('mode'); });
+      rig.on('ptt', () => { events.push('ptt'); });
+
+      try {
+        await rig.refresh();
+        await stopping;
+
+        return { events, connected: rig.connected };
+      } finally {
+        await hamlib.dispose();
+      }
+    }), action);
+
+    const result = expectOk(captured);
+
+    expect(result.events).toEqual(['state:first']);
+    expect(result.connected).toBe(false);
+    expect((await readFakeSerial(page)).isOpen).toBe(false);
+  });
+
+  test(`${action} from an error listener cancels remaining listeners but preserves rejection`, async ({ page }) => {
+    const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
+      const hamlib = await window.__hamlibHarness.createEasy({});
+      const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
+
+      if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+
+      const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
+      const events: string[] = [];
+      let stopping: Promise<void> | undefined;
+
+      rig.on('error', () => {
+        events.push('error:first');
+        stopping = action === 'close' ? rig.close() : hamlib.dispose();
+      });
+      rig.on('error', () => { events.push('error:second'); });
+
+      try {
+        const failure = await window.__testHelpers.capture(() => rig.setMode('NOT_A_MODE'));
+
+        await stopping;
+
+        return { events, failure };
+      } finally {
+        await hamlib.dispose();
+      }
+    }), action);
+
+    const result = expectOk(captured);
+
+    expect(result.events).toEqual(['error:first']);
+    expect(expectFailure(result.failure).operation).toBe('setMode');
+    expect((await readFakeSerial(page)).isOpen).toBe(false);
+  });
+}

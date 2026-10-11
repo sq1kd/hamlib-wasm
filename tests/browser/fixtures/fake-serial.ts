@@ -40,6 +40,16 @@
     isOpen: false,
     /** Set to a DOMException name to make the next open() fail. */
     failNextOpen: null,
+    /** True when the next open() should park until releaseOpen(). */
+    holdNextOpen: false,
+    /** True while a parked open() is waiting. */
+    openPending: false,
+    /** Release a parked open().  A no-op when none is parked. */
+    releaseOpen: function (): void { /* replaced while an open is parked */ },
+    /** Delay every emulator reply by this many milliseconds. */
+    replyDelayMs: 0,
+    /** When true, every host write is refused, as a device that rejects commands. */
+    failWrites: false,
     /** True when close() found a locked stream, i.e. the transport leaked. */
     closedWithLockedStreams: false,
     /** Every command the emulator decoded, without its framing. */
@@ -84,13 +94,38 @@
 
   /** Feed host bytes to the emulator and hand its replies to the reader. */
   function receive(chunk: Uint8Array): void {
+    /* A rig behind a real UART hears the one rate its own menu is set to.
+     * Opened at any other, it sees framing errors and says nothing at all -
+     * the failure a rate scan exists to get past, and one no protocol-level
+     * answer can report. */
+    if (
+      rig.baudRate !== undefined
+      && control.openedOptions !== null
+      && control.openedOptions.baudRate !== rig.baudRate
+    ) {
+      return;
+    }
+
     var replies = rig.feed(chunk);
 
     for (var i = 0; i < replies.length; i++) {
       if (control.state.silent) { continue; }
 
-      if (readableController !== null) { readableController.enqueue(replies[i]!); }
+      enqueueReply(replies[i]!);
     }
+  }
+
+  /** Hand one reply to the reader, after `replyDelayMs` when one is set. */
+  function enqueueReply(chunk: Uint8Array): void {
+    if (control.replyDelayMs > 0) {
+      setTimeout(function () {
+        if (readableController !== null) { readableController.enqueue(chunk); }
+      }, control.replyDelayMs);
+
+      return;
+    }
+
+    if (readableController !== null) { readableController.enqueue(chunk); }
   }
 
   function encodeAscii(text: string): Uint8Array {
@@ -130,34 +165,62 @@
       return Promise.reject(new DOMException('serial settings rejected', name));
     }
 
-    control.openCount += 1;
-    control.openedOptions = {
-      baudRate: options.baudRate,
-      dataBits: options.dataBits,
-      stopBits: options.stopBits,
-      parity: options.parity,
-      flowControl: options.flowControl,
+    var port = this;
+
+    var complete = function (): void {
+      control.openCount += 1;
+      control.openedOptions = {
+        baudRate: options.baudRate,
+        dataBits: options.dataBits,
+        stopBits: options.stopBits,
+        parity: options.parity,
+        flowControl: options.flowControl,
+      };
+      control.isOpen = true;
+      rig.reset();
+      rig.commands.length = 0;
+
+      port.readable = new ReadableStream<Uint8Array>({
+        start: function (controller) {
+          readableController = controller;
+        },
+        cancel: function () {
+          readableController = null;
+        },
+      });
+
+      port.writable = new WritableStream<Uint8Array>({
+        write: function (chunk) {
+          if (control.failWrites) {
+            return Promise.reject(
+              new DOMException('the device refused the command', 'NetworkError'),
+            );
+          }
+
+          receive(chunk);
+        },
+      });
     };
-    control.isOpen = true;
-    rig.reset();
-    rig.commands.length = 0;
 
-    this.readable = new ReadableStream<Uint8Array>({
-      start: function (controller) {
-        readableController = controller;
-      },
-      cancel: function () {
-        readableController = null;
-      },
-    });
+    if (!control.holdNextOpen) {
+      complete();
+      return Promise.resolve();
+    }
 
-    this.writable = new WritableStream<Uint8Array>({
-      write: function (chunk) {
-        receive(chunk);
-      },
-    });
+    /* A controlled gate: the connection attempt parks here until the spec
+     * releases it, so a race can be exercised without a sleep. */
+    control.holdNextOpen = false;
+    control.openPending = true;
 
-    return Promise.resolve();
+    var gate = Promise.withResolvers<void>();
+
+    control.releaseOpen = function (): void {
+      control.openPending = false;
+      complete();
+      gate.resolve();
+    };
+
+    return gate.promise;
   };
 
   FakeSerialPort.prototype.close = function (this: FakePort): Promise<void> {

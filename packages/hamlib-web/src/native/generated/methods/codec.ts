@@ -6,90 +6,80 @@ import { BespokeMethods } from './bespoke.js';
 export abstract class CodecMethods extends BespokeMethods {
 
   async strRmode(mode: number): Promise<string> {
-    return this.native().strRmode(mode);
+    return this.serialized('strRmode', async () => {
+      return this.native().strRmode(mode);
+    });
   }
 
   async strVfo(vfo: number): Promise<string> {
-    return this.native().strVfo(vfo);
-  }
-
-  async strFunc(func: number): Promise<string> {
-    return this.native().strFunc(func);
+    return this.serialized('strVfo', async () => {
+      return this.native().strVfo(vfo);
+    });
   }
 
   async strLevel(level: number): Promise<string> {
-    return this.native().strLevel(level);
-  }
-
-  async strParm(parm: number): Promise<string> {
-    return this.native().strParm(parm);
-  }
-
-  async strAgcLevel(level: number): Promise<string> {
-    return this.native().strAgcLevel(level);
+    return this.serialized('strLevel', async () => {
+      return this.native().strLevel(level);
+    });
   }
 
   async strPtrShift(shift: number): Promise<string> {
-    return this.native().strPtrShift(shift);
-  }
-
-  async strVfoOp(op: number): Promise<string> {
-    return this.native().strVfoOp(op);
-  }
-
-  async strScan(scan: number): Promise<string> {
-    return this.native().strScan(scan);
+    return this.serialized('strPtrShift', async () => {
+      return this.native().strPtrShift(shift);
+    });
   }
 
   async strStatus(status: number): Promise<string> {
-    return this.native().strStatus(status);
-  }
-
-  async strMType(mtype: number): Promise<string> {
-    return this.native().strMType(mtype);
-  }
-
-  async strSpectrumMode(mode: number): Promise<string> {
-    return this.native().strSpectrumMode(mode);
-  }
-
-  async strCommStatus(vfo: number): Promise<string> {
-    return this.native().strCommStatus(vfo);
+    return this.serialized('strStatus', async () => {
+      return this.native().strStatus(status);
+    });
   }
 
   async parseMode(s: string): Promise<number> {
-    return this.native().parseMode(s);
+    return this.serialized('parseMode', async () => {
+      return this.native().parseMode(s);
+    });
   }
 
   async parseVfo(s: string): Promise<number> {
-    return this.native().parseVfo(s);
+    return this.serialized('parseVfo', async () => {
+      return this.native().parseVfo(s);
+    });
   }
 
   async parseFunc(s: string): Promise<number> {
-    return this.native().parseFunc(s);
+    return this.serialized('parseFunc', async () => {
+      return this.native().parseFunc(s);
+    });
   }
 
   async parseLevel(s: string): Promise<number> {
-    return this.native().parseLevel(s);
+    return this.serialized('parseLevel', async () => {
+      return this.native().parseLevel(s);
+    });
   }
 
   async parseParm(s: string): Promise<number> {
-    return this.native().parseParm(s);
+    return this.serialized('parseParm', async () => {
+      return this.native().parseParm(s);
+    });
   }
 
   async parseVfoOp(s: string): Promise<number> {
-    return this.native().parseVfoOp(s);
+    return this.serialized('parseVfoOp', async () => {
+      return this.native().parseVfoOp(s);
+    });
   }
 
   async parseScan(s: string): Promise<number> {
-    return this.native().parseScan(s);
+    return this.serialized('parseScan', async () => {
+      return this.native().parseScan(s);
+    });
   }
 
   async parseRptrShift(s: string): Promise<number> {
-    return this.native().parseRptrShift(s);
-  }
-
-  async parseMType(s: string): Promise<number> {
-    return this.native().parseMType(s);
+    return this.serialized('parseRptrShift', async () => {
+      return this.native().parseRptrShift(s);
+    });
   }
 }

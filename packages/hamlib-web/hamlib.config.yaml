@@ -62,8 +62,10 @@ results:
       - [ ptt, string ]
       - [ error, string ]
 
-# Embind vector registrations.  The element type is a C++ type declared in
-# native/facade.cpp, so it cannot be derived from the upstream headers.
+# Embind vector registrations.  `ModelInfo` is a C++ struct declared in
+# native/facade.cpp; `RigConfparams` is the projection the generator derives
+# from upstream `struct confparams`.  Neither element type can be named from
+# the config alone, so both are listed here.
 vectors:
   - type: ModelInfo
     binding: RigModelList
@@ -128,6 +130,25 @@ operations:
       - rig_open
       - rig_close
       - rig_cleanup
+  # Opens the rig at one rate to find out whether it answers there, then closes
+  # it again, so `detectBaudRate` can walk the rates a model declares without
+  # paying a full open budget for each silent candidate.  Same upstream calls as
+  # openRig; the facade applies a shortened port timeout and no retries.
+  - name: probeBaudRate
+    scope: module
+    args:
+      - [ modelId, int ]
+      - [ logicalPath, string ]
+      - [ baudRate, int ]
+    result: CodeResult
+    calls:
+      - rig_get_caps
+      - rig_init
+      - rig_token_lookup
+      - rig_set_conf
+      - rig_open
+      - rig_close
+      - rig_cleanup
   - name: closeRig
     scope: module
     args:
@@ -160,13 +181,6 @@ operations:
     result: TextResult
     calls:
       - rig_get_rig_info
-  - name: getVfoList
-    scope: rig
-    args:
-      - [ handle, int ]
-    result: TextResult
-    calls:
-      - rig_get_vfo_list
   - name: getExtLevel
     scope: rig
     args:

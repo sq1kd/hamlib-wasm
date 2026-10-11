@@ -187,6 +187,53 @@ const EXCLUDED_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * Declarations that are bindable, but that the reference client never calls:
+ * the upstream `rigctl`/`rigctld` sources under `tests/` are the yardstick for
+ * what a Hamlib client actually needs, and these twenty-one never appear
+ * there.  (The capability predicates `rig_has_scan`/`rig_has_vfo_op` are *not*
+ * in this set: `dumpcaps.c`/`dumpstate.c`, which rigctl and rigctld link in,
+ * enumerate the extension tables through `rig_token_foreach` and
+ * `rig_ext_level|func|parm_foreach` and call `rig_has_vfo_op`, and
+ * `rig_has_scan` is the documented sibling predicate.)
+ *
+ * Three groups, all reachable only as extra API noise on the 1:1 surface:
+ *
+ *  - bare codec names whose `rig_sprintf_*` twin is the call a client makes
+ *    (`rig_strfunc`, `rig_strparm`, `rig_strscan`, `rig_strvfop`,
+ *    `rig_strmtype`, `rig_strspectrummode`, `rig_strcommstatus`,
+ *    `rig_stragclevel`, `rig_parse_mtype`); the generated setters and getters
+ *    keep calling the parses and stringifiers they need internally;
+ *  - introspection the reference client never performs (`rig_license`,
+ *    `rig_copyright`, `rig_is_model`, `rig_confparam_lookup`,
+ *    `rig_ext_token_lookup`, `rig_get_resolution`, `rig_mem_count`);
+ *  - the AGC level codecs and the tracking pair (`rig_levelagcstr`,
+ *    `rig_levelagcvalue`, `rig_valueagclevel`, `rig_get_trn`, `rig_set_trn`).
+ */
+const NOT_IN_REFERENCE_SURFACE: ReadonlySet<string> = new Set([
+  'rig_confparam_lookup',
+  'rig_copyright',
+  'rig_ext_token_lookup',
+  'rig_get_resolution',
+  'rig_get_trn',
+  'rig_is_model',
+  'rig_levelagcstr',
+  'rig_levelagcvalue',
+  'rig_license',
+  'rig_mem_count',
+  'rig_parse_mtype',
+  'rig_set_trn',
+  'rig_stragclevel',
+  'rig_strcommstatus',
+  'rig_strfunc',
+  'rig_strmtype',
+  'rig_strparm',
+  'rig_strscan',
+  'rig_strspectrummode',
+  'rig_strvfop',
+  'rig_valueagclevel',
+]);
+
+/**
  * Symbol families handled with the raw-token (`setting_t`/enum → number) param
  * and result mode rather than the name mapping: the `rig_parse_*` name→token
  * and `rig_str*` token→name codec, and the `rig_ext_*` table walkers.  Without
@@ -196,13 +243,12 @@ const TOKEN_SYMBOLS: readonly RegExp[] = [/^rig_str/, /^rig_parse_/, /^rig_ext_/
 
 /**
  * Value-returning helpers whose `value_t` result is always stored in `.i`.
- * `rig_valueagclevel` sets `.i` for every AGC level (`src/misc.c`), and Hamlib's
- * own `rigctl` assumes the `rig_get_ant`/`rig_set_ant` option is an integer.
+ * Hamlib's own `rigctl` assumes the `rig_get_ant`/`rig_set_ant` option is an
+ * integer, and `src/misc.c` stores every value the same way.
  */
 const VALUE_T_INT_SYMBOLS: ReadonlySet<string> = new Set([
   'rig_get_ant',
   'rig_set_ant',
-  'rig_valueagclevel',
 ]);
 
 /** A `value_t` whose union member is fixed by the symbol, not by a predicate. */
@@ -225,14 +271,25 @@ function asToken(binding: TypeBinding | null): TypeBinding | null {
 
 /**
  * Value-returning helpers whose C result is `int`, so on the type alone they
- * look like error codes.  Only policy can tell a predicate (`rig_is_model`
- * returns 1/0) or an index (`rig_setting2idx`) from a status.
+ * look like error codes.  Only policy can tell an index (`rig_setting2idx`)
+ * from a status.
  */
 const PURE_INT_SYMBOLS: ReadonlySet<string> = new Set([
-  'rig_is_model',
   'rig_setting2idx',
-  'rig_mem_count',
 ]);
+
+/**
+ * Predicates whose enum *result* is a supported-bit mask rather than one
+ * member: `rig_has_scan` returns `scan_ops & scan` and `rig_has_vfo_op`
+ * returns `vfo_ops & op` (`src/rig.c`), so the result has to cross as its
+ * number.  Re-stringifying a multi-bit mask through `rig_strscan`/
+ * `rig_strvfop` would collapse it to one member or none.  The argument stays a
+ * name, so this cannot be folded into the token-mode families.
+ */
+const MASK_RESULT_SYMBOLS: Readonly<Record<string, true>> = {
+  rig_has_scan: true,
+  rig_has_vfo_op: true,
+};
 
 /** `rig_get_rptr_offs` -> `getRptrOffs`; `rig_scan` -> `scan`. */
 function methodName(symbol: string): string {
@@ -258,6 +315,10 @@ export function pascalCase(method: string): string {
 function exclusionReason(symbol: string): string | null {
   if (EXCLUDED_ARRAYS.has(symbol)) {
     return 'excluded: caller-owned array whose length the signature does not give';
+  }
+
+  if (NOT_IN_REFERENCE_SURFACE.has(symbol)) {
+    return 'excluded: not called by the upstream rigctl reference client';
   }
 
   if (EXCLUDED_EXACT.has(symbol)) {
@@ -427,11 +488,15 @@ export function classifyFunction(
       return { symbol, reason: 'more than one RIG * handle' };
     }
 
-    const pure = resultBinding(fn.result, resolveProjection, tokenMode, valueOverride);
+    const bound = resultBinding(fn.result, resolveProjection, tokenMode, valueOverride);
 
-    if (!pure) {
+    if (!bound) {
       return { symbol, reason: `returns unmapped type ${fn.result || 'void'}` };
     }
+
+    /* A capability predicate's enum result is a mask, not one member, so it
+     * crosses as its number; its name argument is bound below, unchanged. */
+    const pure = MASK_RESULT_SYMBOLS[symbol] === true ? (asToken(bound) ?? bound) : bound;
 
     const plan: ParameterPlan[] = [];
     const args: OperationArgument[] = [];

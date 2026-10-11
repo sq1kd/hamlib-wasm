@@ -184,11 +184,15 @@
    *
    * The frequency is five little-endian BCD octets, least significant pair
    * first, which is the CI-V convention the backend decodes.
+   *
+   * `radioAddress` is the rig's own bus address, so one protocol serves every
+   * CI-V model the fixtures need: the IC-703 answers at 0x68, the IC-746 and
+   * IC-746PRO at 0x56.
    */
-  function createIc703(): FakeRig {
+  function createIcomCiv(radioAddress: number, name: string): FakeRig {
     var PREAMBLE = [0xfe, 0xfe];
     var CONTROLLER = 0xe0; /* host */
-    var RADIO = 0x68; /* IC-703 */
+    var RADIO = radioAddress;
 
     var C_READ_FREQ = 0x03;
     var C_READ_MODE = 0x04;
@@ -278,7 +282,7 @@
     }
 
     return {
-      name: 'icom-ic703',
+      name: name,
       state: state,
       commands: commands,
       reset: function (): void {
@@ -342,6 +346,136 @@
   }
 
   // ------------------------------------------------------------------ Yaesu
+
+  /**
+   * Yaesu FT-710: the ASCII "newcat" CAT dialect, `;` terminated.
+   *
+   * Every command and every reply here was recorded from the radio itself
+   * (`rigctl -m 1049 -r <port> -s 38400 -vvvv`) rather than guessed: the open
+   * sequence is `PS;`, `AI;`, `ID;`, `VS;`, `IF;`, `FA;` and the state reads
+   * that follow are `MD0;`, `SH0;` and `TX;`.  Note the sizes - this rig's `IF`
+   * reply is 27 characters, not the 37 a Kenwood sends.
+   *
+   * `baudRate` is set, so the emulator is silent at every other rate: the
+   * FT-710 is a real UART behind a CP2105 bridge, and its CAT rate is a menu
+   * setting on the radio.  That is what makes it the fixture for a wrong rate
+   * (silence, not an error) and for the rate scan.
+   */
+  function createFt710(): FakeRig {
+    var CAT_RATE = 38400;
+    var MODE_LSB = 1;
+
+    var state = {
+      frequency: 7175000,
+      modeDigit: MODE_LSB,
+      filterValue: 0,
+      transmitting: false,
+      silent: false,
+    };
+
+    var commands: string[] = [];
+    var buffer = '';
+
+    /** The 27 character IF payload, exactly as the radio spells it. */
+    function ifPayload(): string {
+      return 'IF'
+        + pad(state.frequency, 12)
+        + '+'
+        + '000000'
+        + (state.transmitting ? '1' : '0')
+        + '00000';
+    }
+
+    /**
+     * The reply to `command`, terminator included, or null for a command the
+     * rig answers with silence (a set command, or ``AI0;``).
+     */
+    function replyFor(command: string): string | null {
+      switch (command) {
+        case 'PS;':
+          return 'PS1;';
+        case 'AI;':
+          return 'AI0;';
+        case 'ID;':
+          return 'ID0800;';
+        case 'VS;':
+          return 'VS0;';
+        case 'IF;':
+          return ifPayload() + ';';
+        case 'KS;':
+          return 'KS020;';
+        case 'FA;':
+          return 'FA' + pad(state.frequency, 9) + ';';
+        case 'MD0;':
+        case 'MD1;':
+          return 'MD0' + String(state.modeDigit) + ';';
+        case 'SH0;':
+        case 'SH1;':
+          return 'SH0020;';
+        case 'TX;':
+          return state.transmitting ? 'TX1;' : 'TX0;';
+        default:
+          break;
+      }
+
+      if (/^FA\d+;$/.test(command)) {
+        state.frequency = Number(command.slice(2, -1));
+        return null;
+      }
+
+      if (/^MD\d\d;$/.test(command)) {
+        state.modeDigit = Number(command[3]);
+        return null;
+      }
+
+      if (/^SH\d+;$/.test(command)) {
+        state.filterValue = Number(command.slice(2, -1));
+        return null;
+      }
+
+      if (command === 'TX1;') { state.transmitting = true; return null; }
+
+      if (command === 'TX0;' || command === 'RX;') { state.transmitting = false; return null; }
+
+      /* A command this rig does not implement, or one its current state
+       * rejects, is answered with `?;`. */
+      return '?;';
+    }
+
+    return {
+      name: 'yaesu-ft710',
+      state: state,
+      baudRate: CAT_RATE,
+      commands: commands,
+      reset: function (): void {
+        buffer = '';
+      },
+      feed: function (chunk: Uint8Array): Uint8Array[] {
+        for (var i = 0; i < chunk.length; i++) {
+          buffer += String.fromCharCode(chunk[i]!);
+        }
+
+        var replies: Uint8Array[] = [];
+
+        /* Commands are `;` terminated and may arrive split or batched. */
+        for (;;) {
+          var end = buffer.indexOf(';');
+
+          if (end < 0) { break; }
+
+          var command = buffer.slice(0, end + 1);
+          buffer = buffer.slice(end + 1);
+          commands.push(command);
+
+          var reply = replyFor(command);
+
+          if (reply !== null) { replies.push(ascii(reply)); }
+        }
+
+        return replies;
+      },
+    };
+  }
 
   /**
    * Yaesu FT-757GXII: fixed five octet binary frames, no terminator.
@@ -413,9 +547,100 @@
     };
   }
 
+  // ------------------------------------------------------- Yaesu FRG-100
+
+  /**
+   * Yaesu FRG-100 receiver: fixed five octet binary frames.
+   *
+   * Its backend declares frequency only - no `get_mode`, no `get_ptt`, no
+   * `set_ptt` - which is what makes it the capability-limited fixture: the
+   * catalogue reports a serial model whose easy telemetry is one field.
+   *
+   * `00 00 00 00 0e` opens (the backend only writes it, so the emulator stays
+   * quiet), and `00 00 00 02 10` reads the 19 octet operating data block whose
+   * receive frequency is the three little-endian octets at offset 2, in tens
+   * of hertz, exactly as `frg100_read_freq_from_buf()` decodes it.  Every
+   * setter is write-only for this backend too.
+   */
+  function createFrg100(): FakeRig {
+    var FRAME_LENGTH = 5;
+    var READ_OP_DATA = [0x00, 0x00, 0x00, 0x02, 0x10];
+    var OP_DATA_LENGTH = 19;
+
+    var state = {
+      frequency: 7050000,
+      modeDigit: 0,
+      filterValue: 0,
+      transmitting: false,
+      silent: false,
+    };
+
+    var commands: string[] = [];
+    var buffer: number[] = [];
+
+    /** True when the buffered frame is `frame`. */
+    function sameFrame(frame: number[]): boolean {
+      for (var i = 0; i < FRAME_LENGTH; i++) {
+        if (buffer[i] !== frame[i]) { return false; }
+      }
+
+      return true;
+    }
+
+    /** The operating data block, receive frequency in octets 2..4. */
+    function opData(): Uint8Array {
+      var units = Math.round(state.frequency / 10);
+      var block = new Uint8Array(OP_DATA_LENGTH);
+
+      block[2] = units & 0xff;
+      block[3] = (units >> 8) & 0xff;
+      block[4] = (units >> 16) & 0xff;
+      /* Octet 7 is the hardware mode; zero is a plausible LSB. */
+      return block;
+    }
+
+    return {
+      name: 'yaesu-frg100',
+      state: state,
+      commands: commands,
+      reset: function (): void {
+        buffer = [];
+      },
+      feed: function (chunk: Uint8Array): Uint8Array[] {
+        for (var i = 0; i < chunk.length; i++) { buffer.push(chunk[i]!); }
+
+        var replies: Uint8Array[] = [];
+
+        while (buffer.length >= FRAME_LENGTH) {
+          var text = '';
+
+          for (var j = 0; j < FRAME_LENGTH; j++) {
+            text += ' ' + pad(buffer[j]!.toString(16).toUpperCase(), 2);
+          }
+
+          commands.push(text.trim());
+
+          if (sameFrame(READ_OP_DATA)) { replies.push(opData()); }
+
+          buffer = buffer.slice(FRAME_LENGTH);
+        }
+
+        return replies;
+      },
+    };
+  }
+
+  /** One CI-V factory per bus address. */
+  function civRig(address: number, name: string): () => FakeRig {
+    return function (): FakeRig { return createIcomCiv(address, name); };
+  }
+
   window.__fakeRigRegistry = {
     'kenwood-ts480': createTs480,
-    'icom-ic703': createIc703,
+    'icom-ic703': civRig(0x68, 'icom-ic703'),
+    'icom-ic746': civRig(0x56, 'icom-ic746'),
+    'yaesu-ft710': createFt710,
     'yaesu-ft757gx2': createFt757gx2,
+    'yaesu-frg100': createFrg100,
   };
 })();

@@ -174,8 +174,10 @@ export abstract class VfoMethods extends MemoryMethods {
     });
   }
 
-  async hasVfoOp(op: string): Promise<string> {
-    return this.native().hasVfoOp(this.handle(), op);
+  async hasVfoOp(op: string): Promise<number> {
+    return this.serialized('hasVfoOp', async () => {
+      return this.native().hasVfoOp(this.handle(), op);
+    });
   }
 
   async scan(scan: string, ch: number): Promise<void> {
@@ -186,24 +188,9 @@ export abstract class VfoMethods extends MemoryMethods {
     });
   }
 
-  async hasScan(scan: string): Promise<string> {
-    return this.native().hasScan(this.handle(), scan);
-  }
-
-  async setTrn(trn: number): Promise<void> {
-    this.available('setTrn');
-    return this.serialized('setTrn', async () => {
-      const result = await this.native().setTrn(this.handle(), trn);
-      if (result.code !== 0) { throw this.failed(result, 'setTrn'); }
-    });
-  }
-
-  async getTrn(): Promise<number> {
-    this.available('getTrn');
-    return this.serialized('getTrn', async () => {
-      const result = await this.native().getTrn(this.handle());
-      if (result.code !== 0) { throw this.failed(result, 'getTrn'); }
-      return result.value;
+  async hasScan(scan: string): Promise<number> {
+    return this.serialized('hasScan', async () => {
+      return this.native().hasScan(this.handle(), scan);
     });
   }
 
