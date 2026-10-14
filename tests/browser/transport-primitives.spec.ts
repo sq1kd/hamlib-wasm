@@ -82,20 +82,20 @@ test('drives the serial registry, queue, flush and signals', async ({ page }) =>
       /* Registry ------------------------------------------------------- */
       const token = glue.storePort(port);
       const storeRejectsNonPort = glue.storePort(null);
-      const registerUnknownToken = glue.registerPort('webserial/unknown', 4242);
-      const registerPath = glue.registerPort('webserial/1', token);
-      const registerKnownPathAgain = glue.registerPort('webserial/1', glue.storePort(port));
-      const registerConsumedToken = glue.registerPort('webserial/3', token);
-      const openUnregisteredPath = await glue.openPort('webserial/42', 9600, 8, 1, 0, 0);
+      const registerUnknownToken = glue.registerPort('serial/unknown', 4242);
+      const registerPath = glue.registerPort('serial/1', token);
+      const registerKnownPathAgain = glue.registerPort('serial/1', glue.storePort(port));
+      const registerConsumedToken = glue.registerPort('serial/3', token);
+      const openUnregisteredPath = await glue.openPort('serial/42', 9600, 8, 1, 0, 0);
 
       /* Open ----------------------------------------------------------- */
-      const handle = await glue.openPort('webserial/1', 9600, 8, 1, 0, 0);
+      const handle = await glue.openPort('serial/1', 9600, 8, 1, 0, 0);
       const matchesSameOptions = glue.matchesOpenOptions(handle, 9600, 8, 1, 0, 0);
       const matchesDifferentOptions = glue.matchesOpenOptions(handle, 19200, 8, 1, 0, 0);
 
       /* A rig may open its CAT and PTT lines on one physical port. */
-      const secondHandle = await glue.openPort('webserial/1', 9600, 8, 1, 0, 0);
-      const unregisterWhileOpen = glue.unregisterPort('webserial/1');
+      const secondHandle = await glue.openPort('serial/1', 9600, 8, 1, 0, 0);
+      const unregisterWhileOpen = glue.unregisterPort('serial/1');
 
       /* Receive queue and flush ---------------------------------------- */
       serial.pushRaw('FA00014074000;');
@@ -114,19 +114,19 @@ test('drives the serial registry, queue, flush and signals', async ({ page }) =>
       const closeFirst = await glue.closePort(secondHandle);
       const closeUnknown = await glue.closePort(987654);
       const closeSecond = await glue.closePort(handle);
-      const unregisterAfterClose = glue.unregisterPort('webserial/1');
-      const unregisterTwice = glue.unregisterPort('webserial/1');
-      const unregisterUnknownPath = glue.unregisterPort('webserial/never');
+      const unregisterAfterClose = glue.unregisterPort('serial/1');
+      const unregisterTwice = glue.unregisterPort('serial/1');
+      const unregisterUnknownPath = glue.unregisterPort('serial/never');
 
       /* An errored stream must report an I/O failure to the reader. */
       const errorToken = glue.storePort(port);
-      glue.registerPort('webserial/2', errorToken);
+      glue.registerPort('serial/2', errorToken);
 
-      const errorHandle = await glue.openPort('webserial/2', 9600, 8, 1, 0, 0);
+      const errorHandle = await glue.openPort('serial/2', 9600, 8, 1, 0, 0);
       serial.errorReadable('NetworkError');
       const waitAfterError = await glue.waitReadable(errorHandle, 2000);
       await glue.closePort(errorHandle);
-      glue.unregisterPort('webserial/2');
+      glue.unregisterPort('serial/2');
 
       return {
         errors,

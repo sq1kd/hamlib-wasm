@@ -1,7 +1,7 @@
 /**
  * The pinned upstream release, as the tests see it.
  *
- * `packages/hamlib-web/hamlib.config.yaml` is the single source of truth for
+ * `packages/hamlib-wasm/hamlib.config.yaml` is the single source of truth for
  * the upstream version, archive and patches, so no spec hardcodes a release
  * number: refreshing Hamlib is a config edit and the tests follow it.  The
  * built package ships the same data as provenance, and the helpers here check
@@ -35,7 +35,7 @@ interface UpstreamProvenance {
 }
 
 const packageUrl = (relative: string): URL =>
-  new URL(`../../packages/hamlib-web/${relative}`, import.meta.url);
+  new URL(`../../packages/hamlib-wasm/${relative}`, import.meta.url);
 
 export const UPSTREAM_MANIFEST: UpstreamManifest = (
   parse(readFileSync(fileURLToPath(packageUrl('hamlib.config.yaml')), 'utf8')) as {

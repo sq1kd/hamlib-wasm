@@ -1,0 +1,15 @@
+{
+  "name": "hamlib-wasm-example-node",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Node command line example for hamlib-wasm: list serial ports, or read a rig through the hamlib-wasm/node transport",
+  "scripts": {
+    "start": "node src/main.ts"
+  },
+  "dependencies": {
+    "hamlib-wasm": "*",
+    "serialport": "13.0.0"
+  }
+}

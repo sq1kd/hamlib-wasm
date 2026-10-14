@@ -8,8 +8,8 @@ import { StrictMode, act, useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { HamlibProvider, useEasyRig } from 'hamlib-web/react';
-import type { HamlibOptions } from 'hamlib-web';
+import { HamlibProvider, useEasyRig } from 'hamlib-wasm/react';
+import type { HamlibOptions } from 'hamlib-wasm';
 
 import { MODEL } from './fake-hamlib';
 import type { HamlibError } from './fake-hamlib';

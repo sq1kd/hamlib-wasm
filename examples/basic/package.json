@@ -1,17 +1,17 @@
 {
-  "name": "hamlib-web-example-basic",
+  "name": "hamlib-wasm-example-basic",
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
-  "description": "Minimal Vanilla TypeScript/Vite example for hamlib-web",
+  "description": "Minimal Vanilla TypeScript/Vite example for hamlib-wasm",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "hamlib-web": "*"
+    "hamlib-wasm": "*"
   },
   "devDependencies": {
     "typescript": "5.9.3",

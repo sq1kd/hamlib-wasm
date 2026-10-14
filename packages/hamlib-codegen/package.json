@@ -4,7 +4,7 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
-  "description": "AST-driven generator for the hamlib-web binding surface",
+  "description": "AST-driven generator for the hamlib-wasm binding surface",
   "dependencies": {
     "yaml": "2.9.1"
   },

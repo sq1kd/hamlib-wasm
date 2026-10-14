@@ -15,8 +15,8 @@ import { StrictMode, useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { HamlibProvider, useEasyRig, useModels, useRigState } from 'hamlib-web/react';
-import type { HamlibOptions } from 'hamlib-web';
+import { HamlibProvider, useEasyRig, useModels, useRigState } from 'hamlib-wasm/react';
+import type { HamlibOptions } from 'hamlib-wasm';
 
 import type { HookControls, HookSnapshot } from './hook-harness-types';
 

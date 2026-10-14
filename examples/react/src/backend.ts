@@ -4,9 +4,9 @@
  * The point of the comparison is the call surface each one produces, so both
  * expose one `Backend` shape and log every call they make:
  *
- *  - `easy` uses `hamlib-web/react` (`useEasyRig`, `useRigState`), so a
+ *  - `easy` uses `hamlib-wasm/react` (`useEasyRig`, `useRigState`), so a
  *    refresh is one `refresh()` and a mode change fills in the passband;
- *  - `native` uses `hamlib-web/native` directly (`createHamlib` and the rig's
+ *  - `native` uses `hamlib-wasm/hamlib` directly (`createHamlib` and the rig's
  *    generated methods), so the same screen is three explicit reads and an
  *    explicit passband, polled by hand.
  *
@@ -14,11 +14,11 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { HamlibError, capabilitiesOf } from 'hamlib-web';
-import type { EasyCapabilities, EasyRig, PttState, RigState } from 'hamlib-web';
-import { useEasyRig, useRigError, useRigState } from 'hamlib-web/react';
-import { createHamlib } from 'hamlib-web/native';
-import type { Hamlib, Rig } from 'hamlib-web/native';
+import { HamlibError, capabilitiesOf } from 'hamlib-wasm';
+import type { EasyCapabilities, EasyRig, PttState, RigState } from 'hamlib-wasm';
+import { useEasyRig, useRigError, useRigState } from 'hamlib-wasm/react';
+import { createHamlib } from 'hamlib-wasm/hamlib';
+import type { Hamlib, Rig, SerialPortLike } from 'hamlib-wasm/hamlib';
 
 import type { PassbandKind } from './RigPanel';
 
@@ -55,7 +55,7 @@ export interface Backend {
    * for one to find the baud rate first; without it the backend asks for one
    * itself, which is why this needs a user gesture either way.
    */
-  connect(modelId: number, baudRate: number | undefined, port?: SerialPort): Promise<void>;
+  connect(modelId: number, baudRate: number | undefined, port?: SerialPortLike): Promise<void>;
   disconnect(): Promise<void>;
   setFrequency(hz: number): Promise<void>;
   setMode(mode: string, passband?: number): Promise<void>;
@@ -172,7 +172,7 @@ export function useEasyBackend(log: Log): Backend {
   }), [rig, state, connecting, connectError, operationError, connect, disconnect, call, log, requireRig]);
 }
 
-/** The 1:1 surface: the same screen, spelled out against `hamlib-web/native`. */
+/** The 1:1 surface: the same screen, spelled out against `hamlib-wasm/hamlib`. */
 export function useNativeBackend(log: Log): Backend {
   const liveRef = useRef(true);
   /* The attempt counter.  Every `connect()` takes a new id, and every
@@ -331,7 +331,7 @@ export function useNativeBackend(log: Log): Backend {
   const connect = useCallback(async (
     modelId: number,
     baudRate: number | undefined,
-    granted?: SerialPort,
+    granted?: SerialPortLike,
   ): Promise<void> => {
     const attempt = generationRef.current + 1;
 

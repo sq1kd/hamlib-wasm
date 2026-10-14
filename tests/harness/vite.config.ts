@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    exclude: ['hamlib-web'],
+    exclude: ['hamlib-wasm'],
   },
   build: {
     target: 'es2022',

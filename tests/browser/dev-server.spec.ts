@@ -36,7 +36,7 @@ for (const [name, url] of DEV_EXAMPLES) {
     });
 
     const wasm = await page.evaluate(() => performance.getEntriesByType('resource')
-      .filter((entry) => entry.name.includes('hamlib-web.wasm'))
+      .filter((entry) => entry.name.includes('hamlib-wasm.wasm'))
       .map((entry) => {
         const resource = entry as PerformanceResourceTiming;
 

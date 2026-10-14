@@ -1,5 +1,5 @@
 {
-  "name": "hamlib-web-monorepo",
+  "name": "hamlib-wasm-monorepo",
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
@@ -8,10 +8,12 @@
   "workspaces": [
     "packages/*",
     "examples/*",
-    "tests/harness"
+    "tests/harness",
+    "tests/node",
+    "tests/hardware"
   ],
   "scripts": {
-    "build": "node packages/hamlib-web/build/package.ts && npm run build --workspace examples/basic",
+    "build": "node packages/hamlib-wasm/build/package.ts && npm run build --workspace examples/basic",
     "typecheck": "mise run typecheck",
     "test": "vitest run --config tests/hooks/vitest.config.ts && playwright test",
     "test:browser": "playwright test tests/browser/e2e",

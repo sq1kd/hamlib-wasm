@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "none",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "useDefineForClassFields": true,
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "declaration": false,
+    "sourceMap": false,
+    "outDir": "../dist/native/library"
+  },
+  "include": ["web_serial.ts", "emscripten-globals.d.ts"]
+}

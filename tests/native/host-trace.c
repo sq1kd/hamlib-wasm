@@ -5,7 +5,7 @@
  * the same public Hamlib configuration sequence, the same transaction, and an
  * emulator that mirrors tests/browser/fixtures/rigs.ts byte for byte.  The
  * command log it prints is compared with the browser baseline
- * (packages/hamlib-web/baseline/baseline.json) by build/compare-native.ts,
+ * (packages/hamlib-wasm/baseline/baseline.json) by build/compare-native.ts,
  * so the adapter can be shown not to perturb protocol behaviour.
  *
  * Hamlib talks to a pseudo terminal, which is what a host build has instead of

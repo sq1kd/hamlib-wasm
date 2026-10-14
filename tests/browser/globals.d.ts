@@ -4,9 +4,15 @@
  * `tests/harness/src/main.ts` publishes the package on `window`; the example
  * publishes nothing and is driven through its DOM instead.
  */
-import type { EasyCapabilities, EasyHamlib } from 'hamlib-web';
-import type { Hamlib, HamlibOptions, RigModel } from 'hamlib-web/native';
-import type { MainModule } from 'hamlib-web/wasm';
+import type { EasyCapabilities, EasyHamlib } from 'hamlib-wasm';
+import type {
+  Hamlib,
+  HamlibOptions,
+  RigModel,
+  SerialPortLike,
+  SerialTransport,
+} from 'hamlib-wasm/hamlib';
+import type { MainModule } from 'hamlib-wasm/native';
 import type { HookHarness } from '../harness/src/hook-harness-types';
 
 export type NativeModule = MainModule;
@@ -31,6 +37,8 @@ export interface HamlibHarness {
   createHamlib(options?: HamlibOptions): Promise<Hamlib>;
   createEasy(options?: HamlibOptions): Promise<EasyHamlib>;
   capabilitiesOf(model: RigModel): EasyCapabilities;
+  /** A transport over `port`, recording every call the facade makes on it. */
+  fakeTransport(port: SerialPortLike): SerialTransport & { calls: string[] };
   isHamlibError(value: unknown): boolean;
   /** Loads the published Emscripten module (a separate wasm instance). */
   nativeModule(): Promise<NativeModule>;

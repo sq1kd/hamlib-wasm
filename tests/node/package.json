@@ -1,0 +1,16 @@
+{
+  "name": "hamlib-wasm-node-tests",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Runs the built hamlib-wasm package in Node: the module, the transport contract and the serialport adapter",
+  "dependencies": {
+    "hamlib-wasm": "*",
+    "serialport": "13.0.0"
+  },
+  "devDependencies": {
+    "@serialport/stream": "13.0.0",
+    "@serialport/bindings-interface": "1.2.2"
+  }
+}

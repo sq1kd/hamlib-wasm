@@ -2,7 +2,7 @@
  * Recorded behavioural baseline for the pinned upstream release.
  *
  * This spec runs the same fixed transaction against the built package every
- * time and compares it with `packages/hamlib-web/baseline/baseline.json`:
+ * time and compares it with `packages/hamlib-wasm/baseline/baseline.json`:
  *
  *   - the upstream version the module reports must match the release manifest,
  *   - the serial model catalogue must hash to the recorded digest,
@@ -14,7 +14,7 @@
  * the wire traffic.
  *
  * Re-record with:
- *   HAMLIBS_WEB_RECORD_BASELINE=1 npx playwright test tests/browser/baseline.spec.ts
+ *   HAMLIB_WASM_RECORD_BASELINE=1 npx playwright test tests/browser/baseline.spec.ts
  */
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -34,12 +34,12 @@ import {
 } from './upstream';
 
 const BASELINE_PATH = fileURLToPath(
-  new URL('../../packages/hamlib-web/baseline/baseline.json', import.meta.url),
+  new URL('../../packages/hamlib-wasm/baseline/baseline.json', import.meta.url),
 );
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
 
-const RECORD = process.env.HAMLIBS_WEB_RECORD_BASELINE === '1';
+const RECORD = process.env.HAMLIB_WASM_RECORD_BASELINE === '1';
 
 interface Ts480Sample {
   id: number;

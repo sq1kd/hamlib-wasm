@@ -1,8 +1,8 @@
 /**
  * The stubbed package boundary the hook unit tests run against.
  *
- * `vi.mock` replaces `hamlib-web`'s built entry point with this module, so the
- * real `hamlib-web/react` hooks run against an `EasyHamlib` whose every promise
+ * `vi.mock` replaces `hamlib-wasm`'s built entry point with this module, so the
+ * real `hamlib-wasm/react` hooks run against an `EasyHamlib` whose every promise
  * this file hands out.  That is what the browser specs cannot express: they
  * drive one rig over one emulated port, so they can cancel an attempt but not
  * interleave two and choose which one settles last.
@@ -10,7 +10,7 @@
  * Only the surface the hooks touch is implemented; the casts in `createEasy`
  * say so out loud, and anything else the real interfaces carry is absent.
  */
-import type { EasyHamlib, EasyRig, OpenEasyRigOptions, RigModel, RigState } from 'hamlib-web';
+import type { EasyHamlib, EasyRig, OpenEasyRigOptions, RigModel, RigState } from 'hamlib-wasm';
 
 /** The `HamlibError` the hooks construct and test with. */
 export class HamlibError extends Error {

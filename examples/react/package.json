@@ -1,17 +1,17 @@
 {
-  "name": "hamlib-web-example-react",
+  "name": "hamlib-wasm-example-react",
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
-  "description": "React landing page and demo application for hamlib-web",
+  "description": "React landing page and demo application for hamlib-wasm",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "hamlib-web": "*",
+    "hamlib-wasm": "*",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

@@ -1,23 +1,29 @@
-# hamlib-web
+# hamlib-wasm
 
 Run [Hamlib](https://hamlib.github.io/) in the browser.
 
-`hamlib-web` compiles Hamlib 4.7.2 to WebAssembly, replaces only its common
-serial transport with the [Web Serial API](https://developer.mozilla.org/docs/Web/API/Web_Serial_API),
-and exposes the compiled CAT operations as promise based TypeScript methods.
+`hamlib-wasm` compiles Hamlib 4.7.2 to WebAssembly, replaces only its common
+serial transport with a switchable one - the
+[Web Serial API](https://developer.mozilla.org/docs/Web/API/Web_Serial_API) in
+the browser and
+[node-serialport](https://serialport.io/) in Node and Electron, each selected by
+the runtime that loads the module - and exposes the
+compiled CAT operations as promise based TypeScript methods.
 Radio backends are upstream Hamlib code and are not modified, so ordinary
-serial CAT rigs work without per-model browser code.
+serial CAT rigs work without per-model browser or Node code.
 
-Three entry points, so it is always clear which surface is in use:
+Five entry points, so it is always clear which surface is in use:
 
 | Import | What it is |
 | --- | --- |
-| `hamlib-web` | The easy surface: `createEasy`, a state snapshot, events, booleans |
-| `hamlib-web/native` | The 1:1 surface: `createHamlib`, a method per upstream Hamlib call |
-| `hamlib-web/react` | React hooks over the easy surface (`hamlib-web/react` needs `react`) |
+| `hamlib-wasm` | The easy surface: `createEasy`, a state snapshot, events, booleans |
+| `hamlib-wasm/hamlib` | The 1:1 surface: `createHamlib`, a method per upstream Hamlib call |
+| `hamlib-wasm/native` | The raw Emscripten module and its generated declaration, for advanced use |
+| `hamlib-wasm/node` | The Node transport: `nodeSerialTransport`, with `serialport` as an optional peer dependency |
+| `hamlib-wasm/react` | React hooks over the easy surface (`hamlib-wasm/react` needs `react`) |
 
 ```ts
-import { createEasy } from 'hamlib-web';
+import { createEasy } from 'hamlib-wasm';
 
 const hamlib = await createEasy();
 const rig = await hamlib.open({ modelId });       // asks for the port: user gesture
@@ -38,7 +44,7 @@ read is as many calls as it takes.  `Rig` carries the whole generated surface,
 so anything the easy entry does not cover is still one call away.
 
 ```ts
-import { createHamlib } from 'hamlib-web/native';
+import { createHamlib } from 'hamlib-wasm/hamlib';
 
 const hamlib = await createHamlib();
 const port = await hamlib.requestPort();          // needs a user gesture
@@ -58,24 +64,27 @@ await hamlib.dispose();
 
 | Path | Purpose |
 | --- | --- |
-| `packages/hamlib-web` | The package: native sources, build scripts, the three entry points (`src/index.ts`, `src/native.ts`, `src/react.ts`) |
-| `packages/hamlib-web/hamlib.config.yaml` | The one config: the pinned release (version, archive URL + SHA-256, patches) and the binding surface |
-| `packages/hamlib-web/coverage.json` | Generated coverage report: bound vs refused declarations, with reasons |
-| `packages/hamlib-web/build` | Native build, package build, audits and the generator wrapper |
+| `packages/hamlib-wasm` | The package: native sources, build scripts, the five entry points (`src/index.ts`, `src/hamlib.ts`, `src/native/`, `src/react.ts`, `src/node.ts`) |
+| `packages/hamlib-wasm/hamlib.config.yaml` | The one config: the pinned release (version, archive URL + SHA-256, patches) and the binding surface |
+| `packages/hamlib-wasm/coverage.json` | Generated coverage report: bound vs refused declarations, with reasons |
+| `packages/hamlib-wasm/build` | Native build, package build, audits and the generator wrapper |
 | `packages/hamlib-codegen` | The AST-driven generator: classifies upstream declarations and emits the binding surface |
-| `packages/hamlib-web/native` | Browser serial transport (TypeScript, compiled to the Emscripten JS library), link-time POSIX wrappers, Embind facade, `pthread` shim |
-| `packages/hamlib-web/baseline/baseline.json` | Recorded catalogue digest and CAT trace for the pinned release |
+| `packages/hamlib-wasm/native` | Browser serial transport (TypeScript, compiled to the Emscripten JS library), link-time POSIX wrappers, Embind facade, `pthread` shim |
+| `packages/hamlib-wasm/baseline/baseline.json` | Recorded catalogue digest and CAT trace for the pinned release |
 | `examples/basic` | Vanilla TypeScript/Vite example of the 1:1 surface |
+| `examples/node` | Node CLI: lists this machine's serial ports and drives a rig read-only through the Node transport |
 | `examples/react` | React landing page and demo: one graphical rig, the easy and native backends side by side |
 | `tests/browser` | Playwright Web Serial double with emulated rigs (Kenwood TS-480, Icom CI-V IC-703/IC-746, Yaesu FT-757GXII and FRG-100) and the scenarios driving them |
 | `tests/hooks` | `vitest` + jsdom: the React hook state machine against a stubbed package boundary |
+| `tests/node` | `vitest` in Node: the built Wasm module, the port contract and the `serialport` adapter against the emulated rigs |
+| `tests/hardware` | Opt-in, read-only checks against a real rig through the shipped Node transport |
 | `tests/harness` | Pages that publish the built package (`index.html`) and drive the React hooks (`hooks.html`) for the specs |
 | `tests/consumer` | External consumer fixture, typechecked against the packed tarball |
 | `.github/workflows/pages.yml` | Builds `examples/react` and publishes it to GitHub Pages |
 | `docs` | Investigation notes, the implementation plan and the implementation record |
 
 Build products live in `.cache/hamlib/<version>` (downloaded upstream source and
-object files) and `packages/hamlib-web/dist`; neither is committed.
+object files) and `packages/hamlib-wasm/dist`; neither is committed.
 
 ## Commands
 
@@ -89,8 +98,11 @@ mise run fetch-native                # fetch, verify, patch and extract the pinn
 mise run generate                    # regenerate the binding surface from the config + upstream AST
 mise run baseline:record             # re-record the upstream behavioural baseline
 mise run typecheck                   # every project, including the packed-consumer fixture
-mise run test                        # hook unit tests + deterministic transport/browser scenarios
+mise run test                        # hook/Node unit tests + deterministic transport/browser scenarios
 mise run test:hooks                  # only the DOM-less React hook unit tests
+mise run test:node                   # only the Node transport checks against the built package
+mise run test:hardware               # read-only checks against a real attached rig (opt-in)
+mise run example:node                # list this machine's serial ports through the Node entry point
 mise run refresh                     # the whole upstream refresh path, end to end
 mise run pack:check                  # verify the published package contents
 mise run dev                         # Vanilla example dev server
@@ -98,7 +110,7 @@ mise run dev:react                   # React landing page dev server
 ```
 
 `mise run build` is reproducible: it reads
-`packages/hamlib-web/hamlib.config.yaml`, downloads the release it names,
+`packages/hamlib-wasm/hamlib.config.yaml`, downloads the release it names,
 verifies its SHA-256, extracts a fresh tree, applies the patches it lists
 strictly (no fuzz, no rejects), installs the project owned `src/serial.c`,
 configures a static single threaded Emscripten build, checks the committed
@@ -139,7 +151,7 @@ graph TD
   D -->|"Wl,--wrap=read/write/select/nanosleep"| E[wrapped_io.cpp: handle dispatch]
   E --> F[web_serial.c: serial contract + fd registry]
   F --> G[web_serial.ts: queue, waiters, signals]
-  G --> H[Web Serial: SerialPort]
+  G --> H[SerialPort: Web Serial in the browser, node-serialport in Node]
 ```
 
 * **Synchronous C, asynchronous browser** - Hamlib's API is blocking, Web
@@ -161,8 +173,16 @@ graph TD
   `rig_token_lookup()` + `rig_set_conf()`; it never writes a `rig_state` or
   `hamlib_port_t` field, so no internal header leaks into the adapter.
 * **Fake descriptors** - `hamlib_port_t.fd` holds an opaque positive handle
-  owned by the JavaScript registry; `webserial/<n>` is the logical path Hamlib
+  owned by the JavaScript registry; `serial/<n>` is the logical path Hamlib
   passes around.
+* **One port contract, two transports** - `src/transport.ts` defines the
+  `SerialTransport`/`SerialPortLike` seam the facade acquires ports through.
+  Web Serial satisfies it structurally (`src/web-serial.ts`), and
+  `hamlib-wasm/node` (`src/node.ts`) adapts `serialport` to it, lazily and behind
+  an optional peer dependency, so the same package, the same Hamlib build and
+  the same catalogue run in an Electron main process, a CLI or a test with no
+  browser present.  With no transport passed, the runtime picks: Web Serial
+  where it exists, the Node transport otherwise (`src/transport-select.ts`).
 * **One queue per module** - every native call runs on a single promise chain,
   because Asyncify can only have one suspended call at a time. Several `Rig`
   objects still work; their calls are serialized in order. This includes the
@@ -221,28 +241,32 @@ graph TD
 
 ## Supported
 
-Web Serial CAT control in a secure context desktop Chromium family browser:
-frequency, mode, passband and PTT for the models Hamlib reports as
-`RIG_PORT_SERIAL`, including CAT based PTT and serial RTS/DTR PTT.
+Serial CAT control, in a secure context desktop Chromium family browser over
+Web Serial and anywhere Node 24+ runs over node-serialport: frequency, mode,
+passband and PTT for the models Hamlib reports as `RIG_PORT_SERIAL`, including
+CAT based PTT and serial RTS/DTR PTT.
 
 What the entries cover:
 
 | Entry | Surface |
 | --- | --- |
-| `hamlib-web` | `createEasy`, `EasyRig` (`refresh`, `setFrequency`, `setMode`, `setPassband`, `setPtt`, `baudRate`, `on`, `watch`), `detectBaudRate` and `EasyRig.raw` for everything below; `refresh` returns only the fields the model advertises and `watch` registers composable polls |
-| `hamlib-web/native` | 100 methods on `Rig`, one per bound Hamlib operation, plus `baudRate`, `detectBaudRate`, the catalogue and the error type |
-| `hamlib-web/react` | `HamlibProvider`, `useModels`, `useEasyRig`, `useRigState`, `useRigError` |
+| `hamlib-wasm` | `createEasy`, `EasyRig` (`refresh`, `setFrequency`, `setMode`, `setPassband`, `setPtt`, `baudRate`, `on`, `watch`), `detectBaudRate` and `EasyRig.raw` for everything below; `refresh` returns only the fields the model advertises and `watch` registers composable polls |
+| `hamlib-wasm/hamlib` | 100 methods on `Rig`, one per bound Hamlib operation, plus `baudRate`, `detectBaudRate`, the catalogue and the error type |
+| `hamlib-wasm/native` | The raw Emscripten module, its generated declaration and the Wasm asset |
+| `hamlib-wasm/node` | `nodeSerialTransport()` behind the same `SerialTransport` contract, `listPorts()` for what the operating system reports, and `requestPort({ path })` |
+| `hamlib-wasm/react` | `HamlibProvider`, `useModels`, `useEasyRig`, `useRigState`, `useRigError` |
 
 Not represented: Firefox/Safari, raw USB/HID, network rigs, rotators,
-amplifiers, audio, GPIO and parallel ports. Web Serial cannot express 5/6 data
-bits, mark/space parity or XON/XOFF flow control; a model that declares those
-is rejected with `-RIG_ECONF` before the port is opened, and the catalogue says
-so through `RigModel.limitation`.
+amplifiers, audio, GPIO and parallel ports. The transport contract cannot
+express 5/6 data bits, mark/space parity or XON/XOFF flow control - the same
+limits apply to both transports - so a model that declares those is rejected
+with `-RIG_ECONF` before the port is opened, and the catalogue says so through
+`RigModel.limitation`.
 
 Every model carries a support level: `"verified"` when a browser test in
 `tests/browser` drives it through the Web Serial double, otherwise
 `"candidate"`. `VERIFIED_MODELS` and `UNUSABLE_MODELS` in
-`packages/hamlib-web/src/browser-support.ts` hold the evidence and the recorded
+`packages/hamlib-wasm/src/browser-support.ts` hold the evidence and the recorded
 reasons. Three limitations are worth knowing:
 
 * a backend that needs a worker thread (AnyTone D578A) fails at open rather
@@ -269,13 +293,13 @@ TS-480, Icom CI-V and Yaesu newcat) and the example-driven scenarios in
 The project code is `UNLICENSED` and every workspace package is private.
 Hamlib itself stays LGPL-2.1-or-later; its licence, pinned source URL/checksum
 and the applied patch ship inside the package under `dist/third_party/hamlib`
-(and are exposed as `hamlib-web/third_party/*`).
+(and are exposed as `hamlib-wasm/third_party/*`).
 
-Hamlib is linked statically into `dist/native/hamlib-web.wasm`, so the source
+Hamlib is linked statically into `dist/native/hamlib-wasm.wasm`, so the source
 that corresponds to the shipped binary has to stay reachable. The arrangement
 is: `dist/third_party/hamlib/SOURCE.json` names the exact upstream release, the
 archive URL and its SHA-256 and the patch text that was applied;
-`packages/hamlib-web/hamlib.config.yaml` plus `mise run build:native`
+`packages/hamlib-wasm/hamlib.config.yaml` plus `mise run build:native`
 reproduce the same artifact from that source, and the pack task keeps both in
 the tarball. There is no install-time build step and no generated code that
 cannot be reproduced from the repository.

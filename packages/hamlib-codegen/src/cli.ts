@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regenerate the binding surface of packages/hamlib-web.
+ * Regenerate the binding surface of packages/hamlib-wasm.
  *
  * Two inputs meet here:
  *

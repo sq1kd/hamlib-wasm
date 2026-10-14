@@ -2,16 +2,16 @@
  * The landing page application.
  *
  * One panel, two backends: the radio on screen is driven either through the
- * easy entry (`hamlib-web`, via `hamlib-web/react`) or through the 1:1 entry
- * (`hamlib-web/native`), and the call log underneath shows exactly which
+ * easy entry (`hamlib-wasm`, via `hamlib-wasm/react`) or through the 1:1 entry
+ * (`hamlib-wasm/hamlib`), and the call log underneath shows exactly which
  * library calls each one makes for the same interaction.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
-import { HamlibError } from 'hamlib-web';
-import type { RigModel } from 'hamlib-web';
-import { useHamlibContext, useModels } from 'hamlib-web/react';
+import { HamlibError } from 'hamlib-wasm';
+import type { RigModel } from 'hamlib-wasm';
+import { useHamlibContext, useModels } from 'hamlib-wasm/react';
 
 import { useEasyBackend, useNativeBackend } from './backend';
 import type { Backend, BackendKind, LogEntry, Log } from './backend';
@@ -56,7 +56,7 @@ function BackendPicker(
             onChange={() => { onChange(option); }}
           />
           <span>
-            <code>{option === 'easy' ? `import { createEasy } from 'hamlib-web'` : `import { createHamlib } from 'hamlib-web/native'`}</code>
+            <code>{option === 'easy' ? `import { createEasy } from 'hamlib-wasm'` : `import { createHamlib } from 'hamlib-wasm/hamlib'`}</code>
             <small>
               {option === 'easy'
                 ? 'one snapshot, passband filled in, events and watch()'

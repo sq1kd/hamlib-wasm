@@ -1,11 +1,11 @@
 {
-  "name": "hamlib-web-consumer-fixture",
+  "name": "hamlib-wasm-consumer-fixture",
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
-  "description": "Typechecks the hamlib-web package as an external consumer sees it",
+  "description": "Typechecks the hamlib-wasm package as an external consumer sees it",
   "dependencies": {
-    "hamlib-web": "file:packed/hamlib-web.tgz"
+    "hamlib-wasm": "file:packed/hamlib-wasm.tgz"
   }
 }

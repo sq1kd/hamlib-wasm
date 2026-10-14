@@ -6,10 +6,10 @@ export default defineConfig({
    * the `/<repository>/` path GitHub Pages serves a project site from. */
   base: './',
   plugins: [react()],
-  /* hamlib-web is a linked workspace package: bundling it would break the
+  /* hamlib-wasm is a linked workspace package: bundling it would break the
    * `new URL(..., import.meta.url)` wasm lookup, so let Vite serve it as is. */
   optimizeDeps: {
-    exclude: ['hamlib-web'],
+    exclude: ['hamlib-wasm'],
   },
   build: {
     target: 'es2022',

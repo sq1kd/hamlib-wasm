@@ -16,11 +16,11 @@ export default defineConfig({
     setupFiles: ['./setup.ts'],
     server: {
       deps: {
-        /* `hamlib-web` is a workspace symlink, which vitest would otherwise
+        /* `hamlib-wasm` is a workspace symlink, which vitest would otherwise
          * hand to Node's own ESM loader - and a module loaded that way cannot
          * be replaced by `vi.mock`.  Inlining it runs the built hooks through
          * vite-node so the stubbed entry point takes effect. */
-        inline: ['hamlib-web'],
+        inline: ['hamlib-wasm'],
       },
     },
   },

@@ -1,0 +1,12 @@
+{
+  "name": "hamlib-wasm-hardware-tests",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Read-only hardware-in-the-loop checks: the shipped Node transport against a real rig",
+  "dependencies": {
+    "hamlib-wasm": "*",
+    "serialport": "13.0.0"
+  }
+}

@@ -16,22 +16,22 @@ npx playwright install chromium
 
 [tasks."fetch-native"]
 description = "Fetch, verify, patch and extract the pinned Hamlib release"
-run = "node packages/hamlib-web/build/fetch-native.ts"
+run = "node packages/hamlib-wasm/build/fetch-native.ts"
 
 [tasks."build:native"]
 description = "Compile the fetched Hamlib release to WebAssembly"
 depends = ["fetch-native"]
-run = "node packages/hamlib-web/build/compile-native.ts"
+run = "node packages/hamlib-wasm/build/compile-native.ts"
 
 [tasks.generate]
 description = "Regenerate the binding surface from hamlib.config.yaml and the upstream AST"
 depends = ["fetch-native"]
-run = "node packages/hamlib-web/build/codegen.ts --update"
+run = "node packages/hamlib-wasm/build/codegen.ts --update"
 
 [tasks."build:package"]
 description = "Compile the public TypeScript package against the generated Embind declarations"
 depends = ["build:native"]
-run = "node packages/hamlib-web/build/package.ts"
+run = "node packages/hamlib-wasm/build/package.ts"
 
 [tasks."build:example"]
 description = "Build the Vanilla TypeScript/Vite example"
@@ -48,6 +48,11 @@ description = "Build the browser test harness app"
 depends = ["build:package"]
 run = "npm run build --workspace tests/harness"
 
+[tasks."example:node"]
+description = "List the serial ports this machine reports, through the Node entry point"
+depends = ["build:package"]
+run = "node examples/node/src/main.ts --list"
+
 [tasks.build]
 description = "Full reproducible build: native Wasm, package, examples"
 depends = ["build:example", "build:react-example"]
@@ -59,9 +64,9 @@ run = '''
 set -e
 rm -rf tests/consumer/packed tests/consumer/node_modules
 mkdir -p tests/consumer/packed
-npm pack --workspace packages/hamlib-web --pack-destination tests/consumer/packed
+npm pack --workspace packages/hamlib-wasm --pack-destination tests/consumer/packed
 tarball=$(ls tests/consumer/packed/*.tgz)
-mv "$tarball" tests/consumer/packed/hamlib-web.tgz
+mv "$tarball" tests/consumer/packed/hamlib-wasm.tgz
 npm install --prefix tests/consumer --no-audit --no-fund --no-package-lock
 '''
 
@@ -71,9 +76,9 @@ depends = ["typecheck:consumer"]
 run = '''
 set -e
 tsc -p packages/hamlib-codegen/tsconfig.json --noEmit
-tsc -p packages/hamlib-web/tsconfig.json --noEmit
-tsc -p packages/hamlib-web/tsconfig.build.json --noEmit
-tsc -p packages/hamlib-web/native/tsconfig.library.json --noEmit
+tsc -p packages/hamlib-wasm/tsconfig.json --noEmit
+tsc -p packages/hamlib-wasm/tsconfig.build.json --noEmit
+tsc -p packages/hamlib-wasm/native/tsconfig.library.json --noEmit
 tsc -p examples/basic/tsconfig.json --noEmit
 tsc -p examples/react/tsconfig.json --noEmit
 tsc -p tests/harness/tsconfig.json --noEmit
@@ -81,6 +86,9 @@ tsc -p tests/hooks/tsconfig.json --noEmit
 tsc -p tests/browser/tsconfig.json --noEmit
 tsc -p tests/browser/fixtures/tsconfig.json --noEmit
 tsc -p tests/consumer/tsconfig.json --noEmit
+tsc -p tests/node/tsconfig.json --noEmit
+tsc -p tests/hardware/tsconfig.json --noEmit
+tsc -p examples/node/tsconfig.json --noEmit
 '''
 
 [tasks.typecheck]
@@ -92,9 +100,19 @@ description = "Run the DOM-less React hook unit tests against a stubbed package 
 depends = ["build:package"]
 run = "npx vitest run --config tests/hooks/vitest.config.ts"
 
+[tasks."test:node"]
+description = "Run the Node transport checks against the built package"
+depends = ["build:package"]
+run = "npx vitest run --config tests/node/vitest.config.ts"
+
+[tasks."test:hardware"]
+description = "Run the read-only checks against a real rig (HAMLIB_WASM_HARDWARE_DEVICE=qmx|ft-710, or HAMLIB_WASM_HARDWARE_PORT=<path>; HAMLIB_WASM_HARDWARE_WRITE=1 adds the frequency round-trip)"
+depends = ["build:package"]
+run = "npx vitest run --config tests/hardware/vitest.config.ts"
+
 [tasks.test]
-description = "Run the hook unit tests, the transport/lifecycle checks and the Playwright scenarios"
-depends = ["build:example", "build:react-example", "build:harness", "test:hooks"]
+description = "Run the hook and Node transport unit tests, the transport/lifecycle checks and the Playwright scenarios"
+depends = ["build:example", "build:react-example", "build:harness", "test:hooks", "test:node"]
 run = "npx playwright test"
 
 [tasks."test:browser"]
@@ -105,16 +123,16 @@ run = "npx playwright test tests/browser/e2e"
 [tasks."baseline:record"]
 description = "Re-record the upstream behavioural baseline from the current build"
 depends = ["build:example", "build:harness", "build:react-example"]
-run = "HAMLIBS_WEB_RECORD_BASELINE=1 npx playwright test tests/browser/baseline.spec.ts"
+run = "HAMLIB_WASM_RECORD_BASELINE=1 npx playwright test tests/browser/baseline.spec.ts"
 
 [tasks."audit:backends"]
 description = "Audit the pinned backends for threads, unwritable line settings and port-layer bypasses"
 depends = ["fetch-native"]
-run = "node packages/hamlib-web/build/audit-backends.ts"
+run = "node packages/hamlib-wasm/build/audit-backends.ts"
 
 [tasks."compare:native"]
 description = "Build the pinned release for the host and compare a representative transaction with the browser baseline"
-run = "node packages/hamlib-web/build/compare-native.ts"
+run = "node packages/hamlib-wasm/build/compare-native.ts"
 
 [tasks.refresh]
 description = "Upstream refresh: fetch, adapt, generate, build, typecheck, browser checks and packed-consumer check"
@@ -123,7 +141,7 @@ depends = ["build", "build:harness", "audit:backends", "typecheck", "test"]
 [tasks."pack:check"]
 description = "Verify the published package contents"
 depends = ["build:package"]
-run = "npm pack --dry-run --workspace packages/hamlib-web"
+run = "npm pack --dry-run --workspace packages/hamlib-wasm"
 
 [tasks.dev]
 description = "Run the Vanilla example dev server on a localhost URL"

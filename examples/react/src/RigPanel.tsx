@@ -7,7 +7,7 @@
 import { useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 
-import type { EasyCapabilities, RigState } from 'hamlib-web';
+import type { EasyCapabilities, RigState } from 'hamlib-wasm';
 
 /**
  * Common Hamlib mode names.

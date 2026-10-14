@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { HamlibProvider } from 'hamlib-web/react';
+import { HamlibProvider } from 'hamlib-wasm/react';
 
 import { App } from './App';
 import './style.css';

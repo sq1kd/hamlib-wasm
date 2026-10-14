@@ -8,4 +8,4 @@ playwright-report/
 tests/browser/fixtures/generated/
 tests/consumer/node_modules/
 tests/consumer/packed/
-packages/hamlib-web/src/native/hamlib-web.d.mts
+packages/hamlib-wasm/src/native/hamlib-wasm.d.mts

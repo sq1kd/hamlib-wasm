@@ -20,7 +20,7 @@ import type { ProbeHandle } from './probe';
 
 /* The factory must import the fake rather than close over it: `vi.mock` is
  * hoisted above the imports, so a static reference would not exist yet. */
-vi.mock('../../packages/hamlib-web/dist/index.js', async () => import('./fake-hamlib'));
+vi.mock('../../packages/hamlib-wasm/dist/index.js', async () => import('./fake-hamlib'));
 
 /** Start a connection. It stays pending until the spec settles its attempt. */
 function begin(probe: ProbeHandle): Promise<void> {

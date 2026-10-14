@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    /* These specs read `process.env` and touch no DOM, unlike the browser
+     * fixtures next to them. */
+    "types": ["node"]
+  },
+  "include": ["*.ts"]
+}

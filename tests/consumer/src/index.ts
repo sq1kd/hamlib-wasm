@@ -6,10 +6,11 @@
  * exports map - and walks both documented flows, so a mismatch between the
  * generated declarations and the package exports fails `mise run typecheck`.
  *
- * Two entries are exercised: `hamlib-web`, the easy surface, and
- * `hamlib-web/native`, the 1:1 Hamlib surface.
+ * Three entries are exercised: `hamlib-wasm`, the easy surface,
+ * `hamlib-wasm/hamlib`, the 1:1 Hamlib surface, and `hamlib-wasm/node`, the Node
+ * transport.
  */
-import { HamlibError, createEasy } from 'hamlib-web';
+import { HamlibError, createEasy } from 'hamlib-wasm';
 import type {
   EasyCapabilities,
   EasyHamlib,
@@ -18,8 +19,8 @@ import type {
   HamlibOptions,
   PttState,
   RigState,
-} from 'hamlib-web';
-import { createHamlib } from 'hamlib-web/native';
+} from 'hamlib-wasm';
+import { createHamlib, webSerialTransport } from 'hamlib-wasm/hamlib';
 import type {
   Hamlib,
   OpenRigOptions,
@@ -29,7 +30,14 @@ import type {
   RigMode,
   RigModeState,
   RigModel,
-} from 'hamlib-web/native';
+  SerialPortLike,
+  SerialTransport,
+} from 'hamlib-wasm/hamlib';
+import { nodeSerialTransport } from 'hamlib-wasm/node';
+import type {
+  NodeSerialPortListEntry,
+  NodeSerialTransport,
+} from 'hamlib-wasm/node';
 
 export interface ConsumerSummary {
   version: string;
@@ -69,8 +77,9 @@ export async function runConsumerFlow(
 
   try {
     /* requestPort() needs a user gesture in a real page; a granted port may be
-     * passed straight to open() instead. */
-    const granted: SerialPort = await hamlib.requestPort();
+     * passed straight to open() instead.  A Web Serial `SerialPort` satisfies
+     * the package's own `SerialPortLike` as it stands. */
+    const granted: SerialPortLike = await hamlib.requestPort();
     rig = await hamlib.open({ ...options, port: granted });
 
     const frequency: number = await rig.getFrequency();
@@ -201,4 +210,30 @@ export async function runEasyFlow(
 
 export function describeMode(mode: RigMode, passband: number): string {
   return `${mode} ${passband} Hz`;
+}
+
+/**
+ * Both transports behind the one documented port contract.
+ *
+ * A Web Serial `SerialPort` still fits the package's own `SerialPortLike` as it
+ * stands (that is why the browser needs no adapter), and both entries publish
+ * the same `SerialTransport` shape, so an application can hold either one in
+ * the same variable - and pass it to `createHamlib({ transport })`.
+ */
+export function describeTransports(port: SerialPort): {
+  web: SerialTransport;
+  node: NodeSerialTransport;
+  asContract: SerialPortLike;
+  ports(): Promise<readonly NodeSerialPortListEntry[]>;
+} {
+  const node: NodeSerialTransport = nodeSerialTransport();
+  const web: SerialTransport = webSerialTransport();
+  const asContract: SerialPortLike = port;
+
+  return {
+    web,
+    node,
+    asContract,
+    ports: (): Promise<readonly NodeSerialPortListEntry[]> => node.listPorts(),
+  };
 }

@@ -17,7 +17,7 @@ import {
   UNUSABLE_MODELS,
   VERIFIED_MODELS,
   describeLineSettingsLimitation,
-} from 'hamlib-web';
+} from 'hamlib-wasm';
 
 import { installFakeSerial, installTestHelpers, readFakeSerial } from './fixtures';
 import type { Captured, HamlibErrorView } from './globals';

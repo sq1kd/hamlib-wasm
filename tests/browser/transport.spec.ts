@@ -127,7 +127,7 @@ test('lists the serial rig catalogue sorted by manufacturer and model', async ({
   expect(ts480?.canSetPtt).toBe(true);
 });
 
-test('reports WEB_SERIAL_UNAVAILABLE when the browser has no Web Serial', async ({ page }) => {
+test('reports TRANSPORT_UNAVAILABLE when the browser has no Web Serial', async ({ page }) => {
   await removeWebSerial(page);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
@@ -146,10 +146,69 @@ test('reports WEB_SERIAL_UNAVAILABLE when the browser has no Web Serial', async 
 
   const { request, open } = expectOk(captured);
 
-  expect(expectFailure(request).code).toBe('WEB_SERIAL_UNAVAILABLE');
+  expect(expectFailure(request).code).toBe('TRANSPORT_UNAVAILABLE');
   expect(expectFailure(request).operation).toBe('requestPort');
-  expect(expectFailure(open).code).toBe('WEB_SERIAL_UNAVAILABLE');
+  expect(expectFailure(open).code).toBe('TRANSPORT_UNAVAILABLE');
   expect(expectFailure(open).operation).toBe('open');
+});
+
+test('rejects a device path, which only the Node transport can open', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createHamlib();
+
+    const byPath = await window.__testHelpers.capture(
+      () => hamlib.requestPort({ path: '/dev/tty.usbserial-1410' }),
+    );
+
+    await hamlib.dispose();
+
+    return { byPath };
+  }));
+
+  /* The browser chooses the port, so a `path` is a caller mistake and not a
+   * runtime accident: this is the Web Serial transport's own refusal. */
+  const byPath = expectFailure(expectOk(captured).byPath);
+
+  expect(byPath.code).toBe('INVALID_ARGUMENT');
+  expect(byPath.operation).toBe('requestPort');
+  expect(byPath.message).toContain('path');
+});
+
+test('uses a caller-supplied transport instead of Web Serial', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const transport = window.__hamlibHarness.fakeTransport(window.__fakeSerial.port);
+    const hamlib = await window.__hamlibHarness.createHamlib({ transport });
+    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
+
+    if (!ts480) {
+      throw new Error('the TS-480 model is missing');
+    }
+
+    const port = await hamlib.requestPort();
+    const rig = await hamlib.open({ modelId: ts480.id, port });
+    const frequency = await rig.getFrequency();
+
+    await rig.close();
+    await hamlib.dispose();
+
+    return { frequency, calls: transport.calls, closed: rig.connected };
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.frequency).toBe(14_074_000);
+  expect(result.calls).toEqual(['requestPort']);
+  expect(result.closed).toBe(false);
+
+  /* The rig really ran: the port the injected transport handed over is the
+   * fake Web Serial one, and it was opened and closed cleanly. */
+  const transport = await readFakeSerial(page);
+
+  expect(transport.openCount).toBe(1);
+  expect(transport.closeCount).toBe(1);
+  expect(transport.isOpen).toBe(false);
+  expect(transport.closedWithLockedStreams).toBe(false);
+  expect(transport.commands).toContain('ID');
 });
 
 test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting input', async ({ page }) => {

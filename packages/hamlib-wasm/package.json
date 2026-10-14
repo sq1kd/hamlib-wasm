@@ -1,0 +1,61 @@
+{
+  "name": "hamlib-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Hamlib CAT control in the browser over Web Serial or in Node over node-serialport, compiled to WebAssembly",
+  "keywords": [
+    "hamlib",
+    "wasm",
+    "webassembly",
+    "web-serial",
+    "node",
+    "electron",
+    "ham-radio",
+    "cat"
+  ],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./hamlib": { "types": "./dist/hamlib.d.ts", "default": "./dist/hamlib.js" },
+    "./native": {
+      "types": "./dist/native/hamlib-wasm.d.mts",
+      "default": "./dist/native/hamlib-wasm.mjs"
+    },
+    "./native/hamlib-wasm.wasm": "./dist/native/hamlib-wasm.wasm",
+    "./node": { "types": "./dist/node.d.ts", "default": "./dist/node.js" },
+    "./react": { "types": "./dist/react.d.ts", "default": "./dist/react.js" },
+    "./third_party/*": "./dist/third_party/*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@types/w3c-web-serial": "1.0.8"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "serialport": ">=12"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "serialport": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "node build/package.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "19.3.0",
+    "yaml": "2.9.1"
+  }
+}

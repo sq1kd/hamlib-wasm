@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    /* Auto-included globals stay out: the emulated rigs are browser code and
+     * the specs see `window` only through the alias tests/node/setup.ts
+     * installs.  `@serialport/stream` pulls `@types/node` in anyway through its
+     * own `/// <reference types="node" />`, which is harmless - those globals
+     * defer to `lib.dom` when `onmessage` is present. */
+    "types": [],
+    /* `@serialport/bindings-interface` ships an `exports` map without a `types`
+     * condition (`default` points at a bare `.mjs`), so a resolver that honours
+     * it cannot find the declarations that sit next to them. */
+    "paths": {
+      "@serialport/bindings-interface": [
+        "../../node_modules/@serialport/bindings-interface/dist/index.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "*.ts",
+    "../browser/fixtures/rigs.ts",
+    "../browser/fixtures/fixtures-globals.d.ts"
+  ]
+}

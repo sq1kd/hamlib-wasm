@@ -10,8 +10,8 @@
  *
  * The page never requests a port on its own and never stores a SerialPort.
  */
-import { createHamlib, HamlibError } from 'hamlib-web/native';
-import type { Hamlib, Rig, RigModel } from 'hamlib-web/native';
+import { createHamlib, HamlibError } from 'hamlib-wasm/hamlib';
+import type { Hamlib, Rig, RigModel } from 'hamlib-wasm/hamlib';
 
 import './style.css';
 

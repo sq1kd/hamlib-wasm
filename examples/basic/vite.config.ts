@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  /* hamlib-web is a linked workspace package: bundling it would break the
+  /* hamlib-wasm is a linked workspace package: bundling it would break the
    * `new URL(..., import.meta.url)` wasm lookup, so let Vite serve it as is. */
   optimizeDeps: {
-    exclude: ['hamlib-web'],
+    exclude: ['hamlib-wasm'],
   },
   build: {
     target: 'es2022',
