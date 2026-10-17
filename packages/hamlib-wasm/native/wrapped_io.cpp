@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * Link-time replacement of the POSIX calls Hamlib makes on a serial port.
  *
  * Hamlib's `src/iofunc.c` reads, writes and waits on `hamlib_port_t.fd`, and
@@ -26,7 +28,7 @@
  * `.c` input as C++ and would mangle the wrapper names the linker looks for.
  * The wrappers therefore carry explicit C linkage.
  *
- * Provenance: project-owned code, UNLICENSED.
+ * Provenance: project-owned code, MIT.
  */
 
 #include <emscripten.h>

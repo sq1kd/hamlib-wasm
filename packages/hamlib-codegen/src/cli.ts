@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
 /**
  * Regenerate the binding surface of packages/hamlib-wasm.
  *

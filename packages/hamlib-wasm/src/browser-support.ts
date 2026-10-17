@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * What the browser build has actually been exercised against.
  *

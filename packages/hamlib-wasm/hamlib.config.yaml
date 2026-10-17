@@ -13,6 +13,9 @@
 release:
   version: 4.7.2
   series: "4.7"
+  repository: https://github.com/Hamlib/Hamlib
+  commit: 40f63488fe0bd751b147f48d62fd217bf53713a0
+  tagObject: f4fe0e5feab233cf45606f63d7f2fdcb7d5579dc
   archive:
     name: hamlib-4.7.2.tar.gz
     url: https://github.com/Hamlib/Hamlib/releases/download/4.7.2/hamlib-4.7.2.tar.gz

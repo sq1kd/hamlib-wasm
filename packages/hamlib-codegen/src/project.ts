@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * Build by-value projections of the C structs an operation uses.
  *

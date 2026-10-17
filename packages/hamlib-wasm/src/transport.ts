@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * The serial port contract this package drives.
  *

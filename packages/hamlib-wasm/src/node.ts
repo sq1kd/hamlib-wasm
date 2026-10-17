@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * hamlib-wasm/node - the `serialport` transport, for Node and Electron.
  *

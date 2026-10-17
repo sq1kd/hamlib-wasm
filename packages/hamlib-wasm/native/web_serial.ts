@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * Serial transport for the Hamlib WebAssembly build.
  *
  * This Emscripten JS library owns everything about a serial port that cannot

@@ -1,0 +1,44 @@
+name: licensing
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+
+      - run: npm ci
+
+      - name: Verify the actual npm tarball and source kit
+        run: mise run verify-package
+
+  release:
+    # The clean-room relink recompiles Hamlib.  The release gate packs once and
+    # runs package and relink verification concurrently.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+
+      - run: npm ci
+
+      - name: Verify package and relink concurrently
+        run: mise run verify-release

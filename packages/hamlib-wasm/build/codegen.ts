@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
 /**
  * Run the binding generator for this package.
  *
@@ -14,13 +15,19 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { CONFIG_PATH, PACKAGE_DIR, REPO_ROOT, loadUpstream, upstreamIncludeDir } from './upstream.ts';
+import {
+  CODEGEN_DIR,
+  CONFIG_PATH,
+  PACKAGE_DIR,
+  releaseIncludeDir,
+} from './paths.ts';
+import { loadUpstream } from './upstream.ts';
 
-const GENERATOR = path.join(REPO_ROOT, 'packages', 'hamlib-codegen', 'src', 'cli.ts');
+const GENERATOR = path.join(CODEGEN_DIR, 'cli.ts');
 
 /** Run the generator with the package's config, outputs and pinned headers. */
 export function runCodegen(args: readonly string[]): void {
-  const headers = upstreamIncludeDir(loadUpstream());
+  const headers = releaseIncludeDir(loadUpstream());
 
   execFileSync(
     process.execPath,

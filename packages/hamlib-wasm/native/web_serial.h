@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * Serial transport for the Hamlib WebAssembly build (Web Serial in the
  * browser, node-serialport in Node; see native/web_serial.ts).
  *
@@ -13,7 +15,7 @@
  * those primitives, and `native/wrapped_io.c` redirects the POSIX calls
  * Hamlib's `src/iofunc.c` and `src/sleep.c` make for a serial port to them.
  *
- * Provenance: project-owned code, UNLICENSED.
+ * Provenance: project-owned code, MIT.
  */
 #ifndef HAMLIB_WASM_SERIAL_H
 #define HAMLIB_WASM_SERIAL_H 1

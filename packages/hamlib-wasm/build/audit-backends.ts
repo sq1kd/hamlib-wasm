@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
 /**
  * Audit the pinned backends for what a browser cannot provide.
  *
@@ -24,11 +25,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-import { loadUpstream, upstreamSourceDir } from './upstream.ts';
+import { releaseSourceDir } from './paths.ts';
+import { loadUpstream } from './upstream.ts';
 
 const UPSTREAM = loadUpstream();
 
-const SOURCE_DIR = upstreamSourceDir(UPSTREAM);
+const SOURCE_DIR = releaseSourceDir(UPSTREAM);
 
 /**
  * Files that reach the device outside the common port layer in the pinned

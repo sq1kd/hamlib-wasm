@@ -2,7 +2,7 @@
   "name": "hamlib-wasm-example-basic",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Minimal Vanilla TypeScript/Vite example for hamlib-wasm",
   "scripts": {

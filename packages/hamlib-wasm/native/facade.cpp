@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * Narrow native facade for the Hamlib WebAssembly build.
  *
  * Everything the browser package may do is expressed here as Embind
@@ -17,7 +19,7 @@
  *
  * `IN_HAMLIB` / `hamlib/rig_state.h` are therefore not needed here.
  *
- * Provenance: project-owned code, UNLICENSED.  Hamlib itself remains
+ * Provenance: project-owned code, MIT.  Hamlib itself remains
  * LGPL-2.1-or-later and is linked in statically.
  */
 

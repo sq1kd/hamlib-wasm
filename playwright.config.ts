@@ -4,9 +4,9 @@ import { defineConfig } from '@playwright/test';
  * Every server the specs need serves a production build, so the artifact users
  * get is what is exercised:
  *
- *   4173  the Vanilla TypeScript example (mise run build:example)
- *   4174  the package test harness      (mise run build:harness)
- *   4175  the React landing page        (mise run build:react-example)
+ *   4173  the Vanilla TypeScript example (mise run build-example)
+ *   4174  the package test harness      (mise run build-harness)
+ *   4175  the React landing page        (mise run build-react)
  *
  * The two `vite` dev servers are here for the same reason in the other
  * direction: a bundler rewrites the asset the module loader looks up, and it

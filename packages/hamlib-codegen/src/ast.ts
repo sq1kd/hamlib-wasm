@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * Compiler-accurate view of the pinned upstream headers.
  *

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * The one place that knows which upstream Hamlib release is pinned.
  *
@@ -13,22 +15,13 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 
-export const PACKAGE_DIR: string = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-);
-
-export const REPO_ROOT: string = path.resolve(PACKAGE_DIR, '..', '..');
-
-export const NATIVE_DIR: string = path.join(PACKAGE_DIR, 'native');
-
-export const CONFIG_PATH: string = path.join(PACKAGE_DIR, 'hamlib.config.yaml');
+import { CONFIG_PATH, NATIVE_DIR, REPO_ROOT } from './paths.ts';
 
 const VERSION_PATTERN = /^\d+\.\d+(?:\.\d+)?$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 
 export interface UpstreamArchive {
   readonly name: string;
@@ -46,6 +39,9 @@ export interface UpstreamPatch {
 export interface Upstream {
   readonly version: string;
   readonly series: string;
+  readonly repository: string;
+  readonly commit: string;
+  readonly tagObject: string;
   readonly archive: UpstreamArchive;
   readonly license: string;
   readonly patches: readonly UpstreamPatch[];
@@ -99,6 +95,18 @@ export function loadUpstream(): Upstream {
     fail(`release.version "${version}" does not belong to series "${series}"`);
   }
 
+  const repository = assertString(release.repository, 'release.repository');
+  const commit = assertString(release.commit, 'release.commit');
+  const tagObject = assertString(release.tagObject, 'release.tagObject');
+
+  if (!COMMIT_PATTERN.test(commit)) {
+    fail('release.commit must be a 40-character lowercase commit SHA');
+  }
+
+  if (!COMMIT_PATTERN.test(tagObject)) {
+    fail('release.tagObject must be a 40-character lowercase object SHA');
+  }
+
   const archive = assertObject(release.archive, 'release.archive');
   const name = assertString(archive.name, 'release.archive.name');
   const url = assertString(archive.url, 'release.archive.url');
@@ -131,13 +139,26 @@ export function loadUpstream(): Upstream {
 
   const license = assertString(release.license, 'release.license');
 
-  return { version, series, archive: { name, url, sha256 }, license, patches };
+  return {
+    version,
+    series,
+    repository,
+    commit,
+    tagObject,
+    archive: { name, url, sha256 },
+    license,
+    patches,
+  };
 }
 
 /** Digest of the release inputs, so a build stamp notices a release change. */
 export function manifestDigest(manifest: Upstream): string {
   const hash = createHash('sha256');
   hash.update(manifest.version);
+  hash.update('\0');
+  hash.update(manifest.commit);
+  hash.update('\0');
+  hash.update(manifest.tagObject);
   hash.update('\0');
   hash.update(manifest.archive.url);
   hash.update('\0');
@@ -151,21 +172,4 @@ export function manifestDigest(manifest: Upstream): string {
   }
 
   return hash.digest('hex');
-}
-
-/** Absolute path to the extracted upstream source tree for the pinned release. */
-export function upstreamSourceDir(manifest: Upstream): string {
-  return path.join(
-    REPO_ROOT,
-    '.cache',
-    'hamlib',
-    manifest.version,
-    'hamlib',
-    `hamlib-${manifest.version}`,
-  );
-}
-
-/** Absolute path to the extracted upstream public headers. */
-export function upstreamIncludeDir(manifest: Upstream): string {
-  return path.join(upstreamSourceDir(manifest), 'include');
 }

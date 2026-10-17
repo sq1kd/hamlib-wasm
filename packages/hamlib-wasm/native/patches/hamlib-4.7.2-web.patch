@@ -1,9 +1,11 @@
 --- a/src/rig.c
 +++ b/src/rig.c
-@@ -1609,6 +1609,15 @@
+@@ -1609,6 +1609,17 @@
      }
  
      // Some models don't support CW so don't need morse handler
++    /* Modified by hamlib-wasm on 2026-10-17: skip the Morse worker on
++     * Emscripten.  See hamlib-4.7.2-web.patch in the source kit. */
 +#ifdef __EMSCRIPTEN__
 +
 +    /*
@@ -16,7 +18,7 @@
      if (rig->caps->send_morse)
      {
          status = morse_data_handler_start(rig);
-@@ -1621,6 +1630,7 @@
+@@ -1621,6 +1632,7 @@
              RETURNFUNC2(status);
          }
      }

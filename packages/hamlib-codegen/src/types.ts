@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * The single C-to-TypeScript/C++ type mapping.
  *

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 import type { SerialTransport } from './transport.js';
 import type * as NodeEntry from './node.js';
 import { webSerialTransport } from './web-serial.js';

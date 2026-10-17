@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * Ambient globals and library types provided by Emscripten when a file is used
  * as a `--js-library`.
  *

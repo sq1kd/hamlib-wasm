@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * Turn clang AST signatures into bindable operations — or refuse them.
  *

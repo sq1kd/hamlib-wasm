@@ -45,7 +45,7 @@ export const UPSTREAM_MANIFEST: UpstreamManifest = (
 
 export const UPSTREAM_VERSION = UPSTREAM_MANIFEST.version;
 
-/** Provenance written by `mise run build:native` into the built package. */
+/** Provenance written by `mise run build-native` into the built package. */
 export function readBuiltProvenance(): UpstreamProvenance {
   return JSON.parse(
     readFileSync(

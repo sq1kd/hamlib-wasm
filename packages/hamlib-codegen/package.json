@@ -2,7 +2,7 @@
   "name": "hamlib-codegen",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "AST-driven generator for the hamlib-wasm binding surface",
   "dependencies": {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * hamlib-wasm - the default, TypeScript-shaped entry point.
  *

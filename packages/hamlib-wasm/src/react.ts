@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * hamlib-wasm/react - React bindings for the easy surface.
  *

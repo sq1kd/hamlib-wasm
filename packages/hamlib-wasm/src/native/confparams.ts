@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * `struct confparams` as the binding surface sees it.
  *

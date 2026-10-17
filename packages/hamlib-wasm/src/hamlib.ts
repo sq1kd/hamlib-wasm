@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * hamlib-wasm/hamlib - Hamlib CAT control over a switchable serial transport.
  *

@@ -37,7 +37,7 @@ jobs:
       - run: npm ci
 
       - name: Build the package and the landing page
-        run: mise run build:react-example
+        run: mise run build-react
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

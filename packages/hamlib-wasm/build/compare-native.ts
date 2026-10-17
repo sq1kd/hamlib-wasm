@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
 /**
  * Compare a representative transaction with native Hamlib.
  *
@@ -13,10 +14,9 @@
  * is opened changed radio-facing behaviour.
  *
  * The host build lives in `.cache/hamlib-host` and is unrelated to the Wasm
- * build.  This is an opt-in verification step (`mise run compare:native`): it
+ * build.  This is an opt-in verification step (`mise run compare-native`): it
  * needs a host C compiler and network access, but no browser.
  */
-import { createHash } from 'node:crypto';
 import { execFileSync, type StdioOptions } from 'node:child_process';
 import {
   existsSync,
@@ -28,34 +28,22 @@ import {
 import path from 'node:path';
 import process from 'node:process';
 
-import { loadUpstream, PACKAGE_DIR, REPO_ROOT } from './upstream.ts';
+import { sha256File } from './files.ts';
+import { CONFIGURE_ARGS } from './native-flags.ts';
+import { PACKAGE_DIR, REPO_ROOT } from './paths.ts';
+import { loadUpstream } from './upstream.ts';
 
 const UPSTREAM = loadUpstream();
 
 const HOST_CACHE = path.join(REPO_ROOT, '.cache', 'hamlib-host');
 const ARCHIVE_PATH = path.join(HOST_CACHE, UPSTREAM.archive.name);
-const SOURCE_DIR = path.join(
-  HOST_CACHE,
-  `hamlib-${UPSTREAM.version}`,
-);
-const BUILD_DIR = path.join(SOURCE_DIR, 'build');
-const LIBRARY = path.join(BUILD_DIR, 'src', '.libs', 'libhamlib.a');
+const HOST_SOURCE_DIR = path.join(HOST_CACHE, `hamlib-${UPSTREAM.version}`);
+const HOST_BUILD_DIR = path.join(HOST_SOURCE_DIR, 'build');
+const LIBRARY = path.join(HOST_BUILD_DIR, 'src', '.libs', 'libhamlib.a');
 const BINARY = path.join(HOST_CACHE, 'host-trace');
 
 const BASELINE_PATH = path.join(PACKAGE_DIR, 'baseline', 'baseline.json');
 const HARNESS = path.join(REPO_ROOT, 'tests', 'native', 'host-trace.c');
-
-const CONFIGURE_ARGS: readonly string[] = [
-  '--disable-shared',
-  '--enable-static',
-  '--without-libusb',
-  '--without-readline',
-  '--without-indi',
-  '--without-cxx-binding',
-  '--disable-html-matrix',
-  '--disable-winradio',
-  '--disable-parallel',
-];
 
 function log(message: string): void {
   process.stdout.write(`[compare-native] ${message}\n`);
@@ -92,10 +80,6 @@ function run(
   return typeof output === 'string' ? output : undefined;
 }
 
-function sha256File(file: string): string {
-  return createHash('sha256').update(readFileSync(file)).digest('hex');
-}
-
 async function ensureArchive(): Promise<void> {
   if (existsSync(ARCHIVE_PATH) && sha256File(ARCHIVE_PATH) === UPSTREAM.archive.sha256) {
     return;
@@ -126,18 +110,18 @@ async function ensureLibrary(): Promise<void> {
   await ensureArchive();
 
   log('extracting a pristine tree for the host build');
-  rmSync(SOURCE_DIR, { recursive: true, force: true });
+  rmSync(HOST_SOURCE_DIR, { recursive: true, force: true });
   run('tar', ['xzf', ARCHIVE_PATH, '-C', HOST_CACHE]);
 
-  if (!existsSync(path.join(SOURCE_DIR, 'configure'))) {
-    fail(`unexpected archive layout: ${SOURCE_DIR}/configure is missing`);
+  if (!existsSync(path.join(HOST_SOURCE_DIR, 'configure'))) {
+    fail(`unexpected archive layout: ${HOST_SOURCE_DIR}/configure is missing`);
   }
 
-  mkdirSync(BUILD_DIR, { recursive: true });
+  mkdirSync(HOST_BUILD_DIR, { recursive: true });
 
   log('configuring and building the host library');
-  run(path.join(SOURCE_DIR, 'configure'), CONFIGURE_ARGS, { cwd: BUILD_DIR });
-  run('make', ['-j', '8', '-C', 'src'], { cwd: BUILD_DIR });
+  run(path.join(HOST_SOURCE_DIR, 'configure'), CONFIGURE_ARGS, { cwd: HOST_BUILD_DIR });
+  run('make', ['-j', '8', '-C', 'src'], { cwd: HOST_BUILD_DIR });
 }
 
 function buildHarness(): void {
@@ -148,14 +132,14 @@ function buildHarness(): void {
     '-o',
     BINARY,
     HARNESS,
-    `-I${path.join(BUILD_DIR, 'include')}`,
-    `-I${path.join(SOURCE_DIR, 'include')}`,
+    `-I${path.join(HOST_BUILD_DIR, 'include')}`,
+    `-I${path.join(HOST_SOURCE_DIR, 'include')}`,
     LIBRARY,
   ]);
 }
 
 function trace(): string[] {
-  const output = run(BINARY, [SOURCE_DIR], {
+  const output = run(BINARY, [HOST_SOURCE_DIR], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'inherit'],
   });
@@ -202,7 +186,7 @@ function main(): void {
 
   if (!existsSync(BASELINE_PATH)) {
     fail(
-      'the browser baseline is missing; run `mise run baseline:record` first',
+      'the browser baseline is missing; run `mise run baseline-record` first',
     );
   }
 

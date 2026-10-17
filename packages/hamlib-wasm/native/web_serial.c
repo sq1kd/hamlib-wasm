@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * Serial transport implementation of Hamlib's serial port layer.
  *
  * This file *replaces* Hamlib's upstream src/serial.c when building for
@@ -20,7 +22,7 @@
  * imports annotated with __async: "auto", which Emscripten's Asyncify turns
  * back into synchronous-looking C.
  *
- * Provenance: this file is project-owned code, licensed UNLICENSED, and is
+ * Provenance: this file is project-owned code, licensed MIT, and is
  * not derived from Hamlib's serial.c.  Hamlib itself remains LGPL-2.1-or-later.
  */
 

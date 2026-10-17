@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * The one error type this package throws, and the codes it reports.
  *

@@ -2,7 +2,7 @@
 
 Run [Hamlib](https://hamlib.github.io/) in the browser.
 
-`hamlib-wasm` compiles Hamlib 4.7.2 to WebAssembly, replaces only its common
+`hamlib-wasm` compiles the pinned Hamlib release to WebAssembly, replaces only its common
 serial transport with a switchable one - the
 [Web Serial API](https://developer.mozilla.org/docs/Web/API/Web_Serial_API) in
 the browser and
@@ -96,17 +96,21 @@ mise install && mise run bootstrap   # toolchain, locked npm deps, Playwright Ch
 mise run build                       # Hamlib wasm, package, both examples
 mise run fetch-native                # fetch, verify, patch and extract the pinned release
 mise run generate                    # regenerate the binding surface from the config + upstream AST
-mise run baseline:record             # re-record the upstream behavioural baseline
+mise run baseline-record             # re-record the upstream behavioural baseline
 mise run typecheck                   # every project, including the packed-consumer fixture
 mise run test                        # hook/Node unit tests + deterministic transport/browser scenarios
-mise run test:hooks                  # only the DOM-less React hook unit tests
-mise run test:node                   # only the Node transport checks against the built package
-mise run test:hardware               # read-only checks against a real attached rig (opt-in)
-mise run example:node                # list this machine's serial ports through the Node entry point
+mise run test-hooks                  # only the DOM-less React hook unit tests
+mise run test-node                   # only the Node transport checks against the built package
+mise run test-hardware               # read-only checks against a real attached rig (opt-in)
+mise run example-node                # list this machine's serial ports through the Node entry point
 mise run refresh                     # the whole upstream refresh path, end to end
-mise run pack:check                  # verify the published package contents
+mise run pack-package                # verify the published package contents
+mise run verify-package              # verify the actual npm tarball
+mise run verify-relink               # clean-room relink with modified Hamlib
+mise run verify-release              # package + relink concurrently
+mise run release-bump -- --version … # update the pinned Hamlib release
 mise run dev                         # Vanilla example dev server
-mise run dev:react                   # React landing page dev server
+mise run dev-react                   # React landing page dev server
 ```
 
 `mise run build` is reproducible: it reads
@@ -123,12 +127,12 @@ Embind declaration against that same config.
 
 ```yaml
 release:
-  version: 4.7.2
+  version: <version>
   archive: { name: …, url: …, sha256: … }
-  patches: [{ file: hamlib-4.7.2-web.patch, purpose: … }]
+  patches: [{ file: hamlib-<version>-web.patch, purpose: … }]
 ```
 
-Moving to another release is a config edit followed by `mise run refresh`,
+Moving to another release is a config edit (or `mise run release-bump`) followed by `mise run refresh`,
 which fetches, adapts, generates, builds, typechecks, runs the browser suite
 and checks the packed consumer. Every step fails loudly rather than drifting:
 
@@ -290,16 +294,29 @@ TS-480, Icom CI-V and Yaesu newcat) and the example-driven scenarios in
 
 ## Licensing
 
-The project code is `UNLICENSED` and every workspace package is private.
-Hamlib itself stays LGPL-2.1-or-later; its licence, pinned source URL/checksum
-and the applied patch ship inside the package under `dist/third_party/hamlib`
-(and are exposed as `hamlib-wasm/third_party/*`).
+This is a mixed-license repository. Original project code is MIT; Hamlib stays
+LGPL-2.1-or-later and is linked statically into
+`packages/hamlib-wasm/dist/native/hamlib-wasm.wasm`. The npm tarball is
+therefore not MIT-only and uses `"license": "SEE LICENSE IN LICENSE.md"`.
 
-Hamlib is linked statically into `dist/native/hamlib-wasm.wasm`, so the source
-that corresponds to the shipped binary has to stay reachable. The arrangement
-is: `dist/third_party/hamlib/SOURCE.json` names the exact upstream release, the
-archive URL and its SHA-256 and the patch text that was applied;
-`packages/hamlib-wasm/hamlib.config.yaml` plus `mise run build:native`
-reproduce the same artifact from that source, and the pack task keeps both in
-the tarball. There is no install-time build step and no generated code that
-cannot be reproduced from the repository.
+The package carries:
+
+- `LICENSE.md`, `LICENSES/` and `THIRD_PARTY_NOTICES.md` — the component map
+  and complete license texts.
+- `dist/third_party/hamlib/` — upstream `LICENSE`, `COPYING`, `COPYING.LIB`,
+  `AUTHORS`, the applied patch and `SOURCE.json` (release, commit, hashes).
+- `dist/third_party/hamlib/corresponding-source.tar.gz` — the complete
+  corresponding-source/relink kit: the pinned Hamlib archive, patch, native
+  bridge, generated bindings and `rebuild.sh`.
+- `REBUILDING.md` — tested instructions for rebuilding the WASM with a
+  modified Hamlib.
+
+The full upstream archive contains GPL-2.0-or-later utilities/examples and the
+GPL-3.0-or-later `lib/precise_time.c`; those files are corresponding source,
+not linked objects. The build redirects `monotonic_seconds()` to the MIT
+implementation in `native/monotonic_time.c` and `LINK_INPUTS.json` records the
+linked archive members, which contain no GPL-only object.
+
+`mise run verify-package` packs the workspace and verifies the actual tarball;
+`mise run verify-relink` performs the clean-room relink test. See
+`docs/licensing-audit.md` for the evidence inventory.

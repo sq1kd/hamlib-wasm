@@ -2,7 +2,7 @@
   "name": "hamlib-wasm-consumer-fixture",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Typechecks the hamlib-wasm package as an external consumer sees it",
   "dependencies": {

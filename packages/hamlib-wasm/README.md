@@ -3,8 +3,10 @@
 Hamlib CAT control over a serial transport, compiled to WebAssembly: Web
 Serial in the browser, node-serialport in Node and Electron.
 
-This package is `private` and `UNLICENSED`; it is not published to npm. The
-repository root README covers building and testing it.
+This package is published to npm under a mixed license: original wrapper code
+is MIT, and the included Hamlib WASM is LGPL-2.1-or-later. See the
+[licensing section](#licensing). The repository root README covers building and
+testing it.
 
 ## Entry points
 
@@ -23,7 +25,7 @@ import { createEasy, HamlibError } from 'hamlib-wasm';
 import type { EasyHamlib, EasyRig, RigState } from 'hamlib-wasm';
 
 const hamlib: EasyHamlib = await createEasy();
-hamlib.version;                       // "Hamlib 4.7.2 …"
+hamlib.version;                       // "Hamlib <version> …"
 hamlib.models;                        // RigModel[], sorted by manufacturer then model
 
 const rig: EasyRig = await hamlib.open({ modelId });   // asks for the port: user gesture
@@ -322,19 +324,33 @@ memory addresses.
 
 Every project-owned file is strict TypeScript. The browser serial transport is
 authored in `native/web_serial.ts` and compiled to the Emscripten JS library
-(`--js-library`) during `build:native`; no JavaScript is handwritten in this
+(`--js-library`) during `build-native`; no JavaScript is handwritten in this
 repository. The generated low-level contract types every operation as
 `T | Promise<T>` because an Asyncify-suspended call returns a promise.
 
 ## Licensing
 
-`UNLICENSED` project code; Hamlib is LGPL-2.1-or-later and its licence, pinned
-source URL/checksum and patch are shipped under `dist/third_party/hamlib`,
-reachable as `hamlib-wasm/third_party/*`.
+The original JavaScript/TypeScript wrapper is MIT-licensed. The included
+`hamlib-wasm.wasm` embeds the Hamlib library, which is licensed under
+LGPL-2.1-or-later, including the project's Hamlib modifications. The package
+is not MIT-only.
 
-Hamlib is linked into `dist/native/hamlib-wasm.wasm` statically, so the
-corresponding source has to stay reachable: `dist/third_party/hamlib/SOURCE.json`
-names the exact release, its archive URL and SHA-256, and the applied patch
-text; `packages/hamlib-wasm/hamlib.config.yaml` and the build scripts in this
-repository reproduce or relink that artifact with `mise run build:native`. The
-package runs no build step at install time.
+If you distribute a site or application containing the WASM binary, you must
+preserve applicable Hamlib copyright and license notices and provide the
+corresponding-source/relink materials under an LGPL-permitted distribution
+mechanism. See [`LICENSE.md`](./LICENSE.md),
+[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md), and
+[`REBUILDING.md`](./REBUILDING.md).
+
+Using the package does not, by itself, require your application's own source
+to be published under LGPL. However, distribution terms must not prohibit
+modification for the customer's own use or reverse engineering to debug such
+modifications, as provided in LGPL 2.1 section 6.
+
+If a bundler emits a hashed `.wasm` asset, it does not automatically include
+these accompanying licensing/source materials. Ensure they are provided in a
+compliant way when deploying or redistributing the asset. The complete
+corresponding-source and relink kit is
+`dist/third_party/hamlib/corresponding-source.tar.gz`.
+
+The package runs no build step at install time.

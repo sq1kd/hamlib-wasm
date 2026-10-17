@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * Single-threaded pthread compatibility header for the WebAssembly build.
  *
  * The browser build runs Hamlib on the main thread without Emscripten

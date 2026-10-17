@@ -14,141 +14,139 @@ npm ci
 npx playwright install chromium
 '''
 
-[tasks."fetch-native"]
+[tasks.fetch-native]
 description = "Fetch, verify, patch and extract the pinned Hamlib release"
-run = "node packages/hamlib-wasm/build/fetch-native.ts"
+run = "npm run fetch-native"
 
-[tasks."build:native"]
+[tasks.build-native]
 description = "Compile the fetched Hamlib release to WebAssembly"
 depends = ["fetch-native"]
-run = "node packages/hamlib-wasm/build/compile-native.ts"
+run = "npm run build-native"
 
 [tasks.generate]
 description = "Regenerate the binding surface from hamlib.config.yaml and the upstream AST"
 depends = ["fetch-native"]
-run = "node packages/hamlib-wasm/build/codegen.ts --update"
+run = "npm run generate"
 
-[tasks."build:package"]
-description = "Compile the public TypeScript package against the generated Embind declarations"
-depends = ["build:native"]
-run = "node packages/hamlib-wasm/build/package.ts"
+[tasks.build-package]
+description = "Compile the public TypeScript package and render licensing artifacts"
+depends = ["build-native"]
+run = "npm run build-package"
 
-[tasks."build:example"]
+[tasks.build-example]
 description = "Build the Vanilla TypeScript/Vite example"
-depends = ["build:package"]
-run = "npm run build --workspace examples/basic"
+depends = ["build-package"]
+run = "npm run build-example"
 
-[tasks."build:react-example"]
+[tasks.build-react]
 description = "Build the React landing page and demo application"
-depends = ["build:package"]
-run = "npm run build --workspace examples/react"
+depends = ["build-package"]
+run = "npm run build-react"
 
-[tasks."build:harness"]
+[tasks.build-harness]
 description = "Build the browser test harness app"
-depends = ["build:package"]
-run = "npm run build --workspace tests/harness"
+depends = ["build-package"]
+run = "npm run build-harness"
 
-[tasks."example:node"]
+[tasks.example-node]
 description = "List the serial ports this machine reports, through the Node entry point"
-depends = ["build:package"]
-run = "node examples/node/src/main.ts --list"
+depends = ["build-package"]
+run = "npm run example-node"
 
 [tasks.build]
 description = "Full reproducible build: native Wasm, package, examples"
-depends = ["build:example", "build:react-example"]
+depends = ["build-example", "build-react"]
+run = "true"
 
-[tasks."typecheck:consumer"]
+[tasks.typecheck-consumer]
 description = "Pack the package and install the tarball into the consumer fixture"
-depends = ["build:package"]
-run = '''
-set -e
-rm -rf tests/consumer/packed tests/consumer/node_modules
-mkdir -p tests/consumer/packed
-npm pack --workspace packages/hamlib-wasm --pack-destination tests/consumer/packed
-tarball=$(ls tests/consumer/packed/*.tgz)
-mv "$tarball" tests/consumer/packed/hamlib-wasm.tgz
-npm install --prefix tests/consumer --no-audit --no-fund --no-package-lock
-'''
+depends = ["build-package"]
+run = "npm run typecheck-consumer"
 
-[tasks."typecheck:projects"]
+[tasks.typecheck-workspace]
 description = "Typecheck every project from the repository root"
-depends = ["typecheck:consumer"]
-run = '''
-set -e
-tsc -p packages/hamlib-codegen/tsconfig.json --noEmit
-tsc -p packages/hamlib-wasm/tsconfig.json --noEmit
-tsc -p packages/hamlib-wasm/tsconfig.build.json --noEmit
-tsc -p packages/hamlib-wasm/native/tsconfig.library.json --noEmit
-tsc -p examples/basic/tsconfig.json --noEmit
-tsc -p examples/react/tsconfig.json --noEmit
-tsc -p tests/harness/tsconfig.json --noEmit
-tsc -p tests/hooks/tsconfig.json --noEmit
-tsc -p tests/browser/tsconfig.json --noEmit
-tsc -p tests/browser/fixtures/tsconfig.json --noEmit
-tsc -p tests/consumer/tsconfig.json --noEmit
-tsc -p tests/node/tsconfig.json --noEmit
-tsc -p tests/hardware/tsconfig.json --noEmit
-tsc -p examples/node/tsconfig.json --noEmit
-'''
+depends = ["typecheck-consumer"]
+run = "npm run typecheck-workspace"
 
 [tasks.typecheck]
 description = "Typecheck every workspace project, including the packed-package consumer fixture"
-depends = ["typecheck:projects"]
+depends = ["typecheck-workspace"]
+run = "true"
 
-[tasks."test:hooks"]
+[tasks.test-hooks]
 description = "Run the DOM-less React hook unit tests against a stubbed package boundary"
-depends = ["build:package"]
-run = "npx vitest run --config tests/hooks/vitest.config.ts"
+depends = ["build-package"]
+run = "npm run test-hooks"
 
-[tasks."test:node"]
+[tasks.test-node]
 description = "Run the Node transport checks against the built package"
-depends = ["build:package"]
-run = "npx vitest run --config tests/node/vitest.config.ts"
+depends = ["build-package"]
+run = "npm run test-node"
 
-[tasks."test:hardware"]
+[tasks.test-hardware]
 description = "Run the read-only checks against a real rig (HAMLIB_WASM_HARDWARE_DEVICE=qmx|ft-710, or HAMLIB_WASM_HARDWARE_PORT=<path>; HAMLIB_WASM_HARDWARE_WRITE=1 adds the frequency round-trip)"
-depends = ["build:package"]
-run = "npx vitest run --config tests/hardware/vitest.config.ts"
+depends = ["build-package"]
+run = "npm run test-hardware"
 
 [tasks.test]
 description = "Run the hook and Node transport unit tests, the transport/lifecycle checks and the Playwright scenarios"
-depends = ["build:example", "build:react-example", "build:harness", "test:hooks", "test:node"]
+depends = ["build-example", "build-react", "build-harness", "test-hooks", "test-node"]
 run = "npx playwright test"
 
-[tasks."test:browser"]
+[tasks.test-browser]
 description = "Run only the example-driven Playwright browser scenarios"
-depends = ["build:example", "build:harness", "build:react-example"]
-run = "npx playwright test tests/browser/e2e"
+depends = ["build-example", "build-harness", "build-react"]
+run = "npm run test-browser"
 
-[tasks."baseline:record"]
+[tasks.baseline-record]
 description = "Re-record the upstream behavioural baseline from the current build"
-depends = ["build:example", "build:harness", "build:react-example"]
-run = "HAMLIB_WASM_RECORD_BASELINE=1 npx playwright test tests/browser/baseline.spec.ts"
+depends = ["build-example", "build-harness", "build-react"]
+run = "npm run baseline-record"
 
-[tasks."audit:backends"]
+[tasks.audit-backends]
 description = "Audit the pinned backends for threads, unwritable line settings and port-layer bypasses"
 depends = ["fetch-native"]
-run = "node packages/hamlib-wasm/build/audit-backends.ts"
+run = "npm run audit-backends"
 
-[tasks."compare:native"]
+[tasks.compare-native]
 description = "Build the pinned release for the host and compare a representative transaction with the browser baseline"
-run = "node packages/hamlib-wasm/build/compare-native.ts"
+run = "npm run compare-native"
 
 [tasks.refresh]
 description = "Upstream refresh: fetch, adapt, generate, build, typecheck, browser checks and packed-consumer check"
-depends = ["build", "build:harness", "audit:backends", "typecheck", "test"]
+depends = ["build", "build-harness", "audit-backends", "typecheck", "test"]
+run = "true"
 
-[tasks."pack:check"]
+[tasks.pack-package]
 description = "Verify the published package contents"
-depends = ["build:package"]
-run = "npm pack --dry-run --workspace packages/hamlib-wasm"
+depends = ["build-package"]
+run = "npm run pack-package"
+
+[tasks.verify-package]
+description = "Verify the actual npm tarball, notices, hashes, link inputs and source kit"
+depends = ["build-package"]
+run = "npm run verify-package"
+
+[tasks.verify-relink]
+description = "Rebuild the packed package with modified Hamlib and exercise it through the loader"
+depends = ["build-package"]
+run = "npm run verify-relink"
+
+[tasks.verify-release]
+description = "Run package and relink verification concurrently against one packed tarball"
+depends = ["build-package"]
+run = "npm run verify-release"
+
+[tasks.release-bump]
+description = "Update the pinned Hamlib release in hamlib.config.yaml"
+run = "npm run release-bump --"
 
 [tasks.dev]
 description = "Run the Vanilla example dev server on a localhost URL"
-depends = ["build:package"]
-run = "npm run dev --workspace examples/basic"
+depends = ["build-package"]
+run = "npm run dev"
 
-[tasks."dev:react"]
+[tasks.dev-react]
 description = "Run the React landing page dev server on a localhost URL"
-depends = ["build:package"]
-run = "npm run dev --workspace examples/react"
+depends = ["build-package"]
+run = "npm run dev-react"

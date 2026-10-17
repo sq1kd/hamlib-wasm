@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * The compound-operation seam between `src/hamlib.ts` (which owns the module's
  * single call queue) and `src/index.ts` (which composes the easy operations on

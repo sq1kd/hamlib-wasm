@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * The browser transport: ports come from Web Serial.
  *
