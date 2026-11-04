@@ -153,7 +153,7 @@ run = "playwright test"
 description = "Re-record the upstream behavioural baseline from the current build"
 depends = ["build"]
 env = { HAMLIB_WASM_RECORD_BASELINE = "1" }
-run = "playwright test --project chromium tests/browser/baseline.spec.ts"
+run = "playwright test tests/browser/baseline.spec.ts --project chromium"
 
 # --- Gates -------------------------------------------------------------------
 
