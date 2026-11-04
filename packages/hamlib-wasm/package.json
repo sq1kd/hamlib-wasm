@@ -15,15 +15,27 @@
     "cat"
   ],
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./hamlib": { "types": "./dist/hamlib.d.ts", "default": "./dist/hamlib.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./hamlib": {
+      "types": "./dist/hamlib.d.ts",
+      "default": "./dist/hamlib.js"
+    },
     "./native": {
       "types": "./dist/native/hamlib-wasm.d.mts",
       "default": "./dist/native/hamlib-wasm.mjs"
     },
     "./native/hamlib-wasm.wasm": "./dist/native/hamlib-wasm.wasm",
-    "./node": { "types": "./dist/node.d.ts", "default": "./dist/node.js" },
-    "./react": { "types": "./dist/react.d.ts", "default": "./dist/react.js" },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
     "./third_party/*": "./dist/third_party/*"
   },
   "files": [
@@ -64,5 +76,9 @@
     "@types/react": "19.3.0",
     "react": "19.3.0",
     "yaml": "2.9.1"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

@@ -56,16 +56,6 @@ export const CODEGEN_LICENSE = path.join(
 export const REBUILD_SCRIPT = path.join(PACKAGE_DIR, 'build', 'rebuild.sh');
 export const TEMPLATES_DIR = path.join(REPO_ROOT, 'docs', 'templates');
 
-export const LICENSE_FILES: readonly string[] = [
-  'LICENSES/MIT.txt',
-  'LICENSES/LGPL-2.1-or-later.txt',
-  'LICENSES/GPL-2.0-or-later.txt',
-  'LICENSES/GPL-3.0-or-later.txt',
-  'LICENSES/Emscripten.txt',
-  'LICENSES/Apache-2.0.txt',
-  'LICENSES/LLVM.txt',
-];
-
 export const BRIDGE_INPUTS: readonly string[] = [
   'native/facade.cpp',
   'native/wrapped_io.cpp',
@@ -126,32 +116,3 @@ export function releaseKitStaging(upstream: Upstream): string {
   return path.join(releaseCacheDir(upstream), 'corresponding-source');
 }
 
-export function thirdPartyFiles(upstream: Upstream): readonly string[] {
-  return [
-    'dist/third_party/hamlib/LICENSE',
-    'dist/third_party/hamlib/COPYING',
-    'dist/third_party/hamlib/COPYING.LIB',
-    'dist/third_party/hamlib/AUTHORS',
-    ...upstream.patches.map((patch) => `dist/third_party/hamlib/${patch.file}`),
-    'dist/third_party/hamlib/SOURCE.json',
-    'dist/third_party/hamlib/LINK_INPUTS.json',
-    'dist/third_party/hamlib/PACKAGE-LICENSING.json',
-    'dist/third_party/hamlib/corresponding-source.tar.gz',
-  ];
-}
-
-export function requiredPackageFiles(upstream: Upstream): readonly string[] {
-  return [
-    'package.json',
-    'README.md',
-    'LICENSE.md',
-    'REBUILDING.md',
-    'THIRD_PARTY_NOTICES.md',
-    ...LICENSE_FILES,
-    ...thirdPartyFiles(upstream),
-    'dist/native/hamlib-wasm.wasm',
-    'dist/native/hamlib-wasm.mjs',
-    'dist/native/hamlib-wasm.d.mts',
-    'dist/native/library/web_serial.js',
-  ];
-}

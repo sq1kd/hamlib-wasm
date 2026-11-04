@@ -7,6 +7,11 @@
  * Packs (or receives) the npm tarball, extracts only that tarball, rebuilds
  * from the included corresponding-source kit, changes a Hamlib version string,
  * and exercises the replacement through the packaged loader.
+ *
+ * `runRelink` is exported so `verify-package --relink` can run the same test
+ * against the tarball it already extracted, without a second pack or a second
+ * extraction.  The command-line entry point below stays reachable for
+ * `mise run verify-relink`.
  */
 import {
   copyFileSync,
@@ -49,24 +54,30 @@ function modifyHamlibVersion(sourceFile: string): void {
   writeFileSync(sourceFile, updated);
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  const tarballArg = parseFlag(args, '--tarball');
-  const workArg = parseFlag(args, '--work-dir');
-  const keep = args.includes('--keep');
+export interface RelinkOptions {
+  /** The already extracted npm tarball root (`package/`). */
+  readonly packageRoot: string;
+  /** The already extracted corresponding-source kit. */
+  readonly kit: string;
+  /** The tarball name, used only for reporting. */
+  readonly tarball: string;
+  /** Directory to relink in; the caller owns it, including cleanup. */
+  readonly work: string;
+}
+
+/**
+ * Rebuild the kit with a modified Hamlib version and prove the packaged
+ * loader used it.  The caller must have extracted both the tarball and the
+ * kit already; this function never packs or extracts either.
+ */
+export function runRelink(options: RelinkOptions): void {
   const upstream = loadUpstream();
-  const work = workArg ?? mkdtempSync(path.join(os.tmpdir(), 'hamlib-wasm-relink-'));
+  const script = path.join(options.kit, 'rebuild.sh');
 
-  mkdirSync(work, { recursive: true });
-
-  const tarball = tarballArg ?? packTarball(path.join(work, 'artifact'));
-  const packageRoot = extractTarball(tarball, path.join(work, 'unpacked'));
-  const kitArtifact = extractKit(packageRoot, path.join(work, 'kit'));
-  const script = path.join(kitArtifact.kit, 'rebuild.sh');
-
+  mkdirSync(options.work, { recursive: true });
   assert(existsSync(script), 'the kit has no rebuild.sh');
 
-  const relink = path.join(work, 'relink');
+  const relink = path.join(options.work, 'build');
   run(SCOPE, 'sh', [script, '--work-dir', relink, '--prepare'], {
     env: { JOBS: process.env.JOBS ?? '4' },
   });
@@ -82,16 +93,19 @@ function main(): void {
   const rebuilt = path.join(relink, 'out/hamlib-wasm.wasm');
   assert(existsSync(rebuilt), 'the relink build produced no wasm');
 
-  const installedWasm = path.join(packageRoot, 'dist/native/hamlib-wasm.wasm');
+  const installedWasm = path.join(
+    options.packageRoot,
+    'dist/native/hamlib-wasm.wasm',
+  );
   const originalHash = sha256File(installedWasm);
   const rebuiltHash = sha256File(rebuilt);
   assert(originalHash !== rebuiltHash, 'the rebuilt wasm is byte-identical to the package wasm');
 
   copyFileSync(rebuilt, installedWasm);
 
-  const smoke = path.join(work, 'smoke.mjs');
+  const smoke = path.join(options.work, 'smoke.mjs');
   const loader = pathToFileURL(
-    path.join(packageRoot, 'dist/native/hamlib-wasm.mjs'),
+    path.join(options.packageRoot, 'dist/native/hamlib-wasm.mjs'),
   ).href;
   writeFileSync(
     smoke,
@@ -110,16 +124,44 @@ function main(): void {
   log(SCOPE, output.trim());
   log(
     SCOPE,
-    `OK: rebuilt ${path.basename(tarball)} with modified Hamlib `
+    `OK: rebuilt ${path.basename(options.tarball)} with modified Hamlib `
     + `(${originalHash.slice(0, 12)} -> ${rebuiltHash.slice(0, 12)})`,
   );
+}
+
+function main(): void {
+  const args = process.argv.slice(2);
+  const tarballArg = parseFlag(args, '--tarball');
+  const workArg = parseFlag(args, '--work-dir');
+  const keep = args.includes('--keep');
+  const work = workArg ?? mkdtempSync(path.join(os.tmpdir(), 'hamlib-wasm-relink-'));
+
+  mkdirSync(work, { recursive: true });
+
+  const tarball = tarballArg ?? packTarball(path.join(work, 'artifact'));
+  const packageRoot = extractTarball(tarball, path.join(work, 'unpacked'));
+  const kitArtifact = extractKit(packageRoot, path.join(work, 'kit'));
+
+  runRelink({
+    packageRoot,
+    kit: kitArtifact.kit,
+    tarball,
+    work: path.join(work, 'relink'),
+  });
 
   cleanup(work, keep);
 }
 
-try {
-  main();
-} catch (error) {
-  process.stderr.write(`[${SCOPE}] error: ${String(error)}\n`);
-  process.exit(1);
+const entryPoint = process.argv[1];
+
+if (
+  entryPoint
+  && pathToFileURL(path.resolve(entryPoint)).href === import.meta.url
+) {
+  try {
+    main();
+  } catch (error) {
+    process.stderr.write(`[${SCOPE}] error: ${String(error)}\n`);
+    process.exit(1);
+  }
 }

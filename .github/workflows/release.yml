@@ -1,0 +1,104 @@
+# SPDX-License-Identifier: MIT
+#
+# Publishing uses npm Trusted Publishing (OIDC), not a long-lived publishing
+# secret.  The npm Trusted Publisher must be configured for this repository and
+# the workflow filename release.yml before the first automatic publish.
+name: release
+
+on:
+  push:
+    branches: [main, next]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      # Keep these keys in sync with .github/workflows/ci.yml so a release
+      # reuses the artifacts CI already validated.
+      - name: Restore cached Hamlib sources and downloads
+        uses: actions/cache@v4
+        with:
+          path: .cache/hamlib
+          key: hamlib-${{ runner.os }}-${{ hashFiles('packages/hamlib-wasm/hamlib.config.yaml', 'mise.toml', 'packages/hamlib-wasm/native/**', 'packages/hamlib-wasm/build/**') }}
+          restore-keys: |
+            hamlib-${{ runner.os }}-
+
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium on a cache miss
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      # check-release is the release gate defined in mise.toml: check +
+      # verify-package + audit-backends.  Keep release logic in mise tasks
+      # rather than duplicating steps here.
+      - name: Run the release gate
+        run: mise run check-release
+
+      # semantic-release publishes whatever is under packages/hamlib-wasm/dist.
+      # Hand the verified build to the release job instead of rebuilding it
+      # there (a second build would also duplicate the native compile).
+      - name: Upload the verified package build
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamlib-wasm-dist
+          path: packages/hamlib-wasm/dist
+          retention-days: 1
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # semantic-release needs the full tag history to choose the next version.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # mise provides Node 24 and therefore npm >= 11.5.1, which is required
+      # for Trusted Publishing.  Do not add a separate Node setup action or a
+      # registry URL: their generated .npmrc conflicts with npm OIDC
+      # authentication.
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Download the verified package build
+        uses: actions/download-artifact@v4
+        with:
+          name: hamlib-wasm-dist
+          path: packages/hamlib-wasm/dist
+
+      - name: Publish and create the GitHub Release
+        run: node scripts/run-release.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

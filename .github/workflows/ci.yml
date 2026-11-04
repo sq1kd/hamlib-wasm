@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: MIT
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      # The native fetch/build is the expensive part.  The key covers every
+      # input that can change the downloaded Hamlib tree or its compiled
+      # artifacts; a partial restore is still useful after an unrelated edit.
+      - name: Restore cached Hamlib sources and downloads
+        uses: actions/cache@v4
+        with:
+          path: .cache/hamlib
+          key: hamlib-${{ runner.os }}-${{ hashFiles('packages/hamlib-wasm/hamlib.config.yaml', 'mise.toml', 'packages/hamlib-wasm/native/**', 'packages/hamlib-wasm/build/**') }}
+          restore-keys: |
+            hamlib-${{ runner.os }}-
+
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium on a cache miss
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Run checks
+        run: mise run check

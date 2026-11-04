@@ -21,7 +21,7 @@
  * asserted against a recorded set: growing it means a backend the transport
  * cannot serve, which should be a deliberate decision.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -110,7 +110,7 @@ function looksLikeBareIo(code: string): boolean {
 }
 
 function main(): void {
-  if (!path.isAbsolute(SOURCE_DIR) || !path.join(SOURCE_DIR, 'rigs')) {
+  if (!path.isAbsolute(SOURCE_DIR) || !existsSync(path.join(SOURCE_DIR, 'rigs'))) {
     process.stderr.write('[audit-backends] error: the source tree is missing\n');
     process.exit(1);
   }

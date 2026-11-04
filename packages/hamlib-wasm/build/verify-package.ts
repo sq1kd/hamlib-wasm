@@ -5,10 +5,19 @@
  * Verify the licensing, provenance and relink material in the actual npm
  * tarball.  This is not a working-tree check: it extracts the bytes a consumer
  * receives, verifies the source kit, and applies the patch to a fresh upstream
- * extraction.
+ * extraction.  With `--relink` it also rebuilds that same extraction and
+ * exercises the rebuilt WASM through the packaged loader, so the release gate
+ * packs and extracts only once.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -28,11 +37,14 @@ import { assertFile, readJson, sha256File, walk } from './files.ts';
 import { verifyRepository } from './guard.ts';
 import {
   LICENSE_FILES,
-  REPO_ROOT,
-  releaseSourceDirName,
+  PACKAGE_JSON_FILES,
+  kitFiles,
   requiredPackageFiles,
-} from './paths.ts';
+  scannedPackageFiles,
+} from './package-manifest.ts';
+import { REPO_ROOT, releaseSourceDirName } from './paths.ts';
 import { loadUpstream } from './upstream.ts';
+import { runRelink } from './verify-relink.ts';
 
 const SCOPE = 'verify-package';
 const PLACEHOLDER_PATTERN =
@@ -46,11 +58,47 @@ function scanText(file: string, what: string): void {
   }
 }
 
+/** Report where a packaged manifest still records an unclassified license. */
+function findUnknownLicense(value: unknown, where: string): string | null {
+  if (value === 'UNKNOWN') { return where; }
+
+  if (Array.isArray(value)) {
+    for (const [index, child] of value.entries()) {
+      const found = findUnknownLicense(child, `${where}[${index}]`);
+
+      if (found) { return found; }
+    }
+  } else if (value && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      const found = findUnknownLicense(child, `${where}.${key}`);
+
+      if (found) { return found; }
+    }
+  }
+
+  return null;
+}
+
+function assertRequiredEntry(packageRoot: string, relative: string, kind: string): void {
+  const absolute = path.join(packageRoot, relative);
+
+  if (kind === 'directory') {
+    assert(
+      existsSync(absolute) && statSync(absolute).isDirectory(),
+      `required package directory ${relative} is missing`,
+    );
+    return;
+  }
+
+  assertFile(absolute, `required package file ${relative}`);
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const tarballArg = parseFlag(args, '--tarball');
   const workArg = parseFlag(args, '--work-dir');
   const keep = args.includes('--keep');
+  const relink = args.includes('--relink');
   const upstream = loadUpstream();
   const patchFile = upstream.patches[0]?.file;
 
@@ -64,8 +112,8 @@ function main(): void {
   const tarball = tarballArg ?? packTarball(path.join(work, 'artifact'));
   const packageRoot = extractTarball(tarball, path.join(work, 'unpacked'));
 
-  for (const relative of requiredPackageFiles(upstream)) {
-    assertFile(path.join(packageRoot, relative), `required package file ${relative}`);
+  for (const entry of requiredPackageFiles(upstream)) {
+    assertRequiredEntry(packageRoot, entry.relative, entry.kind);
   }
 
   const manifest = readJson<{ license?: string; files?: string[] }>(
@@ -75,11 +123,11 @@ function main(): void {
     manifest.license === 'SEE LICENSE IN LICENSE.md',
     `package.json license is ${String(manifest.license)}, expected SEE LICENSE IN LICENSE.md`,
   );
+  const requiredEntries = PACKAGE_JSON_FILES.map((entry) => entry.relative);
   assert(
     Array.isArray(manifest.files)
-    && ['dist', 'LICENSE.md', 'LICENSES', 'THIRD_PARTY_NOTICES.md', 'REBUILDING.md']
-      .every((entry) => (manifest.files as string[]).includes(entry)),
-    'package.json files does not include the licensing and relink artifacts',
+    && requiredEntries.every((entry) => (manifest.files as string[]).includes(entry)),
+    `package.json files does not include every packaged entry: ${requiredEntries.join(', ')}`,
   );
 
   for (const relative of LICENSE_FILES) {
@@ -124,16 +172,7 @@ function main(): void {
     'REBUILDING.md does not document the packaged relink procedure',
   );
 
-  for (const relative of [
-    'LICENSE.md',
-    'REBUILDING.md',
-    'THIRD_PARTY_NOTICES.md',
-    'README.md',
-    'dist/third_party/hamlib/SOURCE.json',
-    'dist/third_party/hamlib/LINK_INPUTS.json',
-    'dist/third_party/hamlib/PACKAGE-LICENSING.json',
-    ...LICENSE_FILES,
-  ]) {
+  for (const relative of scannedPackageFiles(upstream)) {
     scanText(path.join(packageRoot, relative), relative);
   }
 
@@ -208,6 +247,10 @@ function main(): void {
   for (const entry of included) {
     assert(entry.object && entry.license, 'LINK_INPUTS.json entry is incomplete');
     assert(
+      entry.license !== 'UNKNOWN',
+      `LINK_INPUTS.json records an unclassified license for ${entry.object}`,
+    );
+    assert(
       !entry.license.startsWith('GPL-'),
       `GPL-only object is linked into the WASM: ${entry.object} (${entry.license})`,
     );
@@ -237,32 +280,7 @@ function main(): void {
     'SOURCE.json correspondingSourceSha256 does not match the kit',
   );
 
-  for (const relative of [
-    'KIT-README.md',
-    'REBUILDING.md',
-    'rebuild.sh',
-    'SOURCE.json',
-    'release.env',
-    'configure.env',
-    'configure.args',
-    'link.args',
-    `source/${upstream.archive.name}`,
-    `patches/${patchFile}`,
-    'native/facade.cpp',
-    'native/wrapped_io.cpp',
-    'native/monotonic_time.c',
-    'native/web_serial.c',
-    'native/web_serial.h',
-    'native/compat/pthread.h',
-    'native/generated/embind.inc',
-    'native/generated/operations.inc',
-    'native/generated/results.inc',
-    'native/generated/capabilities.inc',
-    'library/web_serial.js',
-    'LICENSES/LGPL-2.1-or-later.txt',
-    'LICENSES/GPL-2.0-or-later.txt',
-    'LICENSES/GPL-3.0-or-later.txt',
-  ]) {
+  for (const relative of kitFiles(upstream)) {
     assertFile(path.join(kitArtifact.kit, relative), `kit file ${relative}`);
   }
 
@@ -299,11 +317,25 @@ function main(): void {
     Array.isArray(packageLicensing.copy) && packageLicensing.copy.length > 0,
     'PACKAGE-LICENSING.json has no copy entries',
   );
+  const unknown = findUnknownLicense(packageLicensing, 'PACKAGE-LICENSING.json');
+
+  assert(!unknown, `${unknown ?? 'PACKAGE-LICENSING.json'} is UNKNOWN`);
+
+  if (relink) {
+    log(SCOPE, 'running the clean-room relink against the extracted tarball');
+    runRelink({
+      packageRoot,
+      kit: kitArtifact.kit,
+      tarball,
+      work: path.join(work, 'relink'),
+    });
+  }
 
   log(
     SCOPE,
     `OK: ${path.basename(tarball)} (${readdirSync(packageRoot).length} top-level entries, `
-    + `${included.length} linked Hamlib objects, source kit verified)`,
+    + `${included.length} linked Hamlib objects, source kit verified`
+    + `${relink ? ', clean-room relink verified' : ''})`,
   );
 
   cleanup(work, keep);

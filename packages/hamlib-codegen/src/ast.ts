@@ -63,7 +63,11 @@ export interface AstIndex {
   readonly typedefs: ReadonlyMap<string, string>;
 }
 
-interface JsonNode {
+/**
+ * The subset of a `clang -ast-dump=json` node this module reads.  Exported so
+ * tests can build AST fixtures in clang's own shape instead of invoking clang.
+ */
+export interface JsonNode {
   readonly kind?: string;
   readonly name?: string;
   readonly type?: { readonly qualType?: string };
@@ -71,6 +75,8 @@ interface JsonNode {
   readonly inner?: readonly JsonNode[];
   readonly storageClass?: string;
   readonly isImplicit?: boolean;
+  /** Set by clang on a record definition, absent on a forward declaration. */
+  readonly completeDefinition?: boolean;
 }
 
 function fail(message: string): never {
@@ -193,10 +199,17 @@ function recordOf(node: JsonNode): AstRecord {
   return { name: node.name ?? '', fields };
 }
 
-function indexAst(root: JsonNode): AstIndex {
+/**
+ * Index a clang AST dump.
+ *
+ * Exported for the unit tests, which feed hand-built nodes in clang's JSON
+ * shape; `loadAst` is the production path that shells out to clang.
+ */
+export function indexAst(root: JsonNode): AstIndex {
   const functions = new Map<string, AstFunction[]>();
   const enums = new Map<string, AstEnum>();
   const records = new Map<string, AstRecord>();
+  const completeRecords = new Set<string>();
   const typedefs = new Map<string, string>();
 
   walk(root, (node) => {
@@ -222,8 +235,28 @@ function indexAst(root: JsonNode): AstIndex {
 
       case 'RecordDecl':
       case 'CXXRecordDecl': {
-        if (node.name && !records.has(node.name)) {
-          records.set(node.name, recordOf(node));
+        if (!node.name) {
+          break;
+        }
+
+        const existing = records.get(node.name);
+        const record = recordOf(node);
+        const isDefinition = node.completeDefinition === true;
+
+        /* A forward declaration (`struct foo;`) can precede the definition and
+         * carries no fields.  Keep the complete definition - clang marks it,
+         * and a field-bearing node is the best fallback - so a projection is
+         * never silently empty. */
+        if (
+          existing === undefined
+          || (isDefinition && !completeRecords.has(node.name))
+          || record.fields.length > existing.fields.length
+        ) {
+          records.set(node.name, record);
+
+          if (isDefinition) {
+            completeRecords.add(node.name);
+          }
         }
 
         break;

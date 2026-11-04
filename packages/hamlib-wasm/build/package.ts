@@ -19,28 +19,16 @@ import {
   buildCorrespondingSourceKit,
   syncPackageLicenseFiles,
 } from './licensing.ts';
+import { generatedPackageOutputs } from './package-manifest.ts';
 import {
   DIST_MODULE_JS,
   DIST_MODULE_TSD,
-  DIST_MODULE_WASM,
   PACKAGE_DIR,
   TSD_SOURCE_PATH,
 } from './paths.ts';
 
 const SCOPE = 'build-package';
 const GENERATED_DECLARATION = TSD_SOURCE_PATH;
-
-const REQUIRED_OUTPUTS: readonly string[] = [
-  path.join(PACKAGE_DIR, 'dist', 'index.js'),
-  path.join(PACKAGE_DIR, 'dist', 'index.d.ts'),
-  path.join(PACKAGE_DIR, 'dist', 'hamlib.js'),
-  path.join(PACKAGE_DIR, 'dist', 'hamlib.d.ts'),
-  path.join(PACKAGE_DIR, 'dist', 'node.js'),
-  path.join(PACKAGE_DIR, 'dist', 'node.d.ts'),
-  DIST_MODULE_JS,
-  DIST_MODULE_WASM,
-  DIST_MODULE_TSD,
-];
 
 /**
  * Generated Emscripten output must carry the notices a bare copyright line
@@ -66,7 +54,7 @@ function main(): void {
   log(SCOPE, 'type checking and emitting declarations');
   run(SCOPE, 'tsc', ['-p', 'tsconfig.json'], { cwd: PACKAGE_DIR });
 
-  for (const output of REQUIRED_OUTPUTS) {
+  for (const output of generatedPackageOutputs()) {
     assert(existsSync(output), `expected build output is missing: ${path.relative(PACKAGE_DIR, output)}`);
   }
 

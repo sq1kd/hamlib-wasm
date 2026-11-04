@@ -8,10 +8,11 @@ emsdk = "6.0.10"
 _.path = ["{{config_root}}/node_modules/.bin"]
 
 [tasks.bootstrap]
-description = "Install pinned toolchain, locked npm dependencies, and Playwright Chromium"
+description = "Install the pinned toolchain, locked dependencies, Playwright Chromium and the commit hook"
 run = '''
 npm ci
 npx playwright install chromium
+git config core.hooksPath .githooks
 '''
 
 [tasks.fetch-native]
@@ -69,8 +70,8 @@ depends = ["typecheck-consumer"]
 run = "npm run typecheck-workspace"
 
 [tasks.typecheck]
-description = "Typecheck every workspace project, including the packed-package consumer fixture"
-depends = ["typecheck-workspace"]
+description = "Typecheck every workspace project, prove the generated bindings are current, and check the packed consumer"
+depends = ["check-generated", "typecheck-workspace"]
 run = "true"
 
 [tasks.test-hooks]
@@ -83,6 +84,23 @@ description = "Run the Node transport checks against the built package"
 depends = ["build-package"]
 run = "npm run test-node"
 
+[tasks.test-codegen]
+description = "Run the hamlib-codegen unit tests against synthetic clang ASTs and a committed Embind declaration"
+run = "npm run test-codegen"
+
+[tasks.docs-check]
+description = "Fail when README/docs name a mise task or layout path that does not exist"
+run = "npm run docs-check"
+
+[tasks.check-generated]
+description = "Fail when the committed generated bindings differ from what the generator emits"
+depends = ["fetch-native"]
+run = "npm run check-generated"
+
+[tasks.lint]
+description = "Lint every source with Biome (formatter intentionally disabled)"
+run = "npm run lint"
+
 [tasks.test-hardware]
 description = "Run the read-only checks against a real rig (HAMLIB_WASM_HARDWARE_DEVICE=qmx|ft-710, or HAMLIB_WASM_HARDWARE_PORT=<path>; HAMLIB_WASM_HARDWARE_WRITE=1 adds the frequency round-trip)"
 depends = ["build-package"]
@@ -90,7 +108,7 @@ run = "npm run test-hardware"
 
 [tasks.test]
 description = "Run the hook and Node transport unit tests, the transport/lifecycle checks and the Playwright scenarios"
-depends = ["build-example", "build-react", "build-harness", "test-hooks", "test-node"]
+depends = ["build-example", "build-react", "build-harness", "test-hooks", "test-node", "test-codegen"]
 run = "npx playwright test"
 
 [tasks.test-browser]
@@ -112,10 +130,47 @@ run = "npm run audit-backends"
 description = "Build the pinned release for the host and compare a representative transaction with the browser baseline"
 run = "npm run compare-native"
 
+[tasks.check]
+description = "The local gate before pushing: lint, typecheck, generated check, unit tests and the browser suite"
+run = '''
+# Sequential on purpose: `typecheck` packs the package and `test` rebuilds it,
+# so running them in parallel would race over `dist`.
+mise run lint
+mise run docs-check
+mise run typecheck
+mise run test
+'''
+
+[tasks.check-release]
+description = "Everything a publish needs: check, the packed tarball audit and the backend audit"
+run = '''
+mise run check
+mise run verify-package
+mise run audit-backends
+'''
+
+[tasks.release-guard]
+description = "Fail when a Hamlib release-block change is not a feat/fix commit"
+run = "npm run release-guard"
+
+[tasks.release-dry-run]
+description = "Report the next semantic-release version without publishing (needs GITHUB_TOKEN and a remote)"
+run = "npm run release-dry-run"
+
 [tasks.refresh]
-description = "Upstream refresh: fetch, adapt, generate, build, typecheck, browser checks and packed-consumer check"
-depends = ["build", "build-harness", "audit-backends", "typecheck", "test"]
-run = "true"
+description = "Upstream refresh: generate, build, typecheck, browser checks and the packed-consumer check"
+depends = ["fetch-native"]
+run = '''
+# Sequential on purpose: `generate` writes the files the build and the
+# generated-binding check read, and mise runs independent dependencies in
+# parallel.
+mise run generate
+mise run build
+mise run build-harness
+mise run audit-backends
+mise run typecheck
+mise run test
+'''
 
 [tasks.pack-package]
 description = "Verify the published package contents"

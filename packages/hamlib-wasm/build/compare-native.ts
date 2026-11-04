@@ -9,9 +9,14 @@
  * the same configuration sequence and the same transaction against a pseudo
  * terminal, and compares the two command logs.
  *
- * That isolates the adapter: the upstream backends are identical, so a
- * difference means the Web Serial transport, the facade or the way the module
- * is opened changed radio-facing behaviour.
+ * The host build is the same patched source as the Wasm build: this script
+ * applies every patch from `hamlib.config.yaml` through `artifact.ts`, exactly
+ * as `fetch-native` does, so the upstream backends are identical.  A
+ * difference therefore means the Web Serial transport, the facade or the way
+ * the module is opened changed radio-facing behaviour.
+ *
+ * The C emulator in `tests/native/host-trace.c` is a second copy of
+ * `tests/browser/fixtures/rigs.ts` and must change with it.
  *
  * The host build lives in `.cache/hamlib-host` and is unrelated to the Wasm
  * build.  This is an opt-in verification step (`mise run compare-native`): it
@@ -28,18 +33,21 @@ import {
 import path from 'node:path';
 import process from 'node:process';
 
+import { applyPatches } from './artifact.ts';
 import { sha256File } from './files.ts';
 import { CONFIGURE_ARGS } from './native-flags.ts';
 import { PACKAGE_DIR, REPO_ROOT } from './paths.ts';
-import { loadUpstream } from './upstream.ts';
+import { loadUpstream, manifestDigest } from './upstream.ts';
 
 const UPSTREAM = loadUpstream();
+const INPUT_DIGEST = manifestDigest(UPSTREAM);
 
 const HOST_CACHE = path.join(REPO_ROOT, '.cache', 'hamlib-host');
 const ARCHIVE_PATH = path.join(HOST_CACHE, UPSTREAM.archive.name);
 const HOST_SOURCE_DIR = path.join(HOST_CACHE, `hamlib-${UPSTREAM.version}`);
 const HOST_BUILD_DIR = path.join(HOST_SOURCE_DIR, 'build');
 const LIBRARY = path.join(HOST_BUILD_DIR, 'src', '.libs', 'libhamlib.a');
+const STAMP = path.join(HOST_CACHE, 'build-stamp.json');
 const BINARY = path.join(HOST_CACHE, 'host-trace');
 
 const BASELINE_PATH = path.join(PACKAGE_DIR, 'baseline', 'baseline.json');
@@ -105,7 +113,15 @@ async function ensureArchive(): Promise<void> {
 }
 
 async function ensureLibrary(): Promise<void> {
-  if (existsSync(LIBRARY)) { return; }
+  /* An unpatched cache would make the trace comparison meaningless, so the
+   * cached library counts only when it was built from these release inputs. */
+  if (
+    existsSync(LIBRARY)
+    && existsSync(STAMP)
+    && readFileSync(STAMP, 'utf8').trim() === INPUT_DIGEST
+  ) {
+    return;
+  }
 
   await ensureArchive();
 
@@ -117,11 +133,15 @@ async function ensureLibrary(): Promise<void> {
     fail(`unexpected archive layout: ${HOST_SOURCE_DIR}/configure is missing`);
   }
 
+  log('applying the pinned Hamlib patches to the host tree');
+  applyPatches(UPSTREAM, HOST_SOURCE_DIR);
+
   mkdirSync(HOST_BUILD_DIR, { recursive: true });
 
   log('configuring and building the host library');
   run(path.join(HOST_SOURCE_DIR, 'configure'), CONFIGURE_ARGS, { cwd: HOST_BUILD_DIR });
   run('make', ['-j', '8', '-C', 'src'], { cwd: HOST_BUILD_DIR });
+  writeFileSync(STAMP, `${INPUT_DIGEST}\n`);
 }
 
 function buildHarness(): void {
@@ -147,36 +167,6 @@ function trace(): string[] {
   return output.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
 }
 
-/**
- * The browser build skips the Morse worker start (the single upstream patch
- * hunk), so its open never asks for the CW keyspeed; the host build does.
- * Everything else must match, so that probe is removed before comparing - and
- * its absence from the browser trace is asserted, which is what makes the
- * patch's effect visible instead of hidden.
- */
-const MORSE_PROBE = 'KS';
-
-function compare(browser: readonly string[], native: readonly string[]): string[] {
-  const browserMorse = browser.filter((command) => command === MORSE_PROBE);
-  const nativeMorse = native.filter((command) => command === MORSE_PROBE);
-
-  if (browserMorse.length !== 0) {
-    fail(
-      `the browser trace contains ${browserMorse.length} ${MORSE_PROBE} probe(s): `
-      + 'the Morse worker patch is not taking effect',
-    );
-  }
-
-  if (nativeMorse.length !== 1) {
-    fail(
-      `expected the host trace to contain exactly one ${MORSE_PROBE} probe, found `
-      + `${nativeMorse.length}; the comparison no longer describes the patch`,
-    );
-  }
-
-  return native.filter((command) => command !== MORSE_PROBE);
-}
-
 function main(): void {
   log(`pinned release ${UPSTREAM.version}`);
 
@@ -194,7 +184,7 @@ function main(): void {
     buildHarness();
 
     const browser: string[] = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).ts480.wire;
-    const native = compare(browser, trace());
+    const native = trace();
 
     if (native.join('|') === browser.join('|')) {
       log(`identical: ${native.length} CAT commands match the browser baseline`);

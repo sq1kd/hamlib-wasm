@@ -19,6 +19,11 @@ import { assert } from './errors.ts';
 import { assertFile, readJson, sha256File, walk, writeJson } from './files.ts';
 import { log } from './exec.ts';
 import {
+  LICENSE_FILES,
+  UPSTREAM_BASE_FILES,
+  UPSTREAM_LICENSE_FILES,
+} from './package-manifest.ts';
+import {
   configureArgsFile,
   configureEnv,
   linkArgsFile,
@@ -30,7 +35,6 @@ import {
   CODEGEN_LICENSE,
   CORRESPONDING_SOURCE,
   LIBRARY_JS,
-  LICENSE_FILES,
   LINK_INPUTS_JSON,
   NATIVE_DIR,
   PACKAGE_DIR,
@@ -72,7 +76,7 @@ export interface LinkInputs {
  * an explicit header in src/, rigs/ or lib/ inherit that policy.  Third-party
  * files carry their own header and take precedence.
  */
-function classifySource(file: string, sourceDir: string): string {
+function classifySource(file: string, sourceDir: string, object: string): string {
   const text = readFileSync(file, 'utf8');
   const spdx = /SPDX-License-Identifier:\s*([^\s*]+)/.exec(text);
 
@@ -114,7 +118,11 @@ function classifySource(file: string, sourceDir: string): string {
     return 'LGPL-2.1-or-later';
   }
 
-  return 'UNKNOWN';
+  throw new Error(
+    `cannot classify the license of linked object ${object} `
+    + `(${relative}); the header is unknown and the file is outside the `
+    + 'Hamlib LGPL source families. Audit it before shipping.',
+  );
 }
 
 /** Map an archive object name to the upstream source that produced it. */
@@ -179,7 +187,7 @@ export function readLinkInputs(mapFile: string): LinkInputs {
       included.push({
         object,
         source: path.relative(sourceDir, source),
-        license: classifySource(source, sourceDir),
+        license: classifySource(source, sourceDir, object),
       });
     }
   }
@@ -275,7 +283,7 @@ export function writeThirdPartyData(linkMapFile: string): void {
   const archive = releaseArchivePath(upstream);
 
   assertFile(archive, 'source archive');
-  for (const file of ['LICENSE', 'COPYING', 'COPYING.LIB', 'AUTHORS']) {
+  for (const file of UPSTREAM_BASE_FILES) {
     assertFile(path.join(sourceDir, file), `upstream ${file}`);
   }
   assert(
@@ -287,7 +295,7 @@ export function writeThirdPartyData(linkMapFile: string): void {
   mkdirSync(THIRD_PARTY_DIR, { recursive: true });
   writeJson(PACKAGE_LICENSING_MANIFEST, packageLicensingManifest(upstream));
 
-  for (const file of ['LICENSE', 'COPYING', 'COPYING.LIB', 'AUTHORS']) {
+  for (const file of UPSTREAM_BASE_FILES) {
     cpSync(path.join(sourceDir, file), path.join(THIRD_PARTY_DIR, file));
   }
 
@@ -313,9 +321,9 @@ export function writeThirdPartyData(linkMapFile: string): void {
   const licenseHashes = Object.fromEntries(
     [
       ...LICENSE_FILES,
-      'dist/third_party/hamlib/LICENSE',
-      'dist/third_party/hamlib/COPYING',
-      'dist/third_party/hamlib/COPYING.LIB',
+      ...UPSTREAM_LICENSE_FILES.map(
+        (file) => `dist/third_party/hamlib/${file}`,
+      ),
     ].map((relative) => [relative, sha256File(path.join(PACKAGE_DIR, relative))]),
   );
 
@@ -447,7 +455,7 @@ export function buildCorrespondingSourceKit(): void {
   cpSync(PACKAGE_LICENSES_DIR, path.join(staging, 'LICENSES'), { recursive: true });
   cpSync(SOURCE_JSON, path.join(staging, 'SOURCE.json'));
 
-  for (const file of ['LICENSE', 'COPYING', 'COPYING.LIB', 'AUTHORS']) {
+  for (const file of UPSTREAM_BASE_FILES) {
     cpSync(path.join(sourceDir, file), path.join(staging, file));
   }
 

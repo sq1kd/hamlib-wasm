@@ -47,14 +47,13 @@ export interface Upstream {
   readonly patches: readonly UpstreamPatch[];
 }
 
-function fail(message: string): never {
-  process.stderr.write(`[upstream] error: ${message}\n`);
-  process.exit(1);
+function invalid(message: string): never {
+  throw new Error(message);
 }
 
 function assertString(value: unknown, what: string): string {
   if (typeof value !== 'string' || value.length === 0) {
-    fail(`${what} must be a non-empty string`);
+    invalid(`${what} must be a non-empty string`);
   }
 
   return value;
@@ -62,37 +61,38 @@ function assertString(value: unknown, what: string): string {
 
 function assertObject(value: unknown, what: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    fail(`${what} must be a mapping`);
+    invalid(`${what} must be a mapping`);
   }
 
   return value as Record<string, unknown>;
 }
 
-/** Read and validate the `release:` section of the config. */
-export function loadUpstream(): Upstream {
-  if (!existsSync(CONFIG_PATH)) {
-    fail(`the config is missing: ${path.relative(REPO_ROOT, CONFIG_PATH)}`);
-  }
-
-  let parsed: unknown;
+/**
+ * Parse and validate the `release:` section from config text.
+ *
+ * Throws on any invalid value instead of exiting, so callers that are about to
+ * write a config (release-bump) can validate the exact bytes they will commit.
+ */
+export function parseUpstreamConfig(text: string): Upstream {
+  let parsed: unknown = null;
 
   try {
-    parsed = parse(readFileSync(CONFIG_PATH, 'utf8'));
+    parsed = parse(text);
   } catch (error) {
-    fail(`the config is not valid YAML: ${String(error)}`);
+    invalid(`the config is not valid YAML: ${String(error)}`);
   }
 
   const release = assertObject(assertObject(parsed, 'config').release, 'release');
   const version = assertString(release.version, 'release.version');
 
   if (!VERSION_PATTERN.test(version)) {
-    fail(`release.version "${version}" is not a Hamlib release number`);
+    invalid(`release.version "${version}" is not a Hamlib release number`);
   }
 
   const series = assertString(release.series, 'release.series');
 
   if (!version.startsWith(`${series}.`)) {
-    fail(`release.version "${version}" does not belong to series "${series}"`);
+    invalid(`release.version "${version}" does not belong to series "${series}"`);
   }
 
   const repository = assertString(release.repository, 'release.repository');
@@ -100,11 +100,11 @@ export function loadUpstream(): Upstream {
   const tagObject = assertString(release.tagObject, 'release.tagObject');
 
   if (!COMMIT_PATTERN.test(commit)) {
-    fail('release.commit must be a 40-character lowercase commit SHA');
+    invalid('release.commit must be a 40-character lowercase commit SHA');
   }
 
   if (!COMMIT_PATTERN.test(tagObject)) {
-    fail('release.tagObject must be a 40-character lowercase object SHA');
+    invalid('release.tagObject must be a 40-character lowercase object SHA');
   }
 
   const archive = assertObject(release.archive, 'release.archive');
@@ -113,15 +113,15 @@ export function loadUpstream(): Upstream {
   const sha256 = assertString(archive.sha256, 'release.archive.sha256');
 
   if (!url.endsWith(`/${name}`)) {
-    fail(`release.archive.url must end with "/${name}"`);
+    invalid(`release.archive.url must end with "/${name}"`);
   }
 
   if (!SHA256_PATTERN.test(sha256)) {
-    fail('release.archive.sha256 must be 64 lowercase hexadecimal characters');
+    invalid('release.archive.sha256 must be 64 lowercase hexadecimal characters');
   }
 
   if (!Array.isArray(release.patches)) {
-    fail('release.patches must be a list');
+    invalid('release.patches must be a list');
   }
 
   const patches: UpstreamPatch[] = release.patches.map((entry) => {
@@ -131,7 +131,7 @@ export function loadUpstream(): Upstream {
     const absolute = path.join(NATIVE_DIR, 'patches', file);
 
     if (!existsSync(absolute)) {
-      fail(`the config names a patch that does not exist: ${file}`);
+      invalid(`the config names a patch that does not exist: ${file}`);
     }
 
     return { file, purpose, path: absolute };
@@ -149,6 +149,25 @@ export function loadUpstream(): Upstream {
     license,
     patches,
   };
+}
+
+/** Read and validate the `release:` section of the config. */
+export function loadUpstream(): Upstream {
+  if (!existsSync(CONFIG_PATH)) {
+    process.stderr.write(
+      `[upstream] error: the config is missing: ${path.relative(REPO_ROOT, CONFIG_PATH)}\n`,
+    );
+    process.exit(1);
+  }
+
+  try {
+    return parseUpstreamConfig(readFileSync(CONFIG_PATH, 'utf8'));
+  } catch (error) {
+    process.stderr.write(
+      `[upstream] error: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exit(1);
+  }
 }
 
 /** Digest of the release inputs, so a build stamp notices a release change. */

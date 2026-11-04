@@ -33,6 +33,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+
+import ts from 'typescript';
 
 import { loadAst, type AstIndex } from './ast.ts';
 import { classifyAll } from './classify.ts';
@@ -219,29 +222,97 @@ function checkSignatures(
 
 interface EmittedOperation {
   readonly arity: number;
+  /** The declared return type, whitespace-normalised. */
+  readonly returnType: string;
 }
 
-function parseEmitted(declaration: string): Map<string, EmittedOperation> {
-  const operations = new Map<string, EmittedOperation>();
-  const interfaceMatch = /interface EmbindModule \{([\s\S]*?)\n\}/.exec(declaration);
+type ModuleDeclaration = ts.InterfaceDeclaration | ts.ClassDeclaration;
 
-  if (!interfaceMatch) {
+function isModuleDeclaration(statement: ts.Statement): statement is ModuleDeclaration {
+  return (ts.isInterfaceDeclaration(statement) || ts.isClassDeclaration(statement))
+    && statement.name !== undefined;
+}
+
+function isExported(node: ts.Node): boolean {
+  return ts.canHaveModifiers(node)
+    && (ts.getModifiers(node) ?? []).some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    );
+}
+
+/**
+ * The module facade the emitted declaration exposes.
+ *
+ * Emscripten always dumps the Embind surface into `EmbindModule`; some
+ * versions instead export the facade class/interface directly, under a name
+ * ending in `Module`.  A non-exported `WasmModule` stub is deliberately not a
+ * candidate: parsing it would look like a module with no operations instead of
+ * the hard failure the caller relies on.
+ */
+function findModuleDeclaration(source: ts.SourceFile): ModuleDeclaration | null {
+  const candidates = source.statements.filter(isModuleDeclaration);
+
+  return candidates.find((statement) => statement.name?.text === 'EmbindModule')
+    ?? candidates.find(
+      (statement) => isExported(statement) && /Module$/.test(statement.name?.text ?? ''),
+    )
+    ?? null;
+}
+
+function methodNameOf(member: ts.MethodSignature | ts.MethodDeclaration): string | null {
+  const name = member.name;
+
+  if (name === undefined) {
+    return null;
+  }
+
+  return ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
+    ? name.text
+    : null;
+}
+
+/**
+ * Parse the emitted `.d.mts` and collect each Embind method with its parameter
+ * count and return type.
+ *
+ * This reads the compiler's own syntax tree instead of slicing lines: wrapping
+ * a signature or re-indenting the interface then leaves the result unchanged,
+ * while a changed parameter count or return type still shows up.  `arity` is
+ * the full declared parameter count, including the leading `handle`, which is
+ * what `embindArity` reports for comparison.
+ */
+export function parseEmitted(declaration: string): Map<string, EmittedOperation> {
+  const source = ts.createSourceFile(
+    'hamlib-wasm.d.mts',
+    declaration,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const module = findModuleDeclaration(source);
+
+  if (module === null) {
     fail('the emitted declaration has no EmbindModule interface');
   }
 
-  for (const line of (interfaceMatch[1] as string).split('\n')) {
-    const match = /^\s{2}(\w+)\((.*)\): (.+);$/.exec(line.trimEnd());
+  const operations = new Map<string, EmittedOperation>();
 
-    if (!match) {
+  for (const member of module.members) {
+    if (!ts.isMethodSignature(member) && !ts.isMethodDeclaration(member)) {
       continue;
     }
 
-    const params = (match[2] as string).trim();
-    const arity = params.length === 0
-      ? 0
-      : params.replace(/_\d+: /g, '').split(',').length;
+    const name = methodNameOf(member);
 
-    operations.set(match[1] as string, { arity });
+    if (name === null) {
+      continue;
+    }
+
+    const returnType = member.type === undefined
+      ? 'any'
+      : member.type.getText(source).replace(/\s+/g, ' ').trim();
+
+    operations.set(name, { arity: member.parameters.length, returnType });
   }
 
   return operations;
@@ -439,4 +510,9 @@ function main(): void {
   }
 }
 
-main();
+/* Importable without side effects: the unit tests load `parseEmitted` from
+ * this module, and running the generator there would parse the test runner's
+ * argv and exit. */
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}

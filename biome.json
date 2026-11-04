@@ -1,0 +1,63 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.cache",
+      "!**/test-results",
+      "!**/playwright-report",
+      "!**/packages/hamlib-wasm/native/generated",
+      "!**/packages/hamlib-wasm/src/native/generated",
+      "!**/packages/hamlib-wasm/src/native/hamlib-wasm.d.mts",
+      "!**/packages/hamlib-wasm/dist",
+      "!**/tests/browser/fixtures/generated",
+      "!**/tests/consumer/packed",
+      "!**/tests/harness/dist",
+      "!**/examples/*/dist"
+    ]
+  },
+  "formatter": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["tests/**", "examples/**", "packages/hamlib-wasm/native/web_serial.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off",
+            "useTemplate": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["tests/browser/fixtures/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noInnerDeclarations": "off",
+            "usePlaywrightValidDescribeCallback": "off"
+          },
+          "complexity": {
+            "useArrowFunction": "off"
+          }
+        }
+      }
+    }
+  ]
+}

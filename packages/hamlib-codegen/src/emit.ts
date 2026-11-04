@@ -762,10 +762,21 @@ function manualResultType(model: Model, result: string): string {
     return 'string';
   }
 
+  /* The config speaks the C boundary's scalar names; the TypeScript surface
+   * speaks its own.  A named value object (`CodeResult`, `OpenResult`, …) is
+   * emitted as registered and passes through. */
+  if (result === 'int' || result === 'double') {
+    return 'number';
+  }
+
+  if (result === 'bool') {
+    return 'boolean';
+  }
+
   if (result.endsWith('[]')) {
     /* `ModelInfo[]` and the projected-struct lists resolve through the
      * registered vector binding, so a hand-written operation can return any
-     * declared `std::vector<T>`. */
+     * declared list without naming the Embind binding. */
     return vectorBindingFor(model, result.slice(0, -2)) ?? 'RigModelList';
   }
 

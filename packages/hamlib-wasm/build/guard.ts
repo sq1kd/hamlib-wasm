@@ -9,36 +9,51 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { assert } from './errors.ts';
-import { sha256File } from './files.ts';
+import { readJson, sha256File } from './files.ts';
 import { REPO_ROOT } from './paths.ts';
 import { loadUpstream } from './upstream.ts';
 
-const OLD_TASKS = [
-  'build:native',
-  'build:package',
-  'build:example',
-  'build:react-example',
-  'build:harness',
-  'typecheck:projects',
-  'typecheck:consumer',
-  'test:hooks',
-  'test:node',
-  'test:browser',
-  'test:hardware',
-  'pack:check',
-  'check:licensing',
-  'relink:check',
-  'dev:react',
-  'audit:backends',
-  'compare:native',
-  'baseline:record',
-  'example:node',
-];
+const TASK_REFERENCE = /\bmise run ([A-Za-z0-9][A-Za-z0-9_.:+-]*)/g;
+
+/**
+ * Task names the repository actually declares: `[tasks.<name>]` headings from
+ * `mise.toml` plus the root `package.json` scripts.  Parsing the heading text
+ * keeps this dependency-free; mise's own config parser would be a build
+ * dependency for one regex.
+ */
+function declaredTaskNames(): ReadonlySet<string> {
+  const toml = readFileSync(path.join(REPO_ROOT, 'mise.toml'), 'utf8');
+  const tasks = [...toml.matchAll(/^\[tasks\.([^\]]+)\]\s*$/gm)]
+    .map((match) => (match[1] as string).replace(/^"|"$/g, ''));
+  const scripts = Object.keys(
+    readJson<{ scripts?: Record<string, string> }>(
+      path.join(REPO_ROOT, 'package.json'),
+    ).scripts ?? {},
+  );
+
+  return new Set([...tasks, ...scripts]);
+}
+
+/** `mise run` references in `content` that name no declared task. */
+function staleTaskReferences(content: string, declared: ReadonlySet<string>): string[] {
+  const stale = new Set<string>();
+
+  for (const match of content.matchAll(TASK_REFERENCE)) {
+    /* A sentence may end right after the task name; the dot is punctuation,
+     * not part of the name. */
+    const name = (match[1] as string).replace(/\.+$/, '');
+
+    if (!declared.has(name)) { stale.add(name); }
+  }
+
+  return [...stale];
+}
 
 const HISTORICAL_DOCS = new Set([
   'docs/plan.md',
   'docs/implementation.md',
   'docs/hamlib-wasm-licensing-implementation.md',
+  'docs/HAMLIB_WASM_RELEASE_DOCS_PLAN.md',
 ]);
 
 const GENERATED_DOCS = new Set([
@@ -66,22 +81,26 @@ function trackedFiles(): string[] {
 
 function releasePatterns(): readonly string[] {
   const upstream = loadUpstream();
-  const patch = upstream.patches[0];
 
-  assert(patch, 'the release config has no patch');
+  assert(upstream.patches.length > 0, 'the release config has no patch');
 
   return [
     upstream.version,
     upstream.commit,
     upstream.tagObject,
     upstream.archive.sha256,
-    sha256File(patch.path),
+    ...upstream.patches.map((patch) => sha256File(patch.path)),
   ];
 }
 
 export function verifyRepository(): void {
   const files = trackedFiles();
   const release = releasePatterns();
+  const declaredTasks = declaredTaskNames();
+  const upstream = loadUpstream();
+  const patchPaths = new Set(
+    upstream.patches.map((patch) => path.relative(REPO_ROOT, patch.path)),
+  );
   const failures: string[] = [];
 
   for (const file of files) {
@@ -95,10 +114,8 @@ export function verifyRepository(): void {
 
     const content = readFileSync(path.join(REPO_ROOT, file), 'utf8');
 
-    for (const task of OLD_TASKS) {
-      if (content.includes(task)) {
-        failures.push(`${file}: old task name ${task}`);
-      }
+    for (const task of staleTaskReferences(content, declaredTasks)) {
+      failures.push(`${file}: unknown task name ${task}`);
     }
 
     if (
@@ -113,7 +130,7 @@ export function verifyRepository(): void {
       !GENERATED_DOCS.has(file)
       && file !== 'packages/hamlib-wasm/hamlib.config.yaml'
       && file !== 'packages/hamlib-wasm/coverage.json'
-      && file !== 'packages/hamlib-wasm/native/patches/hamlib-4.7.2-web.patch'
+      && !patchPaths.has(file)
       && !file.startsWith('docs/templates/')
     ) {
       for (const literal of release) {
