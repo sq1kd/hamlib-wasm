@@ -183,7 +183,7 @@ export function App(): ReactElement {
           <span data-testid="hamlib-version">{hamlib?.version ?? 'Hamlib: loading…'}</span>
           {' · '}
           <span data-testid="web-serial-status" data-state={serial ? 'available' : 'unavailable'}>
-            {serial ? 'Web Serial available' : 'Web Serial unavailable — use desktop Chromium'}
+            {serial ? 'Web Serial available' : 'Web Serial unavailable — use a desktop Chromium-based browser or Firefox 151+'}
           </span>
         </p>
 

@@ -1,6 +1,6 @@
 # hamlib-wasm Node example
 
-The same package as the browser examples, driven from a terminal. Ports come
+The same package as the browser example, driven from a terminal. Ports come
 from node-serialport rather than a page's Web Serial chooser, because
 `createEasy()` / `createHamlib()` select the transport the runtime has:
 `hamlib-wasm/node` is imported here for `listPorts()`, not to wire the
@@ -33,7 +33,7 @@ node examples/node/src/main.ts --port /dev/tty.usbserial-1410 --model TS-480
 `--port` takes the device path `--list` printed. `--model` takes a
 `RigModel.model` name from the catalogue and defaults to `TS-480`. `--baud`
 pins the line rate; without it the example runs `detectBaudRate()` first, the
-same search the browser examples offer, because a wrong rate produces silence
+same search the browser example offers, because a wrong rate produces silence
 rather than an error.
 
 The example only reads: it opens the port, prints what `refresh()` reports

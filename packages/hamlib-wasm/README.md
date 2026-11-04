@@ -1,22 +1,48 @@
 # hamlib-wasm
 
-Hamlib CAT control over a serial transport, compiled to WebAssembly: Web
-Serial in the browser, node-serialport in Node and Electron.
+Run [Hamlib](https://hamlib.github.io/) CAT control in the browser and in Node.
 
-This package is published to npm under a mixed license: original wrapper code
-is MIT, and the included Hamlib WASM is LGPL-2.1-or-later. See the
-[licensing section](#licensing). The repository root README covers building and
-testing it.
+`hamlib-wasm` compiles the pinned Hamlib release to WebAssembly and replaces only
+its common serial transport with a switchable one - the
+[Web Serial API](https://developer.mozilla.org/docs/Web/API/Web_Serial_API) in
+the browser and [node-serialport](https://serialport.io/) in Node and Electron,
+selected by the runtime that loads the module. The compiled CAT operations are
+exposed as promise based TypeScript methods. Radio backends are upstream Hamlib
+code and are not modified, so ordinary serial CAT rigs work without per-model
+browser or Node code.
+
+This package is licensed `MIT AND LGPL-2.1-or-later`: the original wrapper code
+is MIT, and the included Hamlib WASM is LGPL-2.1-or-later. See
+[Licensing](#licensing).
+
+## Runtime support
+
+| Runtime | Transport | Requirements |
+| --- | --- | --- |
+| Desktop Chromium-based browsers (Chrome, Edge, Opera, …) | Web Serial | A secure context (HTTPS or `localhost`) and a user gesture for the port chooser |
+| Desktop Firefox 151+ | Web Serial | The same |
+| Node 24+, an Electron main process | node-serialport | `serialport` installed (an optional peer dependency) |
+| An Electron renderer | Web Serial | A `select-serial-port` handler in the main process |
+
+Safari has no Web Serial. In a browser without it the package still loads and
+lists the catalogue, and every port operation fails with
+`TRANSPORT_UNAVAILABLE` - unless you pass a transport of your own.
 
 ## Entry points
 
 | Import | What it is |
 | --- | --- |
-| `hamlib-wasm` | The easy surface: `createEasy`, one rig object, state snapshots, events, booleans |
-| `hamlib-wasm/hamlib` | The 1:1 surface: `createHamlib` and a method per upstream Hamlib call |
-| `hamlib-wasm/native` | The raw Emscripten module and its generated declaration, for advanced use |
-| `hamlib-wasm/node` | The `serialport` transport: `nodeSerialTransport`, for an Electron main process, a CLI or a test |
-| `hamlib-wasm/react` | React hooks over the easy surface; `react` is an optional peer dependency |
+| `hamlib-wasm` | The easy surface: `createEasy({ levels })`, one `EasyRig` per connection (`refresh`, `level`, `setFrequency`, `setMode`, `setPassband`, `setPtt`, `baudRate`, `on`, `watch`), `detectBaudRate`, and `EasyRig.raw` for everything below |
+| `hamlib-wasm/hamlib` | The 1:1 surface: `createHamlib` and one method on `Rig` per bound Hamlib operation, plus `baudRate`, `detectBaudRate`, the catalogue, the error type and the transport contract |
+| `hamlib-wasm/node` | The node-serialport transport: `nodeSerialTransport()` with `listPorts()` and `requestPort({ path })`, for an Electron main process, a CLI or a test |
+| `hamlib-wasm/react` | React hooks over the easy surface: `HamlibProvider`, `useModels`, `useEasyRig`, `useRigState`, `useRigError`; `react` is an optional peer dependency |
+
+The Emscripten module itself is not an entry point: every native call goes
+through one serialized queue (see [How it works](#how-it-works)), and a direct
+module call would bypass it. Everything the module binds is a method on
+`hamlib-wasm/hamlib`'s `Rig`. `hamlib-wasm/native/hamlib-wasm.wasm` is exported
+as an asset only, for applications that host the binary themselves (see
+[Loading](#loading)).
 
 ## The easy surface
 
@@ -146,8 +172,8 @@ What it adds, and what it deliberately does not:
 ## The 1:1 surface
 
 ```ts
-import { createHamlib, HamlibError } from 'hamlib-wasm/native';
-import type { Hamlib, Rig, RigModel, RigMode, RigModeState } from 'hamlib-wasm/native';
+import { createHamlib, HamlibError } from 'hamlib-wasm/hamlib';
+import type { Hamlib, Rig, RigModel, RigMode, RigModeState } from 'hamlib-wasm/hamlib';
 
 const hamlib: Hamlib = await createHamlib();
 const port = await hamlib.requestPort();          // requires a user gesture
@@ -237,7 +263,14 @@ never stranded behind a disabled button.  `useRigState` registers the rig's own
 `watch()` and its cleanup removes only its own registration, so several
 consumers can poll the same rig.
 
-## How far a model is supported
+## What is supported
+
+Serial CAT control: frequency, mode, passband, PTT and opt-in levels
+(`STRENGTH`, `SWR`, `ALC`, `RFPOWER`, `RFPOWER_METER`) for the models Hamlib
+reports as `RIG_PORT_SERIAL`, including CAT based PTT and serial RTS/DTR PTT.
+
+Not covered: raw USB/HID, network rigs, rotators, amplifiers, audio, GPIO and
+parallel ports.
 
 Hamlib reports several hundred serial models, and `RIG_PORT_SERIAL` only says
 that a backend goes through the common port layer. Every `RigModel` therefore
@@ -245,27 +278,38 @@ carries:
 
 | Field | Meaning |
 | --- | --- |
-| `support` | `"verified"` when a browser test in this package drives the model through the Web Serial double, otherwise `"candidate"` |
+| `support` | `"verified"` when a browser test in this package's repository drives the model through the Web Serial double, otherwise `"candidate"` |
 | `limitation` | Set when the build cannot drive the model: it declares line settings the serial transport cannot express, or a recorded reason applies |
 | `serialDataBits`, `serialStopBits`, `serialParity`, `serialHandshake` | The line settings the backend declares |
 
-`VERIFIED_MODELS` lists the verified models with their evidence, and
+`VERIFIED_MODELS` lists the verified models (the Kenwood TS-480, the Icom IC-703
+over CI-V and the Yaesu FT-710 over newcat) with their evidence, and
 `UNUSABLE_MODELS` the recorded reasons. "Verified" never means tested against
-hardware.
+hardware. The browser suite runs in both Chromium and Firefox.
 
 A model that declares settings the serial transport cannot express fails with
 `-RIG_ECONF` before the port is opened, so a user never ends up on a silently
 downgraded port.  This build accepts one set of line settings for both
 transports - 7 or 8 data bits, 1 or 2 stop bits, none/even/odd parity, no flow
 control or hardware handshake - so the answer does not depend on which one
-acquired the port.
+acquired the port.  5/6 data bits, mark/space parity and XON/XOFF flow control
+are therefore out.
 
-One thing no field can carry is the baud rate the rig itself is configured for:
-a backend declares a *range*, and the radio's menu decides the value inside it.
-`support` therefore says nothing about it - a "verified" model can still be
-opened at the wrong rate, which is silence rather than an error, and is why an
-open verifies that the rig answered (see the baud rate bullet under the easy
-surface).
+Three further limitations are worth knowing:
+
+* a backend that needs a worker thread (AnyTone D578A) fails at open rather
+  than degrading quietly;
+* the only serial model that drives push-to-talk over the DTR line (Yaesu
+  FT-757GXII) cannot open at all: it reads a 75 octet status block through a
+  helper whose retry count Hamlib has already zeroed. The DTR/RTS signal path
+  itself is covered at the transport seam;
+* the baud rate the rig itself is configured for is not in any model field: a
+  backend declares a *range*, and the radio's menu decides the value inside
+  it. `support` therefore says nothing about it - a "verified" model can still
+  be opened at the wrong rate, which is silence rather than an error, and is
+  why an open verifies that the rig answered (see the baud rate bullet under
+  the easy surface). A rig whose interface ignores the line rate (a USB
+  CDC-ACM one, such as the QRP Labs QMX+) is unaffected either way.
 
 ## Errors
 
@@ -281,8 +325,10 @@ Every failure is a `HamlibError` with:
 ## Loading
 
 `createEasy()` / `createHamlib()` load the Emscripten module and resolve the
-`.wasm` asset next to the installed package with `new URL(..., import.meta.url)`.
-Pass `locateFile` to override it.
+`.wasm` asset next to the installed package with `new URL(..., import.meta.url)`,
+the form bundlers such as Vite rewrite into an emitted asset. Pass `locateFile`
+to override it - for instance to serve `hamlib-wasm/native/hamlib-wasm.wasm`
+from a location of your own.
 
 Every native call runs under a watchdog: `callTimeoutMs` (30 s by default)
 bounds how long one call may hold the module queue.  Asyncify cannot unwind a
@@ -332,7 +378,51 @@ const rig = await easy.open({
   main process). An asar packager must leave the native binding unpacked -
   electron-builder: `asarUnpack: ["**/node_modules/@serialport/bindings-cpp/**"]`.
 
-## What is generated
+## How it works
+
+```mermaid
+graph TD
+  A[TypeScript API] --> B[Embind facade + generated registrations]
+  B --> C[Hamlib backends, unmodified]
+  C --> D[iofunc.c and sleep.c, unmodified]
+  D -->|"Wl,--wrap=read/write/select/nanosleep"| E[wrapped_io.cpp: handle dispatch]
+  E --> F[web_serial.c: serial contract + fd registry]
+  F --> G[web_serial.ts: queue, waiters, signals]
+  G --> H[SerialPort: Web Serial in the browser, node-serialport in Node]
+```
+
+* **Synchronous C, asynchronous I/O** - Hamlib's API is blocking; Web Serial
+  and node-serialport are promise based. Emscripten's Asyncify suspends the C
+  stack while a port promise settles.
+* **The transport is replaced, not patched in** - the project's serial layer
+  stands in for upstream's `src/serial.c`, and link-time wrappers redirect the
+  `read()`/`write()`/`select()`/`nanosleep()` calls the common port layer makes
+  for a serial port to it. Upstream's own read loop, 7 data bit masking, retry
+  accounting and timeout handling stay in charge.
+* **One upstream patch hunk** - the pinned patch skips only the Morse worker
+  start in `rig_open()`, which the single threaded build cannot support.
+  Everything else `rig_open()` does still runs.
+* **Public API only** - the facade reaches Hamlib through
+  `rig_init()`/`rig_open()`/`rig_close()` and `rig_token_lookup()` +
+  `rig_set_conf()`; it never writes a `rig_state` or `hamlib_port_t` field.
+* **One port contract, two transports** - `SerialTransport`/`SerialPortLike`
+  is the seam the facade acquires ports through. A browser `SerialPort`
+  satisfies it structurally, and `hamlib-wasm/node` adapts `serialport` to it.
+  With no transport passed, the runtime picks: Web Serial where it exists, the
+  Node transport otherwise.
+* **One queue per module** - every native call runs on a single promise chain,
+  because Asyncify can only have one suspended call at a time. Several `Rig`
+  objects still work; their calls are serialized in order. This is why the
+  Emscripten module is not exported.
+* **Single threaded** - the module is built without `-pthread`, with `async`,
+  `poll_interval` and `auto_power_on`/`auto_power_off` forced to zero through
+  Hamlib's public configuration, so no polling thread, async data handler or
+  Morse worker can start. `RTS`/`DTR`/`BREAK` map to `setSignals()`,
+  `CTS`/`DCD`/`DSR` to `getSignals()`.
+* **Hamlib's cache is left intact** - its setters keep the 500 ms cache
+  coherent, so a read after a write reports what was just written.
+
+### What is generated
 
 Every operation on `Rig` comes from the pinned upstream Hamlib headers, so the
 generator classifies each declaration into a shape whose types all map, and
@@ -348,32 +438,28 @@ PTT shapes): 100 methods on `Rig`, against 87 refusals.
 body a signature cannot describe (the module lifecycle, port registration and
 open/close ownership, the `char *` buffer wrapper, the `struct confparams` table
 walkers, extended settings and PTT); their TypeScript methods are generated too,
-so adding an operation is a config edit plus `mise run generate`.
+so adding an operation is a config edit plus a regeneration.
 
-The raw Emscripten module and its generated declaration are exported as
-`hamlib-wasm/native`. The generated declaration is typed in terms of value objects
-and primitive handles only — no C pointers, no Hamlib structures, no Wasm
-memory addresses.
-
-Every project-owned file is strict TypeScript. The browser serial transport is
-authored in `native/web_serial.ts` and compiled to the Emscripten JS library
-(`--js-library`) during `build-native`; no JavaScript is handwritten in this
-repository. The generated low-level contract types every operation as
-`T | Promise<T>` because an Asyncify-suspended call returns a promise.
+The module's generated declaration is typed in terms of value objects and
+primitive handles only - no C pointers, no Hamlib structures, no Wasm memory
+addresses. Every project-owned file is strict TypeScript: the serial transport
+is authored in TypeScript and compiled to the Emscripten JS library, and the
+generated low-level contract types every operation as `T | Promise<T>` because
+an Asyncify-suspended call returns a promise.
 
 ## Licensing
 
-The original JavaScript/TypeScript wrapper is MIT-licensed. The included
-`hamlib-wasm.wasm` embeds the Hamlib library, which is licensed under
-LGPL-2.1-or-later, including the project's Hamlib modifications. The package
-is not MIT-only.
+`MIT AND LGPL-2.1-or-later`. The original JavaScript/TypeScript wrapper is
+MIT-licensed. The included `hamlib-wasm.wasm` embeds the Hamlib library, which
+is licensed under LGPL-2.1-or-later, including the project's Hamlib
+modifications. The package is not MIT-only.
 
 If you distribute a site or application containing the WASM binary, you must
 preserve applicable Hamlib copyright and license notices and provide the
 corresponding-source/relink materials under an LGPL-permitted distribution
-mechanism. See [`LICENSE.md`](./LICENSE.md),
-[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md), and
-[`REBUILDING.md`](./REBUILDING.md).
+mechanism. The package ships [`LICENSE.md`](./LICENSE.md),
+[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) and
+[`REBUILDING.md`](./REBUILDING.md) for this.
 
 Using the package does not, by itself, require your application's own source
 to be published under LGPL. However, distribution terms must not prohibit
