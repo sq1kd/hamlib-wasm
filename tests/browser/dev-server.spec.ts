@@ -14,9 +14,9 @@
  */
 import { expect, test } from '@playwright/test';
 
-const REACT_DEV_URL = 'http://127.0.0.1:5174/';
+const REACT_DEV_URL = 'http://127.0.0.1:5176/demo/';
 
-test('the React example instantiates the module in dev mode', async ({ page }) => {
+test('the documentation site demo instantiates the module in dev mode', async ({ page }) => {
   const failures: string[] = [];
 
   page.on('pageerror', (error) => {
@@ -24,6 +24,7 @@ test('the React example instantiates the module in dev mode', async ({ page }) =
   });
 
   await page.goto(REACT_DEV_URL);
+  await page.getByTestId('load-demo').click();
 
   /* The element reads "Hamlib: loading…" until the whole chain resolved:
    * the module, its default asset lookup and the wasm. */

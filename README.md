@@ -20,7 +20,7 @@ runtime support and limitations are documented in the package README:
 | `packages/hamlib-wasm/native` | Serial transport (TypeScript, compiled to the Emscripten JS library), link-time POSIX wrappers, Embind facade, `pthread` shim |
 | `packages/hamlib-wasm/baseline/baseline.json` | Recorded catalogue digest and CAT trace for the pinned release |
 | `packages/hamlib-codegen` | The AST-driven generator: classifies upstream declarations and emits the binding surface |
-| `examples/react` | React landing page and demo: one graphical rig, the easy and 1:1 backends side by side |
+| `site` | Documentation website (Astro Starlight, TypeDoc API reference) with the on-demand live rig demo |
 | `examples/node` | Node CLI: lists this machine's serial ports and drives a rig read-only through the Node transport |
 | `tests/browser` | Playwright Web Serial double with emulated rigs and the scenarios driving them, in Chromium and Firefox |
 | `tests/harness` | Pages that publish the built package (`index.html`) and drive the React hooks (`hooks.html`) for the browser specs |

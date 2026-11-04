@@ -65,10 +65,10 @@ description = "Compile the public TypeScript package and render licensing artifa
 depends = ["build-native"]
 run = "node packages/hamlib-wasm/build/package.ts"
 
-[tasks.build-react]
-description = "Build the React landing page and demo application"
+[tasks.build-site]
+description = "Build the documentation site: astro check, TypeDoc API reference, static build"
 depends = ["build-package"]
-run = "npm run build --workspace examples/react"
+run = "npm run build --workspace site"
 
 [tasks.build-harness]
 description = "Build the browser test harness app"
@@ -76,13 +76,18 @@ depends = ["build-package"]
 run = "npm run build --workspace tests/harness"
 
 [tasks.build]
-description = "Full reproducible build: native Wasm, package, examples and the test harness"
-depends = ["build-react", "build-harness"]
+description = "Full reproducible build: native Wasm, package, documentation site and the test harness"
+depends = ["build-site", "build-harness"]
 
-[tasks.dev-react]
-description = "Run the React landing page dev server on a localhost URL"
+[tasks.dev-site]
+description = "Run the documentation site dev server on http://127.0.0.1:5176/"
 depends = ["build-package"]
-run = "npm run dev --workspace examples/react"
+run = "npm run dev --workspace site"
+
+[tasks.preview-site]
+description = "Serve the built documentation site on http://127.0.0.1:4176/"
+depends = ["build-site"]
+run = "npm run preview --workspace site"
 
 [tasks.example-node]
 description = "List the serial ports this machine reports, through the Node entry point"

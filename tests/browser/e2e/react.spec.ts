@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
 
 import { installFakeSerial, installTestHelpers, readFakeSerial, setReplyDelay } from '../fixtures';
 
-const REACT_URL = 'http://127.0.0.1:4175/';
+const REACT_URL = 'http://127.0.0.1:4176/demo/';
 
 /** The TS-480 the emulator starts on. */
 const TS480_FREQUENCY = '14,074,000';
@@ -21,6 +21,7 @@ test.beforeEach(async ({ page }) => {
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(REACT_URL);
+  await page.getByTestId('load-demo').click();
 });
 
 /** The page preselects the TS-480, so connecting is the gesture on its own. */

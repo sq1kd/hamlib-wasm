@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 
 import { UPSTREAM_VERSION } from '../upstream';
 
-const REACT_URL = 'http://127.0.0.1:4175/';
+const REACT_URL = 'http://127.0.0.1:4176/demo/';
 
 test('reports that Web Serial is unavailable and keeps connect disabled', async ({ page }) => {
   /* A browser without Web Serial has no `serial` member at all, so remove the
@@ -17,6 +17,7 @@ test('reports that Web Serial is unavailable and keeps connect disabled', async 
   });
 
   await page.goto(REACT_URL);
+  await page.getByTestId('load-demo').click();
 
   const status = page.getByTestId('web-serial-status');
 

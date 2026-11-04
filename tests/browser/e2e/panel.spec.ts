@@ -27,7 +27,7 @@ import {
   waitForPortOpenPending,
 } from '../fixtures';
 
-const REACT_URL = 'http://127.0.0.1:4175/';
+const REACT_URL = 'http://127.0.0.1:4176/demo/';
 
 test.beforeEach(async ({ page }) => {
   await installFakeSerial(page);
@@ -41,6 +41,7 @@ async function selectModel(page: Page, label: string): Promise<void> {
 
 test('a frequency-only model connects, shows unknown fields and disconnects', async ({ page }) => {
   await page.goto(REACT_URL);
+  await page.getByTestId('load-demo').click();
 
   /* The FRG-100 receiver: its backend declares frequency only. */
   await useRig(page, 'yaesu-frg100');
@@ -82,6 +83,7 @@ test('a frequency-only model connects, shows unknown fields and disconnects', as
 
 test('a rig that never answers fails the acquisition loudly and releases the port', async ({ page }) => {
   await page.goto(REACT_URL);
+  await page.getByTestId('load-demo').click();
   await useRig(page, 'yaesu-frg100');
   await page.getByTestId('backend-native').check();
 
@@ -115,6 +117,7 @@ test('a rig that never answers fails the acquisition loudly and releases the por
 
 test('a rejected command reaches the error display of the native backend', async ({ page }) => {
   await page.goto(REACT_URL);
+  await page.getByTestId('load-demo').click();
   await page.getByTestId('backend-native').check();
 
   await expect(page.getByTestId('model-select')).toBeEnabled();

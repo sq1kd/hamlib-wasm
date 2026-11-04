@@ -15,7 +15,9 @@
       "!**/tests/browser/fixtures/generated",
       "!**/tests/consumer/packed",
       "!**/tests/harness/dist",
-      "!**/examples/*/dist"
+      "!**/examples/*/dist",
+      "!**/site/.astro",
+      "!**/site/src/content/docs/api"
     ]
   },
   "formatter": {

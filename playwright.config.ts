@@ -6,7 +6,7 @@ import { defineConfig } from '@playwright/test';
  * lookup the bundler rewrites:
  *
  *   4174  the package test harness      (mise run build-harness)
- *   4175  the React landing page        (mise run build-react)
+ *   4176  the documentation site        (mise run build-site)
  *
  * The React `vite` dev server is here for the same reason in the other
  * direction: a bundler rewrites the asset the module loader looks up, and it
@@ -43,14 +43,14 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: 'npm run preview --workspace examples/react',
-      url: 'http://127.0.0.1:4175/',
+      command: 'npm run preview --workspace site',
+      url: 'http://127.0.0.1:4176/demo/',
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
-      command: 'npm run dev --workspace examples/react',
-      url: 'http://127.0.0.1:5174/',
+      command: 'npm run dev --workspace site',
+      url: 'http://127.0.0.1:5176/demo/',
       reuseExistingServer: false,
       timeout: 60_000,
     },
