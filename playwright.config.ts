@@ -2,19 +2,21 @@ import { defineConfig } from '@playwright/test';
 
 /**
  * Every server the specs need serves a production build, so the artifact users
- * get is what is exercised:
+ * get is what is exercised, including the `new URL(..., import.meta.url)` wasm
+ * lookup the bundler rewrites:
  *
- *   4173  the Vanilla TypeScript example (mise run build-example)
  *   4174  the package test harness      (mise run build-harness)
  *   4175  the React landing page        (mise run build-react)
  *
- * The two `vite` dev servers are here for the same reason in the other
+ * The React `vite` dev server is here for the same reason in the other
  * direction: a bundler rewrites the asset the module loader looks up, and it
  * does so differently in dev than in a build, so `dev-server.spec.ts` keeps
  * both paths working.
  *
- * Serving built output is deliberate: it is the artifact users get, including
- * the `new URL(..., import.meta.url)` wasm lookup the bundler rewrites.
+ * Every spec runs in Chromium and in Firefox.  Neither needs the browser's own
+ * Web Serial: the specs inject a double for `navigator.serial`, so what the two
+ * projects compare is the library itself - Asyncify, streams, timers and the
+ * bundled wasm lookup - in two engines that ship Web Serial on the desktop.
  */
 export default defineConfig({
   testDir: 'tests/browser',
@@ -35,12 +37,6 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'npm run preview --workspace examples/basic',
-      url: 'http://127.0.0.1:4173/',
-      reuseExistingServer: false,
-      timeout: 60_000,
-    },
-    {
       command: 'npm run preview --workspace tests/harness',
       url: 'http://127.0.0.1:4174/',
       reuseExistingServer: false,
@@ -49,12 +45,6 @@ export default defineConfig({
     {
       command: 'npm run preview --workspace examples/react',
       url: 'http://127.0.0.1:4175/',
-      reuseExistingServer: false,
-      timeout: 60_000,
-    },
-    {
-      command: 'npm run dev --workspace examples/basic',
-      url: 'http://127.0.0.1:5173/',
       reuseExistingServer: false,
       timeout: 60_000,
     },
@@ -68,10 +58,11 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: {
-        browserName: 'chromium',
-        baseURL: 'http://127.0.0.1:4173',
-      },
+      use: { browserName: 'chromium' },
+    },
+    {
+      name: 'firefox',
+      use: { browserName: 'firefox' },
     },
   ],
 });

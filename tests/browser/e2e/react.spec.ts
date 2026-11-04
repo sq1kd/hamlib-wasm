@@ -13,7 +13,7 @@ import { installFakeSerial, installTestHelpers, readFakeSerial, setReplyDelay } 
 
 const REACT_URL = 'http://127.0.0.1:4175/';
 
-/** The TS-480 the emulator starts on, as the basic example's scenarios see it. */
+/** The TS-480 the emulator starts on. */
 const TS480_FREQUENCY = '14,074,000';
 const TS480_MODE = 'USB';
 

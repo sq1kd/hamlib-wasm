@@ -47,7 +47,7 @@ export const VERIFIED_MODELS: readonly VerifiedModel[] = [
     model: 'TS-480',
     evidence: [
       'tests/browser/transport.spec.ts: open, status, frequency, mode, PTT, close',
-      'tests/browser/e2e/happy.spec.ts: the example page, end to end',
+      'tests/browser/e2e/react.spec.ts: the React example page, end to end, on both backends',
       'tests/browser/baseline.spec.ts: the recorded CAT command sequence',
     ],
   },

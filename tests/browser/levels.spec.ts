@@ -90,7 +90,10 @@ test('a level watch reads only the level, a frequency watch reads none', async (
     stopMeter();
     const meterCommands = window.__fakeSerial.commands.slice(base);
 
-    /* Frequency watch with no levels: no SM0 read at all. */
+    /* Frequency watch with no levels: no SM0 read at all.  Wait out Hamlib's
+     * 500 ms cache of the frequency the open read first, or a fast engine
+     * finishes the watch inside that window and no FA reaches the wire. */
+    await window.__testHelpers.sleep(600);
     const frequencyBase = window.__fakeSerial.commands.length;
     const stopFrequency = rig.watch({ intervalMs: 40, fields: ['frequency'] });
     await window.__testHelpers.sleep(260);

@@ -362,6 +362,58 @@ test('opens a rig, drives it over the transport and releases the port', async ({
   expect(transport.state.transmitting).toBe(false);
 });
 
+test('reports a Hamlib timeout and recovers on the next read', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createHamlib();
+    const port = await hamlib.requestPort();
+    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
+
+    if (!ts480) {
+      throw new Error('the TS-480 model is missing');
+    }
+
+    const rig = await hamlib.open({ modelId: ts480.id, port });
+    const before = await rig.getFrequency();
+
+    /* The emulator stops answering, so the next read runs into Hamlib's own
+     * timeout (TS-480 caps: 500 ms, 3 retries).  Wait out Hamlib's 500 ms
+     * cache window first, so the read is guaranteed to reach the wire. */
+    window.__fakeSerial.state.silent = true;
+    await window.__testHelpers.sleep(600);
+    const silent = await window.__testHelpers.capture(() => rig.getFrequency());
+    const connectedAfterTimeout = rig.connected;
+
+    /* The emulator answers again: the same rig reads without a reconnect. */
+    window.__fakeSerial.state.silent = false;
+    const recovered = await window.__testHelpers.capture(() => rig.getFrequency());
+
+    await rig.close();
+    await hamlib.dispose();
+
+    return { before, silent, connectedAfterTimeout, recovered };
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.before).toBe(14_074_000);
+
+  const error = expectFailure(result.silent);
+  expect(error.code).toBe('HAMLIB_ERROR');
+  expect(error.operation).toBe('getFrequency');
+  /* -RIG_ETIMEOUT */
+  expect(error.hamlibCode).toBe(-5);
+  expect(error.hamlibMessage).toBe('communication timed out');
+
+  /* A timeout is reported, not fatal. */
+  expect(result.connectedAfterTimeout).toBe(true);
+  expect(expectOk(result.recovered)).toBe(14_074_000);
+
+  const transport = await readFakeSerial(page);
+  expect(transport.openCount).toBe(1);
+  expect(transport.isOpen).toBe(false);
+  expect(transport.closedWithLockedStreams).toBe(false);
+});
+
 test('surfaces a Hamlib error when the port cannot be opened', async ({ page }) => {
   await failNextPortOpen(page, 'TypeError');
 
