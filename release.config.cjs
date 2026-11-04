@@ -18,7 +18,7 @@ module.exports = {
       {
         // Adds the "Bundled components" section.  It never fails a release:
         // missing provenance produces a shorter section, not a release error.
-        generateNotesCmd: 'node scripts/hamlib-release-notes.mjs',
+        generateNotesCmd: 'node packages/hamlib-wasm/build/release-notes.ts',
       },
     ],
     [
