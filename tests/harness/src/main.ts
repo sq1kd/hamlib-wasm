@@ -4,19 +4,22 @@
  * Test harness entry point.
  *
  * Exposes the built package on the page so Playwright specs can drive it
- * directly with `page.evaluate`, using the same artifacts the example uses.
- * `nativeModule()` additionally loads the published native module, so the
- * transport primitives behind the facade can be exercised on their own.
+ * directly with `page.evaluate`, using the same artifacts an application gets.
  *
- * Both package entries are published: `hamlib-wasm/hamlib` (createHamlib) and
+ * Both browser entries are published: `hamlib-wasm/hamlib` (createHamlib) and
  * the easy `hamlib-wasm` (createEasy and capabilitiesOf), so a spec can drive
  * either surface against the same emulator.
+ *
+ * `nativeModule()` additionally loads the built Emscripten module, so the
+ * transport primitives behind the facade can be exercised on their own.  The
+ * package does not export that module - raw access would bypass the queue every
+ * public call goes through - so the harness reaches into the build output.
  */
 import { capabilitiesOf, createEasy } from 'hamlib-wasm';
 import * as hamlibWasm from 'hamlib-wasm/hamlib';
 import type { SerialPortLike, SerialTransport } from 'hamlib-wasm/hamlib';
-import createNativeModule from 'hamlib-wasm/native';
-import type { MainModule } from 'hamlib-wasm/native';
+import createNativeModule from '../../../packages/hamlib-wasm/dist/native/hamlib-wasm.mjs';
+import type { MainModule } from '../../../packages/hamlib-wasm/dist/native/hamlib-wasm.mjs';
 
 let nativeModule: Promise<MainModule> | null = null;
 

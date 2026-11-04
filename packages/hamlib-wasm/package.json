@@ -23,10 +23,6 @@
       "types": "./dist/hamlib.d.ts",
       "default": "./dist/hamlib.js"
     },
-    "./native": {
-      "types": "./dist/native/hamlib-wasm.d.mts",
-      "default": "./dist/native/hamlib-wasm.mjs"
-    },
     "./native/hamlib-wasm.wasm": "./dist/native/hamlib-wasm.wasm",
     "./node": {
       "types": "./dist/node.d.ts",

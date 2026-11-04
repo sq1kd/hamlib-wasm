@@ -1,8 +1,8 @@
 /**
  * Test-seam declarations for the pages the browser specs drive.
  *
- * `tests/harness/src/main.ts` publishes the package on `window`; the example
- * publishes nothing and is driven through its DOM instead.
+ * `tests/harness/src/main.ts` publishes the package on `window`; the React
+ * example publishes nothing and is driven through its DOM instead.
  */
 import type { EasyHamlib, EasyOperationCapabilities, EasyOptions } from 'hamlib-wasm';
 import type {
@@ -12,7 +12,8 @@ import type {
   SerialPortLike,
   SerialTransport,
 } from 'hamlib-wasm/hamlib';
-import type { MainModule } from 'hamlib-wasm/native';
+/* Not a package export: the harness loads the built module directly. */
+import type { MainModule } from '../../packages/hamlib-wasm/dist/native/hamlib-wasm.mjs';
 import type { HookHarness } from '../harness/src/hook-harness-types';
 
 export type NativeModule = MainModule;
@@ -40,7 +41,7 @@ export interface HamlibHarness {
   /** A transport over `port`, recording every call the facade makes on it. */
   fakeTransport(port: SerialPortLike): SerialTransport & { calls: string[] };
   isHamlibError(value: unknown): boolean;
-  /** Loads the published Emscripten module (a separate wasm instance). */
+  /** Loads the built Emscripten module (a separate wasm instance). */
   nativeModule(): Promise<NativeModule>;
 }
 
