@@ -12,7 +12,7 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, useRig } from './fixtures';
+import { installFakeSerial, installTestHelpers, installVirtualClock, useRig } from './fixtures';
 import type { Captured } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
@@ -34,6 +34,7 @@ function expectFailure<T>(captured: Captured<T>): string {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);

@@ -12,6 +12,9 @@
  * Web Serial.  Everything above the transport layer is the same upstream code
  * the Wasm build links.
  *
+ * Both sides run Hamlib on virtual time (see "Virtual time" below), so the
+ * trace depends on what Hamlib asks for, never on how fast this machine is.
+ *
  * Usage: host-trace <library-dir>   (prints one decoded CAT command per line)
  *
  * Build: see build/compare-native.ts.
@@ -20,8 +23,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef __APPLE__
@@ -31,6 +36,89 @@
 #endif
 
 #include <hamlib/rig.h>
+
+/*
+ * Virtual time.
+ *
+ * Hamlib reads the clock for its cache (the 500 ms cache_timeout the browser
+ * facade applies too) and sleeps between some commands.  On the wall clock,
+ * whether a cached value is still fresh when the transaction reaches it would
+ * depend on how fast this machine runs the transaction - and so would the
+ * trace.  The browser suite runs Hamlib on a virtual clock that moves only by
+ * the sleeps and timeouts Hamlib itself asks for
+ * (tests/browser/fixtures/virtual-clock.ts).  This program applies the same
+ * rule by defining the time functions the statically linked library calls:
+ * the linker binds the library's references to these definitions rather than
+ * the C library's, so a sleep advances the clock instead of waiting, and
+ * waiting for the emulator's reply (select/read) takes no virtual time, just
+ * as the browser emulator's replies take none.
+ */
+
+/* Not zero: Hamlib treats an all-zero timestamp as "never set".  The same
+ * offset the page clock starts at (1 s), on the same epoch. */
+static long long virtual_ns = 1000000000LL;
+
+/* 2025-01-01T00:00:00Z, the page clock's epoch. */
+#define VIRTUAL_EPOCH_SECONDS 1735689600LL
+
+#define NANOS_PER_SECOND 1000000000LL
+
+int nanosleep(const struct timespec *request, struct timespec *remaining)
+{
+    if (request)
+    {
+        virtual_ns += (long long) request->tv_sec * NANOS_PER_SECOND + request->tv_nsec;
+    }
+
+    if (remaining)
+    {
+        remaining->tv_sec = 0;
+        remaining->tv_nsec = 0;
+    }
+
+    return 0;
+}
+
+int usleep(useconds_t microseconds)
+{
+    virtual_ns += (long long) microseconds * 1000LL;
+    return 0;
+}
+
+unsigned int sleep(unsigned int seconds)
+{
+    virtual_ns += (long long) seconds * NANOS_PER_SECOND;
+    return 0;
+}
+
+int clock_gettime(clockid_t clock_id, struct timespec *now)
+{
+    long long ns = virtual_ns;
+
+    if (clock_id == CLOCK_REALTIME) { ns += VIRTUAL_EPOCH_SECONDS * NANOS_PER_SECOND; }
+
+    now->tv_sec = (time_t) (ns / NANOS_PER_SECOND);
+    now->tv_nsec = (long) (ns % NANOS_PER_SECOND);
+    return 0;
+}
+
+int gettimeofday(struct timeval *now, void *zone)
+{
+    long long ns = virtual_ns + VIRTUAL_EPOCH_SECONDS * NANOS_PER_SECOND;
+
+    (void) zone;
+    now->tv_sec = (time_t) (ns / NANOS_PER_SECOND);
+    now->tv_usec = (suseconds_t) ((ns % NANOS_PER_SECOND) / 1000);
+    return 0;
+}
+
+/* Hamlib's own monotonic clock (lib/precise_time.c), which hl_usleep() polls
+ * until a sleep has lasted long enough.  Defining it here keeps that object
+ * out of the link. */
+double monotonic_seconds(void)
+{
+    return (double) virtual_ns / (double) NANOS_PER_SECOND;
+}
 
 /* The emulator stops logging when it sees this byte, so the trace covers the
  * same window the browser baseline records: open through the last command,
@@ -214,6 +302,21 @@ int main(int argc, char **argv)
         fprintf(stderr, "rig_init failed\n");
         return 1;
     }
+
+    /*
+     * The browser build has no threads, so its rig_open() skips the Morse
+     * worker (the web patch in packages/hamlib-wasm/native/patches).  On the
+     * host that worker is a thread which reads the keyer speed (`KS`)
+     * concurrently with the transaction - a command the browser never sends,
+     * at a position only the scheduler decides - and whose sleep loop would
+     * run the virtual clock on its own.  Open with caps that declare no Morse sender, so no worker
+     * starts here either; nothing in the transaction sends Morse.
+     */
+    static struct rig_caps caps_without_morse;
+
+    caps_without_morse = *rig->caps;
+    caps_without_morse.send_morse = NULL;
+    rig->caps = &caps_without_morse;
 
     /* The same configuration the browser facade applies. */
     if (set_conf(rig, "rig_pathname", slave_path) != 0) { return 1; }

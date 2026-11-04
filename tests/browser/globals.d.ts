@@ -48,7 +48,6 @@ export interface HamlibHarness {
 export interface TestHelpers {
   describeError(value: unknown): HamlibErrorView;
   capture<T>(action: () => T | Promise<T>): Promise<Captured<T>>;
-  sleep(ms: number): Promise<void>;
 }
 
 declare global {
@@ -56,6 +55,8 @@ declare global {
     __hamlibHarness: HamlibHarness;
     __testHelpers: TestHelpers;
     __hookHarness: HookHarness;
+    /** A hook call a spec started and settles later, on the virtual clock. */
+    __pendingHookCall: Promise<string> | undefined;
   }
 }
 

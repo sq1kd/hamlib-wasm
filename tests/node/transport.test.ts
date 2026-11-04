@@ -7,12 +7,13 @@
  * second implementation of a contract that already works, not a special case
  * bolted into the facade.
  */
-import { expect, test } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 
 import { createHamlib, webSerialTransport } from 'hamlib-wasm/hamlib';
 import type { SerialPortLike, SerialTransport } from 'hamlib-wasm/hamlib';
 
 import { fakePort } from './fake-port.js';
+import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
 
 test('drives a rig through a caller-supplied transport and port', async () => {
   const control = fakePort();
@@ -140,7 +141,15 @@ function neverSettles(): {
   return { port, closed: () => closed, openStarted: () => started };
 }
 
+afterEach(() => {
+  useRealTime();
+});
+
+/* The watchdog is a timer, so this runs on virtual time: the open is bounded
+ * after exactly 150 ms of it, however long the machine takes to get there. */
 test('bounds a call that never settles and refuses the instance afterwards', async () => {
+  useVirtualTime();
+
   const control = neverSettles();
 
   const transport: SerialTransport = {
@@ -160,26 +169,26 @@ test('bounds a call that never settles and refuses the instance afterwards', asy
       throw new Error('the TS-480 model is missing');
     }
 
-    const failure = await hamlib.open({ modelId: ts480.id, port: control.port }).then(
+    const failure = await settle(hamlib.open({ modelId: ts480.id, port: control.port }).then(
       () => null,
       (error: unknown) => error as { code?: string },
-    );
+    ));
 
     expect(control.openStarted()).toBe(true);
     expect(failure?.code).toBe('RIG_TIMEOUT');
 
     /* The suspended native stack cannot be re-entered: the next call fails
      * fast instead of queueing behind it. */
-    const after = await hamlib.open({ modelId: ts480.id, port: control.port }).then(
+    const after = await settle(hamlib.open({ modelId: ts480.id, port: control.port }).then(
       () => null,
       (error: unknown) => error as { code?: string },
-    );
+    ));
 
     expect(after?.code).toBe('RIG_HUNG');
   } finally {
     /* dispose must settle even though the native stack is still suspended,
      * and must release the port from the JavaScript side. */
-    await hamlib.dispose();
+    await settle(hamlib.dispose());
   }
 
   expect(control.closed()).toBe(true);

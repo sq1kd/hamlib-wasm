@@ -46,7 +46,10 @@
     openPending: false,
     /** Release a parked open().  A no-op when none is parked. */
     releaseOpen: function (): void { /* replaced while an open is parked */ },
-    /** Delay every emulator reply by this many milliseconds. */
+    /**
+     * Delay every emulator reply by this many milliseconds - of virtual time
+     * when the page runs on the virtual clock, as every harness spec does.
+     */
     replyDelayMs: 0,
     /** When true, every host write is refused, as a device that rejects commands. */
     failWrites: false,
@@ -115,7 +118,11 @@
     }
   }
 
-  /** Hand one reply to the reader, after `replyDelayMs` when one is set. */
+  /**
+   * Hand one reply to the reader, after `replyDelayMs` when one is set.  The
+   * delay is an ordinary timer, so on the virtual clock it fires in deadline
+   * order with Hamlib's own read timeout.
+   */
   function enqueueReply(chunk: Uint8Array): void {
     if (control.replyDelayMs > 0) {
       setTimeout(function () {

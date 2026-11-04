@@ -5,10 +5,16 @@
  * consumers can poll at once, removing one leaves the others running, removing
  * the last stops the scheduler, and neither close() nor dispose() may publish
  * afterwards or leave a timer behind.
+ *
+ * The page runs on the virtual clock (fixtures/virtual-clock.ts), so a window
+ * of polling is an exact span of virtual time: every tick due in it fires, in
+ * order, however slowly the machine runs, and counts are asserted exactly.
+ * "Nothing happens afterwards" is proved the same way - by letting virtual
+ * time pass, and by the page having no timer left at all.
  */
 import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers } from './fixtures';
+import { installFakeSerial, installTestHelpers, installVirtualClock } from './fixtures';
 import type { Captured } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
@@ -22,6 +28,7 @@ function expectOk<T>(captured: Captured<T>): T {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);
@@ -44,30 +51,35 @@ test('two watchers coexist and removing one leaves the other polling', async ({ 
 
     /* A's interval is the slower one, so growth after B is removed can only
      * come from A still being registered. */
-    await window.__testHelpers.sleep(500);
+    await window.__virtualClock.advance(500);
     const withBoth = samples;
 
     stopB();
-    await window.__testHelpers.sleep(500);
+    await window.__virtualClock.advance(500);
     const afterRemovingB = samples;
 
     stopA();
-    await window.__testHelpers.sleep(400);
+    const timersAfterRemovingA = window.__virtualClock.pendingTimers();
+    await window.__virtualClock.advance(400);
     const afterRemovingA = samples;
 
     await rig.close();
     await hamlib.dispose();
 
-    return { withBoth, afterRemovingB, afterRemovingA };
+    return { withBoth, afterRemovingB, afterRemovingA, timersAfterRemovingA };
   }));
 
   const result = expectOk(captured);
 
-  expect(result.withBoth).toBeGreaterThan(0);
-  /* B's unsubscribe did not disturb A. */
-  expect(result.afterRemovingB).toBeGreaterThan(result.withBoth);
-  /* Removing the last registration stopped the scheduler. */
-  expect(result.afterRemovingA).toBe(result.afterRemovingB);
+  /* A TS-480 read costs no virtual time, so every tick publishes once.  In the
+   * first 500 ms: A at 0, 150, 300, 450 and B at 0, 40, ..., 480 - 4 + 13. */
+  expect(result.withBoth).toBe(17);
+  /* B's unsubscribe did not disturb A: A alone at 600, 750, 900. */
+  expect(result.afterRemovingB).toBe(20);
+  /* Removing the last registration stopped the scheduler: no timer is left,
+   * and 400 ms of virtual time later nothing more was published. */
+  expect(result.timersAfterRemovingA).toBe(0);
+  expect(result.afterRemovingA).toBe(20);
 });
 
 test('a slow read never accumulates poll work', async ({ page }) => {
@@ -85,7 +97,7 @@ test('a slow read never accumulates poll work', async ({ page }) => {
     const base = window.__fakeSerial.commands.length;
     const stop = rig.watch({ intervalMs: 30 });
 
-    await window.__testHelpers.sleep(900);
+    await window.__virtualClock.advance(900);
 
     /* Count the PTT read, which is the last of a refresh and cannot be served
      * from Hamlib's frequency cache; the total bounds the wire traffic. */
@@ -97,15 +109,17 @@ test('a slow read never accumulates poll work', async ({ page }) => {
     await rig.close();
     await hamlib.dispose();
 
-    return { pttReads, total: during.length };
+    return { pttReads, during };
   }));
 
   const result = expectOk(captured);
 
-  /* Roughly thirty ticks were due: one refresh started, and nothing piled up
-   * behind it. */
+  /* Thirty ticks were due in the 900 ms, and exactly one refresh ran: the
+   * frequency came from the cache the open filled, then MD and FW took 400 ms
+   * each, and the PTT read was still waiting for its reply when the window
+   * closed.  Nothing piled up behind it. */
   expect(result.pttReads).toBe(1);
-  expect(result.total).toBeLessThanOrEqual(4);
+  expect(result.during).toEqual(['MD', 'FW', 'IF']);
 });
 
 test('disposal with an active watcher closes the port and stops polling', async ({ page }) => {
@@ -122,7 +136,7 @@ test('disposal with an active watcher closes the port and stops polling', async 
 
     const stop = rig.watch({ intervalMs: 40 });
 
-    await window.__testHelpers.sleep(300);
+    await window.__virtualClock.advance(300);
 
     const polling = samples;
     const base = window.__fakeSerial.commands.length;
@@ -130,14 +144,16 @@ test('disposal with an active watcher closes the port and stops polling', async 
     await hamlib.dispose();
 
     const atDisposal = samples;
+    const timersAtDisposal = window.__virtualClock.pendingTimers();
 
-    await window.__testHelpers.sleep(400);
+    await window.__virtualClock.advance(400);
 
     stop();
 
     return {
       polling,
       atDisposal,
+      timersAtDisposal,
       afterDisposal: samples,
       commandsAfterDisposal: window.__fakeSerial.commands.length - base,
       connected: rig.connected,
@@ -149,8 +165,12 @@ test('disposal with an active watcher closes the port and stops polling', async 
 
   const result = expectOk(captured);
 
-  expect(result.polling).toBeGreaterThan(0);
-  /* No publication and no read after disposal: the scheduler is gone. */
+  /* Ticks at 0, 40, ..., 280. */
+  expect(result.polling).toBe(8);
+  /* No publication and no read after disposal: the scheduler is gone, and
+   * with it every timer. */
+  expect(result.timersAtDisposal).toBe(0);
+  expect(result.atDisposal).toBe(result.polling);
   expect(result.afterDisposal).toBe(result.atDisposal);
   expect(result.commandsAfterDisposal).toBe(0);
   expect(result.connected).toBe(false);
@@ -169,15 +189,16 @@ test('closing the raw rig behind the wrapper stops the scheduler', async ({ page
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
     rig.watch({ intervalMs: 40 });
-    await window.__testHelpers.sleep(250);
+    await window.__virtualClock.advance(250);
 
     /* The escape hatch closes the port without going through the wrapper. */
     await rig.raw.close();
 
     const base = window.__fakeSerial.commands.length;
-    await window.__testHelpers.sleep(400);
+    await window.__virtualClock.advance(400);
 
     const result = {
+      timersAfterRawClose: window.__virtualClock.pendingTimers(),
       connected: rig.connected,
       commandsAfterRawClose: window.__fakeSerial.commands.length - base,
       isOpen: window.__fakeSerial.isOpen,
@@ -190,6 +211,8 @@ test('closing the raw rig behind the wrapper stops the scheduler', async ({ page
   const result = expectOk(captured);
 
   expect(result.connected).toBe(false);
+  /* The next tick found the rig closed and stopped its own timer. */
+  expect(result.timersAfterRawClose).toBe(0);
   expect(result.commandsAfterRawClose).toBe(0);
   expect(result.isOpen).toBe(false);
 });
@@ -215,7 +238,7 @@ test('a closed wrapper publishes nothing more', async ({ page }) => {
 
     await rig.close();
     const failure = await queued;
-    await window.__testHelpers.sleep(250);
+    await window.__virtualClock.advance(250);
 
     const result = {
       beforeClose,

@@ -22,7 +22,7 @@ runtime support and limitations are documented in the package README:
 | `packages/hamlib-codegen` | The AST-driven generator: classifies upstream declarations and emits the binding surface |
 | `site` | Documentation website (Astro Starlight, TypeDoc API reference) with the on-demand live rig demo |
 | `examples/node` | Node CLI: lists this machine's serial ports and drives a rig read-only through the Node transport |
-| `tests/browser` | Playwright Web Serial double with emulated rigs and the scenarios driving them, in Chromium and Firefox |
+| `tests/browser` | Playwright Web Serial double with emulated rigs, a virtual page clock, and the scenarios driving them, in Chromium and Firefox |
 | `tests/harness` | Pages that publish the built package (`index.html`) and drive the React hooks (`hooks.html`) for the browser specs |
 | `tests/hooks` | `vitest` + jsdom: the React hook state machine against a stubbed package boundary |
 | `tests/node` | `vitest` in Node: the built Wasm module, the port contract and the `serialport` adapter against the emulated rigs |

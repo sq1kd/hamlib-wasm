@@ -13,6 +13,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 
+const CLOCK_SOURCE = readFileSync(
+  fileURLToPath(new URL('./fixtures/generated/virtual-clock.js', import.meta.url)),
+  'utf8',
+);
+
 const RIGS_SOURCE = readFileSync(
   fileURLToPath(new URL('./fixtures/generated/rigs.js', import.meta.url)),
   'utf8',
@@ -97,9 +102,20 @@ export type FakeRigName =
   | 'yaesu-ft757gx2'
   | 'yaesu-frg100';
 
+/** The virtual clock's control surface, as the specs see it. */
+export interface VirtualClockControl {
+  now(): number;
+  mode: VirtualClockMode;
+  pendingTimers(): number;
+  advance(ms: number): Promise<void>;
+  settle<T>(promise: Promise<T>): Promise<T>;
+  until(predicate: () => boolean): Promise<void>;
+}
+
 declare global {
   interface Window {
     __fakeSerial: FakeSerialControl;
+    __virtualClock: VirtualClockControl;
   }
 }
 
@@ -115,6 +131,75 @@ export interface FakeSerialSnapshot {
   outputSignals: Record<string, boolean> | null;
   commands: string[];
   state: FakeRigState;
+}
+
+/** How the page's virtual clock moves; see fixtures/virtual-clock.ts. */
+export type VirtualClockMode = 'auto' | 'manual';
+
+/**
+ * Put the page on virtual time before any page script runs.
+ *
+ * Every timer and clock the page reads is then virtual: time moves only to the
+ * deadline of the timer that fires next, so what a scenario observes never
+ * depends on how fast the machine runs it.  `auto` fires the next timer
+ * whenever the page has drained; `manual` only when a spec asks
+ * ({@link advanceClock}, or `window.__virtualClock` in the page).
+ */
+export async function installVirtualClock(
+  page: Page,
+  mode: VirtualClockMode = 'auto',
+): Promise<void> {
+  await page.addInitScript({
+    content: `${CLOCK_SOURCE}\nwindow.__virtualClock.mode = ${JSON.stringify(mode)};`,
+  });
+}
+
+/** Let `milliseconds` of virtual time pass in the page, firing what is due. */
+export async function advanceClock(page: Page, milliseconds: number): Promise<void> {
+  await page.evaluate((ms: number) => window.__virtualClock.advance(ms), milliseconds);
+}
+
+/** A state of one `data-testid` element, as {@link runClockUntilElement} awaits it. */
+export interface ElementCondition {
+  testId: string;
+  /** The exact text content. */
+  text?: string;
+  /** A substring of the text content. */
+  contains?: string;
+  /** The `data-state` attribute. */
+  state?: string;
+}
+
+/**
+ * Fire the page's timers in deadline order until an element reaches a state.
+ *
+ * For a page whose actions start work the spec holds no promise for - a click
+ * on a panel button - this is how a manual clock is run "until the screen
+ * shows the outcome": the condition is checked every time the page drains, so
+ * time moves exactly as far as the outcome needs and no further.
+ */
+export async function runClockUntilElement(page: Page, condition: ElementCondition): Promise<void> {
+  await page.evaluate((wanted: ElementCondition) => window.__virtualClock.until(() => {
+    const element = document.querySelector(`[data-testid="${wanted.testId}"]`);
+
+    if (element === null) { return false; }
+
+    const text = element.textContent ?? '';
+
+    return (wanted.text === undefined || text === wanted.text)
+      && (wanted.contains === undefined || text.includes(wanted.contains))
+      && (wanted.state === undefined || element.getAttribute('data-state') === wanted.state);
+  }), condition);
+}
+
+/** Fire the page's timers in deadline order until the emulator's port is closed. */
+export async function runClockUntilPortClosed(page: Page): Promise<void> {
+  await page.evaluate(() => window.__virtualClock.until(() => !window.__fakeSerial.isOpen));
+}
+
+/** Timers and intervals still scheduled in the page. */
+export async function pendingTimers(page: Page): Promise<number> {
+  return page.evaluate(() => window.__virtualClock.pendingTimers());
 }
 
 /** Install the fake Web Serial surface before any page script runs. */
@@ -189,9 +274,14 @@ export async function holdNextPortOpen(page: Page): Promise<void> {
   });
 }
 
-/** Wait until a held `open()` has actually parked. */
+/**
+ * Run the page's virtual clock until a held `open()` has actually parked.
+ *
+ * Whatever Hamlib sleeps through on its way to the port fires in deadline
+ * order, and nothing past the moment the open parks.
+ */
 export async function waitForPortOpenPending(page: Page): Promise<void> {
-  await page.waitForFunction(() => window.__fakeSerial?.openPending === true);
+  await page.evaluate(() => window.__virtualClock.until(() => window.__fakeSerial.openPending));
 }
 
 /** Release a parked `open()`, completing it. */
@@ -205,7 +295,12 @@ export async function releasePortOpen(page: Page): Promise<void> {
   });
 }
 
-/** Delay every emulator reply, so a read stays in flight for the window. */
+/**
+ * Delay every emulator reply, so a read stays in flight for the window.
+ *
+ * The delay is a page timer: on the virtual clock it is an exact span of
+ * virtual time, ordered with every other timer.
+ */
 export async function setReplyDelay(page: Page, milliseconds: number): Promise<void> {
   await page.evaluate((delay: number) => {
     if (!window.__fakeSerial) {

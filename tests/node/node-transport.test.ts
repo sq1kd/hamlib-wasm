@@ -7,13 +7,14 @@
  * `set()` flag merging and the `Buffer` requirement are exercised as they are,
  * not as a double restates them.
  */
-import { expect, test } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 
 import { createHamlib } from 'hamlib-wasm/hamlib';
 import type { Hamlib, SerialTransport } from 'hamlib-wasm/hamlib';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
 import { FAKE_PATH, rigSerialPortModule } from './rig-serialport.js';
+import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
 
 /** The model id of a catalogue entry, or a failure that names what is missing. */
 function modelIdOf(hamlib: Hamlib, manufacturer: string, model: string): number {
@@ -228,9 +229,17 @@ test('surfaces a device that cannot be opened as a Hamlib error, not a crash', a
   }
 });
 
+afterEach(() => {
+  useRealTime();
+});
+
 /* A silent probe costs Hamlib's own open timeout, and this rig answers at the
- * third rate the model declares: the scan is slow on purpose. */
-test('finds the rate a rig answers at through the adapter', { timeout: 30_000 }, async () => {
+ * third rate the model declares.  On virtual time those timeouts cost exactly
+ * their budget of it and nothing on the wall clock, so no reply can lose a race
+ * against a loaded machine. */
+test('finds the rate a rig answers at through the adapter', async () => {
+  useVirtualTime();
+
   const module = rigSerialPortModule('yaesu-ft710');
   const transport = nodeSerialTransport({ serialport: module });
   const hamlib = await createHamlib({ transport });
@@ -238,7 +247,7 @@ test('finds the rate a rig answers at through the adapter', { timeout: 30_000 },
   try {
     const modelId = modelIdOf(hamlib, 'Yaesu', 'FT-710');
     const port = await transport.requestPort({ path: FAKE_PATH });
-    const baudRate = await hamlib.detectBaudRate({ modelId, port });
+    const baudRate = await settle(hamlib.detectBaudRate({ modelId, port }));
 
     /* The FT-710 emulator is silent at every rate but 38400 - the rate its own
      * menu is set to - so the search can only succeed by finding it, and the
@@ -246,6 +255,6 @@ test('finds the rate a rig answers at through the adapter', { timeout: 30_000 },
     expect(baudRate).toBe(38_400);
     expect(module.binding.port?.isOpen).toBe(false);
   } finally {
-    await hamlib.dispose();
+    await settle(hamlib.dispose());
   }
 });

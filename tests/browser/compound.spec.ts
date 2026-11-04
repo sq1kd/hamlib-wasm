@@ -9,7 +9,12 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, setReplyDelay } from './fixtures';
+import {
+  installFakeSerial,
+  installTestHelpers,
+  installVirtualClock,
+  setReplyDelay,
+} from './fixtures';
 import type { Captured } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
@@ -47,6 +52,7 @@ function expectRawWriteAfterReads(commands: readonly string[]): void {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);
@@ -248,7 +254,11 @@ test('a pure helper cannot re-enter the module while a write is suspended', asyn
        * helper re-enters the unwound module while the write is suspended. */
       const write = rig.raw.setFrequency(7_074_000);
 
-      await window.__testHelpers.sleep(50);
+      /* The write has reached the emulator once its frame is decoded; its
+       * verification reply is now 250 ms of virtual time away. */
+      await window.__virtualClock.until(
+        () => window.__fakeSerial.commands.includes('FA00007074000'),
+      );
 
       const narrow = rig.raw.passbandNarrow('USB');
 
@@ -325,13 +335,18 @@ test('a write issued while a watch tick holds the queue is not nested', async ({
      * write arrives from outside.  A compound body's own calls run directly;
      * an unrelated call must still be queued, not refused as "nested". */
     window.__fakeSerial.replyDelayMs = 250;
+    const base = window.__fakeSerial.commands.length;
     const stop = rig.watch({ intervalMs: 50, fields: ['frequency', 'levels'] });
-    await window.__testHelpers.sleep(120);
+
+    /* The first tick has put its read on the wire and waits for the reply. */
+    await window.__virtualClock.until(() => window.__fakeSerial.commands.length > base);
 
     const failure = await window.__testHelpers.capture(() => rig.setFrequency(7_074_000));
 
+    /* Fast replies again; a tick after the write publishes what it wrote.  The
+     * slowest one still in flight answers within 250 ms of virtual time. */
     window.__fakeSerial.replyDelayMs = 0;
-    await window.__testHelpers.sleep(600);
+    await window.__virtualClock.advance(600);
 
     const state = rig.state;
     stop();

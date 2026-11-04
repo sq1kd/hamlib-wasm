@@ -8,7 +8,12 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, readFakeSerial } from './fixtures';
+import {
+  installFakeSerial,
+  installTestHelpers,
+  installVirtualClock,
+  readFakeSerial,
+} from './fixtures';
 import type { Captured, HamlibErrorView } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
@@ -34,6 +39,7 @@ function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);

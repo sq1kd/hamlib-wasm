@@ -12,6 +12,7 @@ import {
   failNextPortOpen,
   installFakeSerial,
   installTestHelpers,
+  installVirtualClock,
   readFakeSerial,
   removeWebSerial,
 } from './fixtures';
@@ -55,6 +56,7 @@ function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);
@@ -376,10 +378,11 @@ test('reports a Hamlib timeout and recovers on the next read', async ({ page }) 
     const before = await rig.getFrequency();
 
     /* The emulator stops answering, so the next read runs into Hamlib's own
-     * timeout (TS-480 caps: 500 ms, 3 retries).  Wait out Hamlib's 500 ms
-     * cache window first, so the read is guaranteed to reach the wire. */
+     * timeout (TS-480 caps: 500 ms, 3 retries), on virtual time.  Let 600 ms
+     * of virtual time pass first: Hamlib's 500 ms cache of the frequency read
+     * above has then lapsed, so the read reaches the wire. */
     window.__fakeSerial.state.silent = true;
-    await window.__testHelpers.sleep(600);
+    await window.__virtualClock.advance(600);
     const silent = await window.__testHelpers.capture(() => rig.getFrequency());
     const connectedAfterTimeout = rig.connected;
 

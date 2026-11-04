@@ -14,6 +14,7 @@
    * without colliding with globals.d.ts and fixtures.ts, so the spec project
    * does not carry them; fixtures/compile.ts stays in. */
   "exclude": [
+    "fixtures/virtual-clock.ts",
     "fixtures/rigs.ts",
     "fixtures/fake-serial.ts",
     "fixtures/helpers.ts",

@@ -19,7 +19,12 @@ import {
   describeLineSettingsLimitation,
 } from 'hamlib-wasm';
 
-import { installFakeSerial, installTestHelpers, readFakeSerial } from './fixtures';
+import {
+  installFakeSerial,
+  installTestHelpers,
+  installVirtualClock,
+  readFakeSerial,
+} from './fixtures';
 import type { Captured, HamlibErrorView } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
@@ -57,6 +62,7 @@ function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);
@@ -272,11 +278,10 @@ test('reports a device that disappears mid-session', async ({ page }) => {
     const rig = await hamlib.open({ modelId: ts480.id, port });
     await rig.getFrequency();
 
-    /* Let Hamlib's level cache (500 ms) go stale, so the next read is a real
-     * transaction and not the cached answer from the healthy session. */
-    const elapsed = Promise.withResolvers<void>();
-    setTimeout(() => { elapsed.resolve(); }, 600);
-    await elapsed.promise;
+    /* Let 600 ms of virtual time pass: Hamlib's 500 ms cache has then lapsed,
+     * so the next read is a real transaction and not the cached answer from
+     * the healthy session. */
+    await window.__virtualClock.advance(600);
 
     /* The device is unplugged: the readable stream errors. */
     window.__fakeSerial.errorReadable('NetworkError');

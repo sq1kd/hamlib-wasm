@@ -11,6 +11,14 @@
  *    available;
  *  - a rejected command reaches the error display, because the panel callbacks
  *    discard the rejected promise.
+ *
+ * Every scenario runs on a manual virtual clock (fixtures/virtual-clock.ts):
+ * the panel polls on an interval, the backends sleep and time out inside
+ * Hamlib, and a parked connect has its call watchdog armed, so time must not
+ * run while the page merely waits for the spec.  After each action the clock
+ * runs, in deadline order, until the screen or the emulator shows the outcome
+ * - a timeout takes exactly its budget of virtual time, however loaded the
+ * machine is.
  */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -19,8 +27,11 @@ import {
   holdNextPortOpen,
   installFakeSerial,
   installTestHelpers,
+  installVirtualClock,
   readFakeSerial,
   releasePortOpen,
+  runClockUntilElement,
+  runClockUntilPortClosed,
   setEmulatorSilent,
   setWritesFailing,
   useRig,
@@ -30,6 +41,7 @@ import {
 const REACT_URL = 'http://127.0.0.1:4176/demo/';
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page, 'manual');
   await installFakeSerial(page);
   await installTestHelpers(page);
 });
@@ -48,6 +60,7 @@ test('a frequency-only model connects, shows unknown fields and disconnects', as
 
   await selectModel(page, 'FRG-100');
   await page.getByTestId('connect-button').click();
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '7,050,000' });
 
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected');
   await expect(page.getByTestId('frequency-display')).toHaveText('7,050,000');
@@ -70,14 +83,17 @@ test('a frequency-only model connects, shows unknown fields and disconnects', as
   /* The setter works even though the mode cannot be read back. */
   await page.getByTestId('frequency-input').fill('7100000');
   await page.getByTestId('frequency-set').click();
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '7,100,000' });
   await expect(page.getByTestId('frequency-display')).toHaveText('7,100,000');
 
   await page.getByTestId('disconnect-button').click();
+  await runClockUntilElement(page, { testId: 'connection-state', state: 'disconnected' });
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'disconnected');
 
   /* The panel discards the rejection of the close, so the port release is
    * observed rather than assumed. */
-  await expect.poll(async () => (await readFakeSerial(page)).isOpen).toBe(false);
+  await runClockUntilPortClosed(page);
+  expect((await readFakeSerial(page)).isOpen).toBe(false);
   expect((await readFakeSerial(page)).closeCount).toBe(1);
 });
 
@@ -98,20 +114,25 @@ test('a rig that never answers fails the acquisition loudly and releases the por
   await setEmulatorSilent(page, true);
   await releasePortOpen(page);
 
+  /* The open gives up after its retry budget of virtual time and hands the
+   * port back. */
+  await page.evaluate(() => window.__virtualClock.until(
+    () => window.__fakeSerial.closeCount === 1,
+  ));
+  await runClockUntilElement(page, { testId: 'error-message', contains: 'nothing arrived' });
+
   /* A port that opened onto nothing is not a connection: nothing is published,
    * the failure names what to check, and the port is given back rather than
    * held by a rig that cannot be used.  (A rig that goes quiet *after* it has
    * answered is the other case - see the timeout scenario, where the failure
    * stays telemetry and the rig stays owned.) */
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'disconnected');
-  await expect(page.getByTestId('error-message')).toContainText('nothing arrived', {
-    timeout: 30_000,
-  });
+  await expect(page.getByTestId('error-message')).toContainText('nothing arrived');
   await expect(page.getByTestId('error-message')).toContainText('baud');
   await expect(page.getByTestId('frequency-display')).toHaveText('---.---.---');
   await expect(page.getByTestId('disconnect-button')).toBeDisabled();
 
-  await expect.poll(async () => (await readFakeSerial(page)).isOpen).toBe(false);
+  expect((await readFakeSerial(page)).isOpen).toBe(false);
   expect((await readFakeSerial(page)).closeCount).toBe(1);
 });
 
@@ -122,6 +143,7 @@ test('a rejected command reaches the error display of the native backend', async
 
   await expect(page.getByTestId('model-select')).toBeEnabled();
   await page.getByTestId('connect-button').click();
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '14,074,000' });
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected');
   await expect(page.getByTestId('frequency-display')).toHaveText('14,074,000');
 
@@ -132,7 +154,8 @@ test('a rejected command reaches the error display of the native backend', async
 
   /* The panel callback discards the rejection, so the failure has to be in the
    * backend error state to be visible at all. */
-  await expect(page.getByTestId('error-message')).toContainText('setPtt', { timeout: 30_000 });
+  await runClockUntilElement(page, { testId: 'error-message', contains: 'setPtt' });
+  await expect(page.getByTestId('error-message')).toContainText('setPtt');
 
   /* Still owned: a rejected command is reported, not fatal. */
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected');
@@ -142,10 +165,13 @@ test('a rejected command reaches the error display of the native backend', async
    * not poison the panel queue used by that connection. */
   await setWritesFailing(page, false);
   await page.getByTestId('disconnect-button').click();
-  await expect.poll(async () => (await readFakeSerial(page)).isOpen).toBe(false);
+  await runClockUntilPortClosed(page);
+  expect((await readFakeSerial(page)).isOpen).toBe(false);
   await page.getByTestId('connect-button').click();
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '14,074,000' });
   await expect(page.getByTestId('frequency-display')).toHaveText('14,074,000');
   await page.getByTestId('frequency-input').fill('7074000');
   await page.getByTestId('frequency-set').click();
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '7,074,000' });
   await expect(page.getByTestId('frequency-display')).toHaveText('7,074,000');
 });

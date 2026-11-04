@@ -206,10 +206,41 @@ type CapturedView<T> = { ok: true; value: T } | { ok: false; error: HamlibErrorV
 interface TestHelpersView {
   describeError(value: unknown): HamlibErrorView;
   capture<T>(action: () => T | Promise<T>): Promise<CapturedView<Awaited<T>>>;
-  sleep(ms: number): Promise<void>;
+}
+
+/** How the virtual clock moves: by itself when the page drains, or on request. */
+type VirtualClockMode = 'auto' | 'manual';
+
+/** One pending virtual timer. */
+interface VirtualTimer {
+  id: number;
+  /** Virtual time it is due at. */
+  callAt: number;
+  /** Tie-break between timers due at the same instant: scheduling order. */
+  sequence: number;
+  /** Interval period, or 0 for a one-shot timeout. */
+  period: number;
+  callback: (...values: unknown[]) => void;
+  args: unknown[];
+}
+
+/** The control surface `window.__virtualClock` publishes. */
+interface VirtualClockView {
+  /** Current virtual time, in milliseconds (what `performance.now()` reports). */
+  now(): number;
+  mode: VirtualClockMode;
+  /** Timers and intervals still scheduled. */
+  pendingTimers(): number;
+  /** Let `ms` of virtual time pass, firing every timer due in it, in order. */
+  advance(ms: number): Promise<void>;
+  /** Fire timers, in order, until `promise` settles; resolve to its outcome. */
+  settle<T>(promise: Promise<T>): Promise<T>;
+  /** Fire timers, in order, until `predicate()` holds. */
+  until(predicate: () => boolean): Promise<void>;
 }
 
 interface Window {
+  __virtualClock: VirtualClockView;
   __fakeRigRegistry: FakeRigRegistry;
   __fakeSerial: FakeSerialControl;
   __hamlibHarness: HamlibHarnessView | undefined;

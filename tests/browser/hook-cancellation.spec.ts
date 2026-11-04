@@ -7,14 +7,25 @@
  * parks inside `SerialPort.open()`, so a spec can cancel an attempt that has
  * already reached the device and then assert both what the hooks published and
  * - through the emulator - that the port was released.
+ *
+ * The page runs on a *manual* virtual clock (fixtures/virtual-clock.ts): the
+ * spec drives it across several `page.evaluate()` calls while timers are
+ * armed - the probe polls on an interval, a parked connect has its watchdog
+ * running - so time moves only when a step says so.  Each step runs the clock
+ * until the promise it started settles, or until the emulator reaches the
+ * state it waits for; React's renders are timers too, so every step returns
+ * with the hooks' output committed, and is asserted directly.
  */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 import {
+  advanceClock,
   holdNextPortOpen,
   installFakeSerial,
   installTestHelpers,
+  installVirtualClock,
+  pendingTimers,
   readFakeSerial,
   releasePortOpen,
   waitForPortOpenPending,
@@ -23,16 +34,71 @@ import type { HookSnapshot } from '../harness/src/hook-harness-types';
 
 const HOOKS_URL = 'http://127.0.0.1:4174/hooks.html';
 
+/** The probe's poll interval (tests/harness/src/hooks.tsx). */
+const POLL_MS = 100;
+
 async function snapshot(page: Page): Promise<HookSnapshot> {
   return page.evaluate(() => window.__hookHarness.snapshot());
 }
 
-/** Wait for the provider to publish its catalogue. */
+/**
+ * Wait for the provider to publish its catalogue.
+ *
+ * Loading the module is network and compilation, not time, so this is a
+ * condition the driver polls for.
+ */
 async function waitForReady(page: Page): Promise<void> {
   await expect.poll(async () => (await snapshot(page)).ready, { timeout: 60_000 }).toBe(true);
 }
 
+/**
+ * Start a connect and leave it pending in the page, recording how it ends.
+ *
+ * Not awaited: a held one stays inside `SerialPort.open()`.
+ */
+async function startConnect(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.__pendingHookCall = window.__hookHarness.connect('TS-480').then(
+      () => 'resolved',
+      (error: unknown) => `rejected: ${String(error)}`,
+    );
+  });
+}
+
+/** Run the clock until the connect {@link startConnect} began has settled. */
+async function settleConnect(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const pending = window.__pendingHookCall;
+
+    if (pending === undefined) { throw new Error('no connect is pending'); }
+
+    return window.__virtualClock.settle(pending);
+  });
+}
+
+/** Connect for real and run one poll interval, so the probe holds a snapshot. */
+async function connectAndPoll(page: Page): Promise<void> {
+  await startConnect(page);
+  expect(await settleConnect(page)).toBe('resolved');
+  await advanceClock(page, POLL_MS);
+}
+
+async function disconnect(page: Page): Promise<void> {
+  await page.evaluate(() => window.__virtualClock.settle(window.__hookHarness.disconnect()));
+}
+
+/** Run the clock until the emulator has seen `count` port closes. */
+async function untilClosed(page: Page, count: number): Promise<void> {
+  await page.evaluate(
+    (closes: number) => window.__virtualClock.until(
+      () => window.__fakeSerial.closeCount === closes,
+    ),
+    count,
+  );
+}
+
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page, 'manual');
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HOOKS_URL);
@@ -41,29 +107,25 @@ test.beforeEach(async ({ page }) => {
 
 test('disconnect during a parked connect publishes nothing and releases the port', async ({ page }) => {
   await holdNextPortOpen(page);
-
-  /* Not awaited: the attempt is still inside `SerialPort.open()`. */
-  const parked = page.evaluate(() => window.__hookHarness.connect('TS-480'));
-
+  await startConnect(page);
   await waitForPortOpenPending(page);
   expect((await snapshot(page)).connecting).toBe(true);
 
-  await page.evaluate(() => window.__hookHarness.disconnect());
+  await disconnect(page);
   await releasePortOpen(page);
 
   /* The superseded attempt resolves without publishing. */
-  await parked;
+  expect(await settleConnect(page)).toBe('resolved');
 
-  await expect.poll(async () => (await snapshot(page)).connecting).toBe(false);
+  /* It did reach the device, and it really was closed again. */
+  await untilClosed(page, 1);
 
   const published = await snapshot(page);
 
+  expect(published.connecting).toBe(false);
   expect(published.connected).toBe(false);
   expect(published.error).toBeNull();
   expect(published.hasState).toBe(false);
-
-  /* It did reach the device, and it really was closed again. */
-  await expect.poll(async () => (await readFakeSerial(page)).closeCount).toBe(1);
 
   const transport = await readFakeSerial(page);
 
@@ -72,20 +134,18 @@ test('disconnect during a parked connect publishes nothing and releases the port
   expect(transport.closedWithLockedStreams).toBe(false);
 
   /* Nothing is wedged: a later connect still works. */
-  await page.evaluate(() => window.__hookHarness.connect('TS-480'));
-  await expect.poll(async () => (await snapshot(page)).connected).toBe(true);
-  await expect.poll(async () => (await snapshot(page)).hasState).toBe(true);
+  await connectAndPoll(page);
+  expect((await snapshot(page)).connected).toBe(true);
+  expect((await snapshot(page)).hasState).toBe(true);
 
-  await page.evaluate(() => window.__hookHarness.disconnect());
-  await expect.poll(async () => (await readFakeSerial(page)).isOpen).toBe(false);
+  await disconnect(page);
+  expect((await readFakeSerial(page)).isOpen).toBe(false);
   expect((await readFakeSerial(page)).closeCount).toBe(2);
 });
 
 test('removing the probe during a parked connect publishes nothing', async ({ page }) => {
   await holdNextPortOpen(page);
-
-  const parked = page.evaluate(() => window.__hookHarness.connect('TS-480'));
-
+  await startConnect(page);
   await waitForPortOpenPending(page);
   expect((await snapshot(page)).connecting).toBe(true);
 
@@ -93,9 +153,8 @@ test('removing the probe during a parked connect publishes nothing', async ({ pa
    * the part a StrictMode remount runs and then undoes. */
   await page.evaluate(() => { window.__hookHarness.setProbeVisible(false); });
   await releasePortOpen(page);
-  await parked;
-
-  await expect.poll(async () => (await readFakeSerial(page)).closeCount).toBe(1);
+  await settleConnect(page);
+  await untilClosed(page, 1);
 
   /* The snapshot published before the probe went away never held a rig. */
   const published = await page.evaluate(() => window.__hookHarness.lastPublished());
@@ -109,12 +168,12 @@ test('removing the probe during a parked connect publishes nothing', async ({ pa
 
   /* The probe can come back and connect for real. */
   await page.evaluate(() => { window.__hookHarness.setProbeVisible(true); });
-  await page.evaluate(() => window.__hookHarness.connect('TS-480'));
-  await expect.poll(async () => (await snapshot(page)).connected).toBe(true);
-  await expect.poll(async () => (await snapshot(page)).hasState).toBe(true);
+  await connectAndPoll(page);
+  expect((await snapshot(page)).connected).toBe(true);
+  expect((await snapshot(page)).hasState).toBe(true);
 
-  await page.evaluate(() => window.__hookHarness.disconnect());
-  await expect.poll(async () => (await readFakeSerial(page)).isOpen).toBe(false);
+  await disconnect(page);
+  expect((await readFakeSerial(page)).isOpen).toBe(false);
 });
 
 test('unmount during a parked connect leaves no owned rig', async ({ page }) => {
@@ -122,19 +181,12 @@ test('unmount during a parked connect leaves no owned rig', async ({ page }) => 
 
   /* The attempt may reject: unmounting also disposes the module it opened
    * against.  Either way it must not publish, and it must not leak the port. */
-  const parked = page.evaluate(
-    () => window.__hookHarness.connect('TS-480').then(
-      () => 'resolved',
-      (error: unknown) => `rejected: ${String(error)}`,
-    ),
-  );
-
+  await startConnect(page);
   await waitForPortOpenPending(page);
   await page.evaluate(() => window.__hookHarness.unmount());
   await releasePortOpen(page);
-  await parked;
-
-  await expect.poll(async () => (await readFakeSerial(page)).closeCount).toBe(1);
+  await settleConnect(page);
+  await untilClosed(page, 1);
 
   const transport = await readFakeSerial(page);
 
@@ -146,27 +198,31 @@ test('unmount during a parked connect leaves no owned rig', async ({ page }) => 
 
   await page.evaluate(() => { window.__hookHarness.mount(); });
   await waitForReady(page);
-  await page.evaluate(() => window.__hookHarness.connect('TS-480'));
-  await expect.poll(async () => (await snapshot(page)).connected).toBe(true);
-  await expect.poll(async () => (await snapshot(page)).hasState).toBe(true);
+  await connectAndPoll(page);
+  expect((await snapshot(page)).connected).toBe(true);
+  expect((await snapshot(page)).hasState).toBe(true);
 
-  await page.evaluate(() => window.__hookHarness.disconnect());
-  await expect.poll(async () => (await readFakeSerial(page)).isOpen).toBe(false);
+  await disconnect(page);
+  expect((await readFakeSerial(page)).isOpen).toBe(false);
 });
 
 test('a closed rig publishes no further state', async ({ page }) => {
-  await page.evaluate(() => window.__hookHarness.connect('TS-480'));
-  await expect.poll(async () => (await snapshot(page)).connected).toBe(true);
-  await expect.poll(async () => (await snapshot(page)).snapshots).toBeGreaterThan(0);
+  await connectAndPoll(page);
 
-  await page.evaluate(() => window.__hookHarness.disconnect());
-  await expect.poll(async () => (await readFakeSerial(page)).isOpen).toBe(false);
+  const polling = await snapshot(page);
+
+  expect(polling.connected).toBe(true);
+  expect(polling.snapshots).toBeGreaterThan(0);
+
+  await disconnect(page);
+  expect((await readFakeSerial(page)).isOpen).toBe(false);
 
   const frozen = await snapshot(page);
 
-  /* Well past five poll intervals: a scheduler that survived the close would
-   * keep publishing. */
-  await page.waitForTimeout(600);
+  /* Six poll intervals of virtual time: a scheduler that survived the close
+   * would have fired in them.  None is left to fire. */
+  expect(await pendingTimers(page)).toBe(0);
+  await advanceClock(page, 6 * POLL_MS);
 
   const after = await snapshot(page);
 

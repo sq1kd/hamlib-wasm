@@ -6,11 +6,19 @@
  * over closed instead of publishing a live wrapper, and the port is released.
  *
  * The fixture parks `SerialPort.open()` behind a gate, so the race is decided
- * by explicit release rather than by a sleep.
+ * by explicit release rather than by a sleep, and the spec waits for the park
+ * itself on the virtual clock: whatever Hamlib sleeps through before it reaches
+ * the port fires in order, and nothing after.
  */
 import { expect, test } from '@playwright/test';
 
-import { holdNextPortOpen, installFakeSerial, installTestHelpers, readFakeSerial } from './fixtures';
+import {
+  holdNextPortOpen,
+  installFakeSerial,
+  installTestHelpers,
+  installVirtualClock,
+  readFakeSerial,
+} from './fixtures';
 import type { Captured } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
@@ -24,6 +32,7 @@ function expectOk<T>(captured: Captured<T>): T {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);
@@ -43,9 +52,7 @@ test('disposal during a parked open publishes nothing and releases the port', as
       () => hamlib.open({ modelId: model.id, baudRate: model.serialRateMax }),
     );
 
-    while (!window.__fakeSerial.openPending) {
-      await window.__testHelpers.sleep(5);
-    }
+    await window.__virtualClock.until(() => window.__fakeSerial.openPending);
 
     /* Disposal is accepted while the open is parked; releasing the port lets
      * that open finish and be handed over closed. */
@@ -103,9 +110,7 @@ test('a later open after a cancelled one still works', async ({ page }) => {
       () => hamlib.open({ modelId: model.id, baudRate: model.serialRateMax }),
     );
 
-    while (!window.__fakeSerial.openPending) {
-      await window.__testHelpers.sleep(5);
-    }
+    await window.__virtualClock.until(() => window.__fakeSerial.openPending);
 
     const disposal = window.__testHelpers.capture(() => hamlib.dispose());
 

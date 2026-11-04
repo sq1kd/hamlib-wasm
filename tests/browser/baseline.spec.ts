@@ -13,6 +13,12 @@
  * the transport wiring, the facade or the build must not move the catalogue or
  * the wire traffic.
  *
+ * The page runs on the virtual clock (fixtures/virtual-clock.ts), so whether
+ * Hamlib's 500 ms cache is still fresh at any step depends only on the sleeps
+ * Hamlib itself asks for - never on how fast the machine runs the transaction.
+ * The host reference (tests/native/host-trace.c, `mise run compare-native`)
+ * runs under the same rule.
+ *
  * Re-record with:
  *   HAMLIB_WASM_RECORD_BASELINE=1 npx playwright test tests/browser/baseline.spec.ts
  */
@@ -23,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers } from './fixtures';
+import { installFakeSerial, installTestHelpers, installVirtualClock } from './fixtures';
 import {
   UPSTREAM_MANIFEST,
   UPSTREAM_VERSION,
@@ -95,6 +101,7 @@ test('the built package provenance matches the release manifest', () => {
 });
 
 test('matches the recorded upstream baseline', async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);

@@ -8,7 +8,7 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers } from './fixtures';
+import { installFakeSerial, installTestHelpers, installVirtualClock } from './fixtures';
 import type { Captured } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
@@ -24,6 +24,7 @@ function expectOk<T>(captured: Captured<T>): T {
 }
 
 test.beforeEach(async ({ page }) => {
+  await installVirtualClock(page);
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);
@@ -86,17 +87,18 @@ test('a level watch reads only the level, a frequency watch reads none', async (
     /* Meter-only watch: one SM0 read per tick, nothing else. */
     const base = window.__fakeSerial.commands.length;
     const stopMeter = rig.watch({ intervalMs: 40, fields: ['levels'], levels: ['STRENGTH'] });
-    await window.__testHelpers.sleep(260);
+    await window.__virtualClock.advance(260);
     stopMeter();
     const meterCommands = window.__fakeSerial.commands.slice(base);
 
-    /* Frequency watch with no levels: no SM0 read at all.  Wait out Hamlib's
-     * 500 ms cache of the frequency the open read first, or a fast engine
-     * finishes the watch inside that window and no FA reaches the wire. */
-    await window.__testHelpers.sleep(600);
+    /* Frequency watch with no levels: no SM0 read at all.  It starts 260 ms
+     * after the open read the frequency, inside Hamlib's 500 ms cache window,
+     * and runs 600 ms of virtual time - so the window lapses during the watch,
+     * at the same tick on every run, and exactly one read reaches the wire
+     * before the cache it refills serves the rest. */
     const frequencyBase = window.__fakeSerial.commands.length;
     const stopFrequency = rig.watch({ intervalMs: 40, fields: ['frequency'] });
-    await window.__testHelpers.sleep(260);
+    await window.__virtualClock.advance(600);
     stopFrequency();
     const frequencyCommands = window.__fakeSerial.commands.slice(frequencyBase);
 
@@ -108,12 +110,9 @@ test('a level watch reads only the level, a frequency watch reads none', async (
 
   const result = expectOk(captured);
 
-  expect(result.meterCommands.length).toBeGreaterThan(0);
-  expect(result.meterCommands.every((command) => command.startsWith('SM'))).toBe(true);
-
-  expect(result.frequencyCommands.length).toBeGreaterThan(0);
-  expect(result.frequencyCommands.some((command) => command === 'FA')).toBe(true);
-  expect(result.frequencyCommands.some((command) => command.startsWith('SM'))).toBe(false);
+  /* Ticks at 0, 40, ..., 240: one meter read each, and nothing else. */
+  expect(result.meterCommands).toEqual(Array.from({ length: 7 }, () => 'SM0'));
+  expect(result.frequencyCommands).toEqual(['FA']);
 });
 
 test('watching levels on an instance with none configured is refused', async ({ page }) => {
