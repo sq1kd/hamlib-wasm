@@ -25,39 +25,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jdx/mise-action@v2
+      - uses: ./.github/actions/setup
         with:
-          install: true
+          hamlib: 'true'
+          playwright: 'true'
 
-      - name: Install locked dependencies
-        run: npm ci
-
-      # Keep these keys in sync with .github/workflows/ci.yml so a release
-      # reuses the artifacts CI already validated.
-      - name: Restore cached Hamlib sources and downloads
-        uses: actions/cache@v4
-        with:
-          path: .cache/hamlib
-          key: hamlib-${{ runner.os }}-${{ hashFiles('packages/hamlib-wasm/hamlib.config.yaml', 'mise.toml', 'packages/hamlib-wasm/native/**', 'packages/hamlib-wasm/build/**') }}
-          restore-keys: |
-            hamlib-${{ runner.os }}-
-
-      - name: Restore Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
-
-      - name: Install Playwright Chromium on a cache miss
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      # check-release is the release gate defined in mise.toml: check +
-      # verify-package + audit-backends.  Keep release logic in mise tasks
-      # rather than duplicating steps here.
+      # The same gate CI runs: check + verify-package + audit-backends.
       - name: Run the release gate
         run: mise run check-release
 
@@ -85,12 +58,7 @@ jobs:
       # for Trusted Publishing.  Do not add a separate Node setup action or a
       # registry URL: their generated .npmrc conflicts with npm OIDC
       # authentication.
-      - uses: jdx/mise-action@v2
-        with:
-          install: true
-
-      - name: Install locked dependencies
-        run: npm ci
+      - uses: ./.github/actions/setup
 
       - name: Download the verified package build
         uses: actions/download-artifact@v4
@@ -99,6 +67,6 @@ jobs:
           path: packages/hamlib-wasm/dist
 
       - name: Publish and create the GitHub Release
-        run: node scripts/run-release.mjs
+        run: mise run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

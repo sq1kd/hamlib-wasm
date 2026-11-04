@@ -1,51 +1,68 @@
 # SPDX-License-Identifier: MIT
+#
+# Every job runs a mise task, so CI checks exactly what `mise run <task>`
+# checks locally.
 name: ci
 
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+  # Weekly, so the clean-room relink notices toolchain or upstream drift even
+  # when nothing is merged.
+  schedule:
+    - cron: '0 4 * * 1'
 
 permissions:
   contents: read
 
 jobs:
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Lint the pull request's commit messages
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: mise run lint-commits -- --from "$BASE" --to "$HEAD"
+
+  # check-release = check (lint, docs, typecheck, unit and browser tests)
+  # + verify-package (the packed tarball and source kit) + audit-backends.
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jdx/mise-action@v2
+      - uses: ./.github/actions/setup
         with:
-          install: true
+          hamlib: 'true'
+          playwright: 'true'
 
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Run the release gate
+        run: mise run check-release
 
-      # The native fetch/build is the expensive part.  The key covers every
-      # input that can change the downloaded Hamlib tree or its compiled
-      # artifacts; a partial restore is still useful after an unrelated edit.
-      - name: Restore cached Hamlib sources and downloads
-        uses: actions/cache@v4
+  # The clean-room relink recompiles Hamlib from the packed source kit, so it
+  # stays off pull requests.
+  relink:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
         with:
-          path: .cache/hamlib
-          key: hamlib-${{ runner.os }}-${{ hashFiles('packages/hamlib-wasm/hamlib.config.yaml', 'mise.toml', 'packages/hamlib-wasm/native/**', 'packages/hamlib-wasm/build/**') }}
-          restore-keys: |
-            hamlib-${{ runner.os }}-
+          hamlib: 'true'
 
-      - name: Restore Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
-
-      - name: Install Playwright Chromium on a cache miss
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Run checks
-        run: mise run check
+      - name: Verify the package and relink it from the packed tarball
+        run: mise run verify-release
