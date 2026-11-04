@@ -1,0 +1,34 @@
+---
+title: Live demo
+description: Drive a real radio from this page over Web Serial.
+tableOfContents: false
+---
+
+import LiveDemo from '../../components/LiveDemo';
+
+Connect a radio over USB (or through a USB-to-serial adapter), pick its model
+and press **Grant port & connect**. The browser asks which port to use; the page
+never sees ports you do not grant.
+
+The panel can be driven two ways over the **same** rig and the same Hamlib
+module:
+
+- **Easy** - `rig.setMode(mode)`, `rig.setPassband('narrow')` and a
+  `useRigState` poll that reads one snapshot per tick;
+- **1:1** - `rig.raw`, the underlying `Rig`: `getFrequency()`, `getMode()` and
+  `getPtt()` polled by hand, and `setMode(mode, width)` with an explicit width
+  from `passbandNormal()`.
+
+The call log under the panel shows exactly which library calls each one makes.
+
+:::note[Requirements]
+A desktop Chromium-based browser or Firefox 151+, and a radio. Without Web
+Serial the demo still loads and lists the model catalogue, but cannot connect.
+The demo writes to the radio only when you press a control - including PTT, so
+mind your antenna.
+:::
+
+The demo is not loaded with this page. The button below fetches the Hamlib
+WebAssembly module and its loader on demand.
+
+<LiveDemo client:only="react" />

@@ -1,0 +1,31 @@
+{
+  "name": "hamlib-wasm-site",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Documentation website and live demo for hamlib-wasm (Astro Starlight)",
+  "scripts": {
+    "dev": "astro dev --port 5176 --ignore-lock",
+    "build": "astro check && astro build",
+    "preview": "astro preview --port 4176 --ignore-lock",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/react": "7.1.2",
+    "@astrojs/starlight": "0.42.9",
+    "astro": "7.4.5",
+    "hamlib-wasm": "*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "starlight-typedoc": "0.23.2",
+    "typedoc": "0.28.20",
+    "typedoc-plugin-markdown": "4.14.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}

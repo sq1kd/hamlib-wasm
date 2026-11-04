@@ -1,0 +1,34 @@
+/* The live demo's loader: everything else on the site is Starlight's own. */
+.live-demo-loader {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px dashed var(--sl-color-hairline-light);
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+.live-demo-loader button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 1.2rem;
+  border: 0;
+  border-radius: 999rem;
+  color: var(--sl-color-black);
+  background: var(--sl-color-accent-high);
+  cursor: pointer;
+}
+
+.live-demo-loader button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.live-demo-loader p {
+  margin: 0.75rem 0 0;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+}
+
+.live-demo-loader .live-demo-error {
+  color: var(--sl-color-red);
+}

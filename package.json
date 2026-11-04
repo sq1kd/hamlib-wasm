@@ -10,7 +10,8 @@
     "examples/*",
     "tests/harness",
     "tests/node",
-    "tests/hardware"
+    "tests/hardware",
+    "site"
   ],
   "devDependencies": {
     "@biomejs/biome": "2.6.4",

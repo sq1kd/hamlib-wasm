@@ -1,0 +1,36 @@
+---
+title: hamlib-wasm
+description: Hamlib CAT control compiled to WebAssembly - Web Serial in the browser, serialport in Node and Electron.
+template: splash
+hero:
+  tagline: Hamlib's own CAT backends, compiled to WebAssembly. Talk to your radio from a web page over Web Serial, or from Node and Electron over serialport - no native helper to install.
+  actions:
+    - text: Get started
+      link: getting-started/
+      icon: right-arrow
+    - text: Try the live demo
+      link: demo/
+      icon: rocket
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <Card title="Upstream Hamlib, not a port" icon="approve-check">
+    The rig backends are the pinned upstream Hamlib release compiled with
+    Emscripten. A model behaves the way `rigctl` drives it.
+  </Card>
+  <Card title="Two API surfaces" icon="puzzle">
+    An easy surface with snapshots, events and booleans, and a 1:1 surface with
+    a typed method per upstream Hamlib call - on the same rig.
+  </Card>
+  <Card title="Browser, Node and Electron" icon="laptop">
+    Web Serial in desktop Chromium-based browsers and Firefox 151+; the
+    `serialport` package in Node and an Electron main process.
+  </Card>
+  <Card title="React hooks" icon="seti:react">
+    A provider and hooks that own the module, the rig and the polling, and get
+    StrictMode and unmount races right.
+  </Card>
+</CardGrid>

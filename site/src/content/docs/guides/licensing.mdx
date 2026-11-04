@@ -1,0 +1,50 @@
+---
+title: Licensing
+description: MIT wrapper, LGPL-2.1-or-later Hamlib inside the Wasm, and what that means when you ship it.
+---
+
+import { repositoryFile, served } from '../../../links';
+
+`hamlib-wasm` is not MIT-only:
+
+- The JavaScript/TypeScript wrapper is **MIT**.
+- `hamlib-wasm.wasm` embeds **Hamlib**, licensed **LGPL-2.1-or-later**,
+  including this project's small patch to it.
+
+## Using it in your application
+
+Using the package does not by itself require your application's own source to
+be published under the LGPL. If you **distribute** the Wasm binary - a deployed
+website counts, as does an Electron app - you must:
+
+- keep the Hamlib copyright and license notices available alongside it;
+- provide the corresponding source and the materials needed to relink a
+  modified Hamlib, through a mechanism the LGPL permits;
+- not prohibit, in your own terms, modification for the user's own use or the
+  reverse engineering needed to debug such modifications (LGPL-2.1 section 6).
+
+A bundler that emits a hashed `.wasm` asset does not copy these materials for
+you. The package ships them: `hamlib-wasm/third_party/*` contains the notices,
+the exact source manifest and `corresponding-source.tar.gz`, the complete
+corresponding-source and relink kit.
+
+## Relinking
+
+The relink kit rebuilds `hamlib-wasm.wasm` from the pinned Hamlib release plus
+the patch, with the same pinned Emscripten toolchain, so a modified Hamlib can
+be swapped into an application that uses this package. The steps are in
+REBUILDING.md.
+
+## The documents
+
+- <a href={repositoryFile('packages/hamlib-wasm/LICENSE.md', 'licensing/LICENSE.md')}>LICENSE.md</a> - the package's license terms
+- <a href={repositoryFile('packages/hamlib-wasm/THIRD_PARTY_NOTICES.md', 'licensing/THIRD_PARTY_NOTICES.md')}>THIRD_PARTY_NOTICES.md</a> - Hamlib's notices and provenance
+- <a href={repositoryFile('packages/hamlib-wasm/REBUILDING.md', 'licensing/REBUILDING.md')}>REBUILDING.md</a> - how to rebuild and relink the Wasm
+
+## This site
+
+The [live demo](../../demo/) serves `hamlib-wasm.wasm`, so this site carries the
+same materials, served from its `licensing/` directory: the
+<a href={served('licensing/THIRD_PARTY_NOTICES.md')}>notices</a>, the
+<a href={served('licensing/third_party/hamlib/COPYING.LIB')}>LGPL text</a> and the
+<a href={served('licensing/third_party/hamlib/corresponding-source.tar.gz')}>corresponding-source kit</a>.
