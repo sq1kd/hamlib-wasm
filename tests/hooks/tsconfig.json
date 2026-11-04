@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "../../.cache/tsc/tests-hooks.tsbuildinfo",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",

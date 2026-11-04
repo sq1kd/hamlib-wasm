@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "../../.cache/tsc/example-basic.tsbuildinfo",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,

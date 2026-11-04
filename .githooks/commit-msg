@@ -1,8 +1,4 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
-#
-# Enable with: git config core.hooksPath .githooks
-# The pinned commitlint devDependency must already be installed.
-set -eu
-
+# Enabled by `mise run bootstrap` (git config core.hooksPath .githooks).
 exec npx --no-install commitlint --edit "$1"

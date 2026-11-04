@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "tsBuildInfoFile": "../../../.cache/tsc/tests-browser-fixtures.tsbuildinfo",
     "target": "ES2022",
     "module": "none",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],

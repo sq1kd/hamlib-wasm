@@ -8,49 +8,60 @@
  * its old name in prose, and a moved directory left a Layout table pointing at
  * a missing path.  Both are mechanical to check:
  *
- *   1. every `mise run <task>` in the READMEs and `docs/*.md` is a
- *      `[tasks.<name>]` heading in `mise.toml`;
+ *   1. every `mise run <task>` in the READMEs, RELEASING.md and the
+ *      REBUILDING template is a task (or alias) this repository declares;
  *   2. every relative path in the root README's Layout table exists.
+ *
+ * The task list comes from `mise tasks ls --json`, so `[tasks.*]` tables and
+ * file tasks are covered alike, and the user's global tasks are not.
  *
  * This deliberately does not edit the docs.  It lists the mismatches and
  * exits non-zero so the author fixes the text where it is wrong.
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-import { log } from './exec.ts';
+import { capture, log } from './exec.ts';
 import { REPO_ROOT } from './paths.ts';
 
 const SCOPE = 'docs-check';
 const MISE_RUN = /\bmise run ([A-Za-z0-9][A-Za-z0-9_.:+-]*)/g;
-const TASK_HEADING = /^\[tasks\.([^\]]+)\]\s*$/gm;
 const INLINE_CODE = /`([^`\n]+)`/g;
 
-/** Every task name declared as a `[tasks.<name>]` heading in mise.toml. */
+interface MiseTask {
+  readonly name: string;
+  readonly aliases: readonly string[];
+  readonly source: string;
+}
+
+/**
+ * Every task name and alias declared inside this repository.  mise also
+ * merges tasks from parent directories and the user's global config; those
+ * are not something the docs may promise.
+ */
 function miseTasks(): ReadonlySet<string> {
-  const text = readFileSync(path.join(REPO_ROOT, 'mise.toml'), 'utf8');
+  const tasks = JSON.parse(
+    capture(SCOPE, 'mise', ['tasks', 'ls', '--json', '--hidden'], { cwd: REPO_ROOT }),
+  ) as MiseTask[];
 
   return new Set(
-    [...text.matchAll(TASK_HEADING)]
-      .map((match) => (match[1] as string).replace(/^"|"$/g, '')),
+    tasks
+      .filter((task) => !path.relative(REPO_ROOT, task.source).startsWith('..'))
+      .flatMap((task) => [task.name, ...task.aliases]),
   );
 }
 
-/** Documentation that promises tasks and paths. */
-function documentation(): readonly string[] {
-  const files = [
-    'README.md',
-    'RELEASING.md',
-    path.join('packages', 'hamlib-wasm', 'README.md'),
-  ];
-
-  for (const name of readdirSync(path.join(REPO_ROOT, 'docs')).sort()) {
-    if (name.endsWith('.md')) { files.push(path.join('docs', name)); }
-  }
-
-  return files;
-}
+/**
+ * Documentation that promises tasks: the READMEs, the release guide and the
+ * REBUILDING template the package build renders into the npm tarball.
+ */
+const DOCUMENTATION: readonly string[] = [
+  'README.md',
+  'RELEASING.md',
+  path.join('packages', 'hamlib-wasm', 'README.md'),
+  path.join('packages', 'hamlib-wasm', 'build', 'REBUILDING.md.in'),
+];
 
 /** `mise run` names mentioned in one document, deduplicated. */
 function mentionedTasks(text: string): readonly string[] {
@@ -104,12 +115,12 @@ function main(): void {
   const tasks = miseTasks();
   const mismatches: string[] = [];
 
-  for (const relative of documentation()) {
+  for (const relative of DOCUMENTATION) {
     const text = readFileSync(path.join(REPO_ROOT, relative), 'utf8');
 
     for (const task of mentionedTasks(text)) {
       if (!tasks.has(task)) {
-        mismatches.push(`${relative}: mise task "${task}" is not declared in mise.toml`);
+        mismatches.push(`${relative}: mise task "${task}" is not a declared mise task`);
       }
     }
   }

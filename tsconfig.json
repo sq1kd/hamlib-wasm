@@ -1,0 +1,26 @@
+{
+  /* Solution file: `tsc -b --noEmit` (mise run typecheck) checks every project
+   * below in one invocation.  Each project keeps its own options; build info
+   * goes to .cache/tsc, so nothing is written next to the sources.
+   *
+   * packages/hamlib-wasm/native/tsconfig.library.json is deliberately absent:
+   * it ships in the relink kit, and build-native (a dependency of typecheck)
+   * already compiles it with noEmitOnError. */
+  "files": [],
+  "references": [
+    { "path": "packages/hamlib-codegen" },
+    { "path": "packages/hamlib-wasm" },
+    { "path": "packages/hamlib-wasm/tsconfig.build.json" },
+    { "path": "examples/basic" },
+    { "path": "examples/react" },
+    { "path": "examples/node" },
+    { "path": "tests/codegen" },
+    { "path": "tests/harness" },
+    { "path": "tests/hooks" },
+    { "path": "tests/browser" },
+    { "path": "tests/browser/fixtures" },
+    { "path": "tests/consumer" },
+    { "path": "tests/node" },
+    { "path": "tests/hardware" }
+  ]
+}

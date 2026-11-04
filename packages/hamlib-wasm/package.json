@@ -61,14 +61,6 @@
       "optional": true
     }
   },
-  "scripts": {
-    "build": "node build/package.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify-package": "node build/verify-package.ts",
-    "verify-relink": "node build/verify-relink.ts",
-    "verify-release": "node build/verify-release.ts",
-    "release-bump": "node build/release-bump.ts"
-  },
   "engines": {
     "node": ">=24"
   },

@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "../../.cache/tsc/example-react.tsbuildinfo",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,

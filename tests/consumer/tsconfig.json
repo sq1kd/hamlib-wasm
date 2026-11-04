@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "../../.cache/tsc/tests-consumer.tsbuildinfo",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "noEmit": true,

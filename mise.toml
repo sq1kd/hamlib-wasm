@@ -7,201 +7,203 @@ emsdk = "6.0.10"
 [env]
 _.path = ["{{config_root}}/node_modules/.bin"]
 
+# Every task runs from the repository root.  A task named in several places of
+# one `mise run` graph runs once, so composite tasks are plain `depends` lists.
+# `wait_for` orders a task after another only when both are in the same run:
+# `refresh` regenerates the bindings before anything reads them.
+
+# --- Setup -------------------------------------------------------------------
+
 [tasks.bootstrap]
-description = "Install the pinned toolchain, locked dependencies, Playwright Chromium and the commit hook"
-run = '''
-npm ci
-npx playwright install chromium
-git config core.hooksPath .githooks
-'''
+description = "Install the locked dependencies, Playwright Chromium and the commit hook"
+run = [
+  "npm ci",
+  "playwright install chromium",
+  "git config core.hooksPath .githooks",
+]
+
+# --- Native build and generated bindings -------------------------------------
 
 [tasks.fetch-native]
 description = "Fetch, verify, patch and extract the pinned Hamlib release"
-run = "npm run fetch-native"
-
-[tasks.build-native]
-description = "Compile the fetched Hamlib release to WebAssembly"
-depends = ["fetch-native"]
-run = "npm run build-native"
+run = "node packages/hamlib-wasm/build/fetch-native.ts"
 
 [tasks.generate]
 description = "Regenerate the binding surface from hamlib.config.yaml and the upstream AST"
 depends = ["fetch-native"]
-run = "npm run generate"
-
-[tasks.build-package]
-description = "Compile the public TypeScript package and render licensing artifacts"
-depends = ["build-native"]
-run = "npm run build-package"
-
-[tasks.build-example]
-description = "Build the Vanilla TypeScript/Vite example"
-depends = ["build-package"]
-run = "npm run build-example"
-
-[tasks.build-react]
-description = "Build the React landing page and demo application"
-depends = ["build-package"]
-run = "npm run build-react"
-
-[tasks.build-harness]
-description = "Build the browser test harness app"
-depends = ["build-package"]
-run = "npm run build-harness"
-
-[tasks.example-node]
-description = "List the serial ports this machine reports, through the Node entry point"
-depends = ["build-package"]
-run = "npm run example-node"
-
-[tasks.build]
-description = "Full reproducible build: native Wasm, package, examples"
-depends = ["build-example", "build-react"]
-run = "true"
-
-[tasks.typecheck-consumer]
-description = "Pack the package and install the tarball into the consumer fixture"
-depends = ["build-package"]
-run = "npm run typecheck-consumer"
-
-[tasks.typecheck-workspace]
-description = "Typecheck every project from the repository root"
-depends = ["typecheck-consumer"]
-run = "npm run typecheck-workspace"
-
-[tasks.typecheck]
-description = "Typecheck every workspace project, prove the generated bindings are current, and check the packed consumer"
-depends = ["check-generated", "typecheck-workspace"]
-run = "true"
-
-[tasks.test-hooks]
-description = "Run the DOM-less React hook unit tests against a stubbed package boundary"
-depends = ["build-package"]
-run = "npm run test-hooks"
-
-[tasks.test-node]
-description = "Run the Node transport checks against the built package"
-depends = ["build-package"]
-run = "npm run test-node"
-
-[tasks.test-codegen]
-description = "Run the hamlib-codegen unit tests against synthetic clang ASTs and a committed Embind declaration"
-run = "npm run test-codegen"
-
-[tasks.docs-check]
-description = "Fail when README/docs name a mise task or layout path that does not exist"
-run = "npm run docs-check"
+run = "node packages/hamlib-wasm/build/codegen.ts --update"
 
 [tasks.check-generated]
 description = "Fail when the committed generated bindings differ from what the generator emits"
 depends = ["fetch-native"]
-run = "npm run check-generated"
+wait_for = ["generate"]
+run = "node packages/hamlib-wasm/build/codegen.ts --check"
 
-[tasks.lint]
-description = "Lint every source with Biome (formatter intentionally disabled)"
-run = "npm run lint"
-
-[tasks.test-hardware]
-description = "Run the read-only checks against a real rig (HAMLIB_WASM_HARDWARE_DEVICE=qmx|ft-710, or HAMLIB_WASM_HARDWARE_PORT=<path>; HAMLIB_WASM_HARDWARE_WRITE=1 adds the frequency round-trip)"
-depends = ["build-package"]
-run = "npm run test-hardware"
-
-[tasks.test]
-description = "Run the hook and Node transport unit tests, the transport/lifecycle checks and the Playwright scenarios"
-depends = ["build-example", "build-react", "build-harness", "test-hooks", "test-node", "test-codegen"]
-run = "npx playwright test"
-
-[tasks.test-browser]
-description = "Run only the example-driven Playwright browser scenarios"
-depends = ["build-example", "build-harness", "build-react"]
-run = "npm run test-browser"
-
-[tasks.baseline-record]
-description = "Re-record the upstream behavioural baseline from the current build"
-depends = ["build-example", "build-harness", "build-react"]
-run = "npm run baseline-record"
+[tasks.build-native]
+description = "Compile the fetched Hamlib release to WebAssembly"
+depends = ["fetch-native"]
+wait_for = ["generate"]
+run = "node packages/hamlib-wasm/build/compile-native.ts"
 
 [tasks.audit-backends]
 description = "Audit the pinned backends for threads, unwritable line settings and port-layer bypasses"
 depends = ["fetch-native"]
-run = "npm run audit-backends"
+run = "node packages/hamlib-wasm/build/audit-backends.ts"
 
 [tasks.compare-native]
 description = "Build the pinned release for the host and compare a representative transaction with the browser baseline"
-run = "npm run compare-native"
-
-[tasks.check]
-description = "The local gate before pushing: lint, typecheck, generated check, unit tests and the browser suite"
-run = '''
-# Sequential on purpose: `typecheck` packs the package and `test` rebuilds it,
-# so running them in parallel would race over `dist`.
-mise run lint
-mise run docs-check
-mise run typecheck
-mise run test
-'''
-
-[tasks.check-release]
-description = "Everything a publish needs: check, the packed tarball audit and the backend audit"
-run = '''
-mise run check
-mise run verify-package
-mise run audit-backends
-'''
-
-[tasks.release-guard]
-description = "Fail when a Hamlib release-block change is not a feat/fix commit"
-run = "npm run release-guard"
-
-[tasks.release-dry-run]
-description = "Report the next semantic-release version without publishing (needs GITHUB_TOKEN and a remote)"
-run = "npm run release-dry-run"
-
-[tasks.refresh]
-description = "Upstream refresh: generate, build, typecheck, browser checks and the packed-consumer check"
-depends = ["fetch-native"]
-run = '''
-# Sequential on purpose: `generate` writes the files the build and the
-# generated-binding check read, and mise runs independent dependencies in
-# parallel.
-mise run generate
-mise run build
-mise run build-harness
-mise run audit-backends
-mise run typecheck
-mise run test
-'''
-
-[tasks.pack-package]
-description = "Verify the published package contents"
-depends = ["build-package"]
-run = "npm run pack-package"
-
-[tasks.verify-package]
-description = "Verify the actual npm tarball, notices, hashes, link inputs and source kit"
-depends = ["build-package"]
-run = "npm run verify-package"
-
-[tasks.verify-relink]
-description = "Rebuild the packed package with modified Hamlib and exercise it through the loader"
-depends = ["build-package"]
-run = "npm run verify-relink"
-
-[tasks.verify-release]
-description = "Run package and relink verification concurrently against one packed tarball"
-depends = ["build-package"]
-run = "npm run verify-release"
+run = "node packages/hamlib-wasm/build/compare-native.ts"
 
 [tasks.release-bump]
-description = "Update the pinned Hamlib release in hamlib.config.yaml"
-run = "npm run release-bump --"
+description = "Update the pinned Hamlib release in hamlib.config.yaml (mise run release-bump -- --version ...)"
+run = "node packages/hamlib-wasm/build/release-bump.ts"
+
+# --- Package and apps --------------------------------------------------------
+
+[tasks.build-package]
+description = "Compile the public TypeScript package and render licensing artifacts"
+depends = ["build-native"]
+run = "node packages/hamlib-wasm/build/package.ts"
+
+[tasks.build-example]
+description = "Build the Vanilla TypeScript/Vite example"
+depends = ["build-package"]
+run = "npm run build --workspace examples/basic"
+
+[tasks.build-react]
+description = "Build the React landing page and demo application"
+depends = ["build-package"]
+run = "npm run build --workspace examples/react"
+
+[tasks.build-harness]
+description = "Build the browser test harness app"
+depends = ["build-package"]
+run = "npm run build --workspace tests/harness"
+
+[tasks.build]
+description = "Full reproducible build: native Wasm, package, examples and the test harness"
+depends = ["build-example", "build-react", "build-harness"]
 
 [tasks.dev]
 description = "Run the Vanilla example dev server on a localhost URL"
 depends = ["build-package"]
-run = "npm run dev"
+run = "npm run dev --workspace examples/basic"
 
 [tasks.dev-react]
 description = "Run the React landing page dev server on a localhost URL"
 depends = ["build-package"]
-run = "npm run dev-react"
+run = "npm run dev --workspace examples/react"
+
+[tasks.example-node]
+description = "List the serial ports this machine reports, through the Node entry point"
+depends = ["build-package"]
+run = "node examples/node/src/main.ts --list"
+
+# --- Static checks -----------------------------------------------------------
+
+[tasks.lint]
+description = "Lint every source with Biome (formatter intentionally disabled)"
+run = "biome lint ."
+
+[tasks.lint-commits]
+description = "Lint commit messages with commitlint (mise run lint-commits -- --from <rev>)"
+run = "commitlint --verbose"
+
+[tasks.docs-check]
+description = "Fail when README/docs name a mise task or layout path that does not exist"
+run = "node packages/hamlib-wasm/build/docs-check.ts"
+
+[tasks.typecheck-consumer]
+description = "Pack the package and install the tarball into the consumer fixture"
+depends = ["build-package"]
+run = "node packages/hamlib-wasm/build/typecheck-consumer.ts"
+
+[tasks.typecheck]
+description = "Typecheck every project (tsc -b), prove the generated bindings are current, and check the packed consumer"
+depends = ["check-generated", "typecheck-consumer"]
+run = "tsc -b --noEmit"
+
+# --- Tests -------------------------------------------------------------------
+
+[tasks.test-codegen]
+description = "Run the hamlib-codegen unit tests against synthetic clang ASTs and a committed Embind declaration"
+run = "vitest run --config tests/codegen/vitest.config.ts"
+
+[tasks.test-hooks]
+description = "Run the DOM-less React hook unit tests against a stubbed package boundary"
+depends = ["build-package"]
+run = "vitest run --config tests/hooks/vitest.config.ts"
+
+[tasks.test-node]
+description = "Run the Node transport checks against the built package"
+depends = ["build-package"]
+run = "vitest run --config tests/node/vitest.config.ts"
+
+[tasks.test-hardware]
+description = "Run the read-only checks against a real rig (HAMLIB_WASM_HARDWARE_DEVICE=qmx|ft-710, or HAMLIB_WASM_HARDWARE_PORT=<path>; HAMLIB_WASM_HARDWARE_WRITE=1 adds the frequency round-trip)"
+depends = ["build-package"]
+run = "vitest run --config tests/hardware/vitest.config.ts"
+
+[tasks.test-browser]
+description = "Run only the example-driven Playwright browser scenarios"
+depends = ["build"]
+run = "playwright test tests/browser/e2e"
+
+[tasks.test]
+description = "Run the hook, codegen and Node unit tests, then every Playwright scenario"
+depends = ["build", "test-hooks", "test-node", "test-codegen"]
+run = "playwright test"
+
+[tasks.baseline-record]
+description = "Re-record the upstream behavioural baseline from the current build"
+depends = ["build"]
+env = { HAMLIB_WASM_RECORD_BASELINE = "1" }
+run = "playwright test tests/browser/baseline.spec.ts"
+
+# --- Gates -------------------------------------------------------------------
+
+[tasks.check]
+description = "The local gate before pushing: lint, docs, typecheck, generated check, unit tests and the browser suite"
+depends = ["lint", "docs-check", "typecheck", "test"]
+
+[tasks.check-release]
+description = "Everything a publish needs: check, the packed tarball audit and the backend audit"
+depends = ["check", "verify-package", "audit-backends"]
+
+[tasks.refresh]
+description = "Upstream refresh: generate, build, audit, typecheck and every test"
+depends = ["generate", "audit-backends", "typecheck", "test"]
+
+# --- Package verification and release ----------------------------------------
+
+[tasks.pack-package]
+description = "List the published package contents (npm pack --dry-run)"
+depends = ["build-package"]
+run = "npm pack --dry-run --workspace packages/hamlib-wasm"
+
+[tasks.verify-package]
+description = "Verify the actual npm tarball, notices, hashes, link inputs and source kit"
+depends = ["build-package"]
+run = "node packages/hamlib-wasm/build/verify-package.ts"
+
+[tasks.verify-relink]
+description = "Rebuild the packed package with modified Hamlib and exercise it through the loader"
+depends = ["build-package"]
+run = "node packages/hamlib-wasm/build/verify-relink.ts"
+
+[tasks.verify-release]
+description = "Pack once, verify the package and run the clean-room relink against the same tarball"
+depends = ["build-package"]
+run = "node packages/hamlib-wasm/build/verify-package.ts --relink"
+
+[tasks.release-guard]
+description = "Fail when a Hamlib release-block change is not a feat/fix/perf commit"
+run = "node packages/hamlib-wasm/build/release-commit-guard.ts"
+
+[tasks.release-dry-run]
+description = "Report the next semantic-release version without publishing (needs GITHUB_TOKEN and a remote)"
+run = "semantic-release --dry-run --no-ci"
+
+[tasks.release]
+description = "Publish with semantic-release and write the GitHub step outputs (CI; a dry run elsewhere)"
+run = "node packages/hamlib-wasm/build/release-publish.ts"
