@@ -88,9 +88,9 @@ export function generatedPackageOutputs(): readonly string[] {
 }
 
 /**
- * Canonical license texts copied from the repository root into the package.
- * The directory is listed in `files`; these are the individual files whose
- * bytes the package verification compares and hashes.
+ * License texts copied from the repository root into the package.  The
+ * directory is listed in `files`; these are the individual files whose bytes
+ * the package verification compares and hashes.
  */
 export const LICENSE_FILES: readonly string[] = [
   'LICENSES/MIT.txt',
@@ -98,8 +98,19 @@ export const LICENSE_FILES: readonly string[] = [
   'LICENSES/GPL-2.0-or-later.txt',
   'LICENSES/GPL-3.0-or-later.txt',
   'LICENSES/Emscripten.txt',
-  'LICENSES/Apache-2.0.txt',
   'LICENSES/LLVM.txt',
+];
+
+/**
+ * Every licensing file the package build copies verbatim from the repository
+ * root.  The same relative path names the root original, the package copy and
+ * the copy inside the source kit.  `REBUILDING.md` is not here: it is rendered
+ * per release from `build/REBUILDING.md.in`.
+ */
+export const ROOT_LICENSING_FILES: readonly string[] = [
+  'LICENSE.md',
+  'THIRD_PARTY_NOTICES.md',
+  ...LICENSE_FILES,
 ];
 
 /** Upstream license texts copied from the release tree into the package. */
@@ -198,7 +209,8 @@ export function kitFiles(upstream: Upstream): readonly string[] {
         ? relative.slice('dist/native/'.length)
         : relative
     )),
-    ...LICENSE_FILES,
+    ...ROOT_LICENSING_FILES,
+    ...UPSTREAM_BASE_FILES,
   ];
 }
 

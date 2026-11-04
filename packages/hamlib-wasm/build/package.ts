@@ -12,12 +12,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-import { renderLicensingDocs } from './docs.ts';
 import { assert } from './errors.ts';
 import { log, run } from './exec.ts';
 import {
   buildCorrespondingSourceKit,
   syncPackageLicenseFiles,
+  writeRebuildingGuide,
 } from './licensing.ts';
 import { generatedPackageOutputs } from './package-manifest.ts';
 import {
@@ -89,8 +89,8 @@ function main(): void {
     ].join('\n'),
   );
 
-  renderLicensingDocs({ check: false });
   syncPackageLicenseFiles();
+  writeRebuildingGuide();
   buildCorrespondingSourceKit();
 
   log(SCOPE, 'package build complete');

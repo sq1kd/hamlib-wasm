@@ -9,3 +9,9 @@ tests/browser/fixtures/generated/
 tests/consumer/node_modules/
 tests/consumer/packed/
 packages/hamlib-wasm/src/native/hamlib-wasm.d.mts
+# Licensing files the package build copies from the repository root or
+# renders from build/REBUILDING.md.in.
+packages/hamlib-wasm/LICENSE.md
+packages/hamlib-wasm/LICENSES/
+packages/hamlib-wasm/THIRD_PARTY_NOTICES.md
+packages/hamlib-wasm/REBUILDING.md

@@ -30,14 +30,13 @@ import {
   extractTarball,
   packTarball,
 } from './artifact.ts';
-import { renderLicensingDocs } from './docs.ts';
 import { assert } from './errors.ts';
 import { log, parseFlag } from './exec.ts';
 import { assertFile, readJson, sha256File, walk } from './files.ts';
 import { verifyRepository } from './guard.ts';
 import {
-  LICENSE_FILES,
   PACKAGE_JSON_FILES,
+  ROOT_LICENSING_FILES,
   kitFiles,
   requiredPackageFiles,
   scannedPackageFiles,
@@ -47,8 +46,9 @@ import { loadUpstream } from './upstream.ts';
 import { runRelink } from './verify-relink.ts';
 
 const SCOPE = 'verify-package';
+const PACKAGE_LICENSE_EXPRESSION = 'MIT AND LGPL-2.1-or-later';
 const PLACEHOLDER_PATTERN =
-  /\[(?:INSERT|REPLACE)|REPLACE_WITH|YOUR COPYRIGHT HOLDER|YOUR NAME|\bTODO\b|\bTBD\b|example\.com/i;
+  /\[(?:INSERT|REPLACE)|REPLACE_WITH|<year> <copyright holders>|YOUR COPYRIGHT HOLDER|YOUR NAME|\bTODO\b|\bTBD\b|example\.com/i;
 
 function scanText(file: string, what: string): void {
   const text = readFileSync(file, 'utf8');
@@ -104,7 +104,6 @@ function main(): void {
 
   assert(patchFile, 'the release config has no patch');
   verifyRepository();
-  renderLicensingDocs({ check: true });
 
   const work = workArg ?? mkdtempSync(path.join(os.tmpdir(), 'hamlib-wasm-package-'));
   mkdirSync(work, { recursive: true });
@@ -120,8 +119,8 @@ function main(): void {
     path.join(packageRoot, 'package.json'),
   );
   assert(
-    manifest.license === 'SEE LICENSE IN LICENSE.md',
-    `package.json license is ${String(manifest.license)}, expected SEE LICENSE IN LICENSE.md`,
+    manifest.license === PACKAGE_LICENSE_EXPRESSION,
+    `package.json license is ${String(manifest.license)}, expected ${PACKAGE_LICENSE_EXPRESSION}`,
   );
   const requiredEntries = PACKAGE_JSON_FILES.map((entry) => entry.relative);
   assert(
@@ -130,35 +129,28 @@ function main(): void {
     `package.json files does not include every packaged entry: ${requiredEntries.join(', ')}`,
   );
 
-  for (const relative of LICENSE_FILES) {
+  for (const relative of ROOT_LICENSING_FILES) {
     const canonical = path.join(REPO_ROOT, relative);
     const packaged = path.join(packageRoot, relative);
     assertFile(canonical, `canonical ${relative}`);
     assert(
       sha256File(canonical) === sha256File(packaged),
-      `${relative} in the package is not byte-identical to the canonical file`,
+      `${relative} in the package is not byte-identical to the repository root copy`,
     );
   }
 
-  assert(
-    sha256File(path.join(REPO_ROOT, 'THIRD_PARTY_NOTICES.md'))
-    === sha256File(path.join(packageRoot, 'THIRD_PARTY_NOTICES.md')),
-    'package THIRD_PARTY_NOTICES.md is not byte-identical to the repository copy',
-  );
-
   const licenseText = readFileSync(path.join(packageRoot, 'LICENSE.md'), 'utf8');
   assert(
-    /LGPL-2\.1-or-later/.test(licenseText)
-    && /Hamlib/.test(licenseText)
-    && /not MIT-only/i.test(licenseText),
-    'LICENSE.md does not describe the mixed MIT/LGPL arrangement',
+    licenseText.includes(PACKAGE_LICENSE_EXPRESSION) && /Hamlib/.test(licenseText),
+    'LICENSE.md does not describe the MIT and LGPL component licensing',
   );
 
   const notices = readFileSync(path.join(packageRoot, 'THIRD_PARTY_NOTICES.md'), 'utf8');
   for (const required of [
-    `Hamlib ${upstream.version}`,
+    'Hamlib',
     'LGPL-2.1-or-later',
     'GPL-3.0-or-later',
+    'precise_time.c',
     'Emscripten',
   ]) {
     assert(notices.includes(required), `THIRD_PARTY_NOTICES.md is missing ${required}`);
@@ -170,6 +162,10 @@ function main(): void {
     && rebuild.includes('--source-dir')
     && rebuild.includes('hamlib-wasm.wasm'),
     'REBUILDING.md does not document the packaged relink procedure',
+  );
+  assert(
+    rebuild.includes(upstream.commit) && rebuild.includes(upstream.archive.sha256),
+    'REBUILDING.md does not name the exact Hamlib commit and archive hash',
   );
 
   for (const relative of scannedPackageFiles(upstream)) {
@@ -261,8 +257,7 @@ function main(): void {
   }
 
   assert(
-    linkInputs.linkedLicenses
-    && linkInputs.linkedLicenses.includes('MIT')
+    linkInputs.linkedLicenses?.includes('MIT')
     && linkInputs.linkedLicenses.includes('LGPL-2.1-or-later'),
     'LINK_INPUTS.json linkedLicenses is missing MIT or LGPL-2.1-or-later',
   );

@@ -41,20 +41,10 @@ export const GENERATED_INC = path.join(NATIVE_DIR, 'generated');
 export const GENERATED_TS = path.join(PACKAGE_DIR, 'src', 'native', 'generated');
 export const CODEGEN_DIR = path.join(REPO_ROOT, 'packages', 'hamlib-codegen', 'src');
 
-export const ROOT_LICENSES_DIR = path.join(REPO_ROOT, 'LICENSES');
 export const PACKAGE_LICENSES_DIR = path.join(PACKAGE_DIR, 'LICENSES');
-export const ROOT_NOTICES = path.join(REPO_ROOT, 'THIRD_PARTY_NOTICES.md');
-export const PACKAGE_NOTICES = path.join(PACKAGE_DIR, 'THIRD_PARTY_NOTICES.md');
-export const PACKAGE_LICENSE = path.join(PACKAGE_DIR, 'LICENSE.md');
 export const PACKAGE_REBUILDING = path.join(PACKAGE_DIR, 'REBUILDING.md');
-export const CODEGEN_LICENSE = path.join(
-  REPO_ROOT,
-  'packages',
-  'hamlib-codegen',
-  'LICENSE',
-);
+export const REBUILDING_TEMPLATE = path.join(PACKAGE_DIR, 'build', 'REBUILDING.md.in');
 export const REBUILD_SCRIPT = path.join(PACKAGE_DIR, 'build', 'rebuild.sh');
-export const TEMPLATES_DIR = path.join(REPO_ROOT, 'docs', 'templates');
 
 export const BRIDGE_INPUTS: readonly string[] = [
   'native/facade.cpp',

@@ -1,0 +1,103 @@
+# Rebuilding `hamlib-wasm` with a modified Hamlib
+
+This release includes the source and build inputs needed to create a
+replacement `hamlib-wasm.wasm` with a modified Hamlib library, consistent with
+LGPL 2.1 section 6. The WASM contains statically linked Hamlib.
+
+## Exact release inputs
+
+- Package version: `hamlib-wasm` {{PACKAGE_VERSION}}
+- Hamlib version: {{HAMLIB_VERSION}}, commit
+  `{{HAMLIB_COMMIT}}` (tag object
+  `{{HAMLIB_TAG_OBJECT}}`)
+- Original archive:
+  {{HAMLIB_ARCHIVE_URL}}
+- SHA-256 of original archive:
+  `{{HAMLIB_ARCHIVE_SHA256}}`
+- Patch: `{{HAMLIB_PATCH_FILE}}`
+- SHA-256 of applied patch:
+  `{{HAMLIB_PATCH_SHA256}}`
+- Toolchain: Emscripten SDK {{EMSCRIPTEN_VERSION}}, Node.js {{NODE_MAJOR}}, GNU tar, GNU patch (or the
+  BSD equivalents), and `make`
+- Source/relink kit in this npm package:
+  `dist/third_party/hamlib/corresponding-source.tar.gz`
+
+## What the kit contains
+
+- `source/{{HAMLIB_ARCHIVE_NAME}}`: the complete upstream source archive
+- `patches/{{HAMLIB_PATCH_FILE}}`: the exact applied patch
+- `native/`: the facade, serial transport, compatibility header, monotonic
+  clock replacement and generated `.inc` bindings
+- `library/web_serial.js`: the precompiled Emscripten JS library
+- `rebuild.sh`: the build and relink script
+- `release.env`, `configure.env`, `configure.args`, `link.args`: the pinned
+  version and hash values and the configure and link flags `rebuild.sh` uses
+- `LICENSE.md`, `LICENSES/`, `THIRD_PARTY_NOTICES.md`, the upstream
+  `AUTHORS`, `LICENSE`, `COPYING` and `COPYING.LIB`: notices
+- `SOURCE.json`: the release, commit and hash manifest
+
+The kit does not need the `hamlib-wasm` monorepo or the TypeScript compiler and
+does not download anything. `rebuild.sh` verifies the archive and patch
+SHA-256 values before compiling and applies the same configure and link flags
+as the package build, including `-Wl,--wrap=monotonic_seconds`, which keeps the
+GPL-3.0 `precise_time.o` out of the binary.
+
+## Build and relink procedure
+
+Run these commands with the pinned Emscripten SDK active on `PATH`; in the
+repository, `mise exec --` does that.
+
+```sh
+# 1. Start in a fresh directory and extract the kit from the installed package.
+mkdir hamlib-relink
+cd hamlib-relink
+tar xzf /path/to/node_modules/hamlib-wasm/dist/third_party/hamlib/corresponding-source.tar.gz
+
+# 2. Verify the recorded source and patch hashes, extract Hamlib, apply the
+#    patch, and install the project serial transport.
+./rebuild.sh --prepare
+
+# 3. Change a Hamlib library source file, for example the hamlib_version2
+#    initializer in build/{{HAMLIB_SOURCE_DIR}}/src/rig.c.
+$EDITOR build/{{HAMLIB_SOURCE_DIR}}/src/rig.c
+
+# 4. Compile and link the modified Hamlib into a replacement binary.
+./rebuild.sh --source-dir build/{{HAMLIB_SOURCE_DIR}}
+
+# 5. Replace the package's binary (keep a backup if you want to compare).
+cp build/out/hamlib-wasm.wasm \
+   /path/to/node_modules/hamlib-wasm/dist/native/hamlib-wasm.wasm
+
+# 6. Exercise the replacement through the published loader.
+node --input-type=module -e '
+  import create from "/path/to/node_modules/hamlib-wasm/dist/native/hamlib-wasm.mjs";
+  const module = await create();
+  console.log(module.version());
+'
+```
+
+The build writes `build/out/hamlib-wasm.wasm`, `hamlib-wasm.mjs`,
+`hamlib-wasm.d.mts` and `hamlib-wasm.map`. `--prepare` writes
+`build/{{HAMLIB_SOURCE_DIR}}/`, and `--source-dir` reuses that tree so edits
+survive. A run without either option extracts and patches a fresh tree and
+links immediately. The output need not reproduce the original binary byte for
+byte; it must contain the modified Hamlib and load through the published
+loader.
+
+## From the repository
+
+`mise run build-package` builds the WASM, this document and the kit.
+`mise run verify-package` packs the workspace and checks the actual tarball:
+the notices, the hashes in `SOURCE.json`, the linked-input audit, the kit
+contents and a clean application of the patch. `mise run verify-relink` runs
+the procedure above from the packed tarball alone, changes `hamlib_version2`,
+and checks that the packaged loader reports the modified version.
+
+## Distribution
+
+The rebuilt binary remains a combined work. When redistributing it in a
+website, application or another package, retain the Hamlib notices and the
+LGPL license and provide corresponding-source and relink access with that
+distribution. The kit in this package is the corresponding source for the
+unmodified package. If you modify Hamlib, distribute your modified source too,
+with the prominent dated change notices LGPL 2.1 section 2 requires.

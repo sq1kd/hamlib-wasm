@@ -1,7 +1,7 @@
 {
   "name": "hamlib-wasm",
   "version": "0.1.0",
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "MIT AND LGPL-2.1-or-later",
   "type": "module",
   "description": "Hamlib CAT control in the browser over Web Serial or in Node over node-serialport, compiled to WebAssembly",
   "keywords": [

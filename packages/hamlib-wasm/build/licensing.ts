@@ -4,9 +4,10 @@
  * Assemble the licensing, provenance and corresponding-source artifacts that
  * ship with the package.
  *
- * The canonical license texts and repository-level notices live at the
- * repository root.  Packaging copies them into the package instead of
- * maintaining a second handwritten set.  The source kit contains the pinned
+ * `LICENSE.md`, `THIRD_PARTY_NOTICES.md` and the license texts live at the
+ * repository root; packaging copies them into the package.  `REBUILDING.md`
+ * carries exact release values, so it is rendered from `REBUILDING.md.in`.
+ * None of the package copies is committed.  The source kit contains the pinned
  * upstream archive, the applied patch and every project-owned input needed to
  * relink the WASM without the monorepo.
  */
@@ -20,6 +21,7 @@ import { assertFile, readJson, sha256File, walk, writeJson } from './files.ts';
 import { log } from './exec.ts';
 import {
   LICENSE_FILES,
+  ROOT_LICENSING_FILES,
   UPSTREAM_BASE_FILES,
   UPSTREAM_LICENSE_FILES,
 } from './package-manifest.ts';
@@ -32,26 +34,24 @@ import {
 } from './release-env.ts';
 import {
   BRIDGE_INPUTS,
-  CODEGEN_LICENSE,
   CORRESPONDING_SOURCE,
   LIBRARY_JS,
   LINK_INPUTS_JSON,
   NATIVE_DIR,
   PACKAGE_DIR,
-  PACKAGE_LICENSE,
+  PACKAGE_JSON,
   PACKAGE_LICENSES_DIR,
   PACKAGE_LICENSING_MANIFEST,
-  PACKAGE_NOTICES,
   PACKAGE_REBUILDING,
+  REBUILDING_TEMPLATE,
   REBUILD_SCRIPT,
   REPO_ROOT,
-  ROOT_LICENSES_DIR,
-  ROOT_NOTICES,
   SOURCE_JSON,
   THIRD_PARTY_DIR,
   releaseArchivePath,
   releaseKitStaging,
   releaseSourceDir,
+  releaseSourceDirName,
 } from './paths.ts';
 import { loadUpstream, type Upstream } from './upstream.ts';
 
@@ -259,22 +259,68 @@ function emscriptenVersion(): string | null {
   }
 }
 
-/** Copy the canonical root license texts into the package tarball. */
+/** Copy the root licensing files into the package. */
 export function syncPackageLicenseFiles(): void {
-  for (const relative of LICENSE_FILES) {
-    assertFile(path.join(REPO_ROOT, relative), relative);
+  rmSync(PACKAGE_LICENSES_DIR, { recursive: true, force: true });
+
+  for (const relative of ROOT_LICENSING_FILES) {
+    const source = path.join(REPO_ROOT, relative);
+    const destination = path.join(PACKAGE_DIR, relative);
+
+    assertFile(source, relative);
+    mkdirSync(path.dirname(destination), { recursive: true });
+    cpSync(source, destination);
   }
 
-  assertFile(ROOT_NOTICES, 'root third-party notices');
-  assertFile(PACKAGE_LICENSE, 'package LICENSE.md');
-  assertFile(PACKAGE_REBUILDING, 'package REBUILDING.md');
+  log('licensing', 'copied the licensing files into the package');
+}
 
-  rmSync(PACKAGE_LICENSES_DIR, { recursive: true, force: true });
-  cpSync(ROOT_LICENSES_DIR, PACKAGE_LICENSES_DIR, { recursive: true });
-  cpSync(ROOT_NOTICES, PACKAGE_NOTICES);
-  cpSync(path.join(ROOT_LICENSES_DIR, 'MIT.txt'), CODEGEN_LICENSE);
+/**
+ * Render `REBUILDING.md` for this release.  It needs the provenance written by
+ * the native build (`SOURCE.json`), so it runs in the package step.
+ */
+export function writeRebuildingGuide(): void {
+  const upstream = loadUpstream();
+  const source = readJson<{ emscriptenVersion?: string | null; patchSha256?: string | null }>(
+    SOURCE_JSON,
+  );
+  const manifest = readJson<{ version?: string }>(PACKAGE_JSON);
+  const patch = upstream.patches[0];
 
-  log('licensing', 'synced package license texts');
+  assert(patch, 'the release config has no patch');
+  assert(manifest.version, 'package.json has no version');
+  assert(source.patchSha256, 'SOURCE.json has no patch hash');
+
+  const emscripten = /(\d+\.\d+\.\d+)/.exec(String(source.emscriptenVersion ?? ''));
+
+  assert(emscripten, 'SOURCE.json has no Emscripten version');
+
+  const values: Record<string, string> = {
+    PACKAGE_VERSION: manifest.version,
+    HAMLIB_VERSION: upstream.version,
+    HAMLIB_COMMIT: upstream.commit,
+    HAMLIB_TAG_OBJECT: upstream.tagObject,
+    HAMLIB_ARCHIVE_NAME: upstream.archive.name,
+    HAMLIB_ARCHIVE_URL: upstream.archive.url,
+    HAMLIB_ARCHIVE_SHA256: upstream.archive.sha256,
+    HAMLIB_PATCH_FILE: patch.file,
+    HAMLIB_PATCH_SHA256: source.patchSha256,
+    HAMLIB_SOURCE_DIR: releaseSourceDirName(upstream),
+    EMSCRIPTEN_VERSION: emscripten[1] as string,
+    NODE_MAJOR: process.versions.node.split('.')[0] as string,
+  };
+  const rendered = readFileSync(REBUILDING_TEMPLATE, 'utf8').replace(
+    /\{\{([A-Z0-9_]+)\}\}/g,
+    (token, key: string) => {
+      const value = values[key];
+
+      assert(value !== undefined, `REBUILDING.md.in has an unknown token ${token}`);
+      return value;
+    },
+  );
+
+  writeFileSync(PACKAGE_REBUILDING, rendered);
+  log('licensing', 'rendered REBUILDING.md');
 }
 
 export function writeThirdPartyData(linkMapFile: string): void {
@@ -333,7 +379,6 @@ export function writeThirdPartyData(linkMapFile: string): void {
     version: upstream.version,
     series: upstream.series,
     license: upstream.license,
-    licenseExpression: 'SEE LICENSE IN LICENSE.md',
     upstreamRepository: upstream.repository,
     upstreamCommit: upstream.commit,
     upstreamTagObject: upstream.tagObject,
@@ -395,7 +440,8 @@ This archive contains the source and build inputs needed to rebuild
 - Patch: \`patches/${patch}\`
 - Project bridge and generated bindings: \`native/\`
 - Precompiled Emscripten JS library: \`library/web_serial.js\`
-- License texts and notices: \`LICENSES/\`, \`LICENSE.md\`, \`THIRD_PARTY_NOTICES.md\`
+- License texts and notices: \`LICENSES/\`, \`LICENSE.md\`, \`THIRD_PARTY_NOTICES.md\`,
+  and the upstream \`AUTHORS\`, \`LICENSE\`, \`COPYING\`, \`COPYING.LIB\`
 - Rebuild instructions: \`REBUILDING.md\`
 - Release values consumed by \`rebuild.sh\`: \`release.env\`, \`configure.env\`,
   \`configure.args\`, \`link.args\`
@@ -450,10 +496,12 @@ export function buildCorrespondingSourceKit(): void {
   cpSync(LIBRARY_JS, path.join(staging, 'library', 'web_serial.js'));
   cpSync(REBUILD_SCRIPT, path.join(staging, 'rebuild.sh'));
   cpSync(PACKAGE_REBUILDING, path.join(staging, 'REBUILDING.md'));
-  cpSync(PACKAGE_LICENSE, path.join(staging, 'LICENSE.md'));
-  cpSync(PACKAGE_NOTICES, path.join(staging, 'THIRD_PARTY_NOTICES.md'));
-  cpSync(PACKAGE_LICENSES_DIR, path.join(staging, 'LICENSES'), { recursive: true });
   cpSync(SOURCE_JSON, path.join(staging, 'SOURCE.json'));
+
+  for (const relative of ROOT_LICENSING_FILES) {
+    mkdirSync(path.dirname(path.join(staging, relative)), { recursive: true });
+    cpSync(path.join(PACKAGE_DIR, relative), path.join(staging, relative));
+  }
 
   for (const file of UPSTREAM_BASE_FILES) {
     cpSync(path.join(sourceDir, file), path.join(staging, file));
