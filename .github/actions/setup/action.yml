@@ -55,7 +55,7 @@ runs:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-    - name: Install Playwright Chromium on a cache miss
+    - name: Install Playwright browsers on a cache miss
       if: inputs.playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: npx playwright install --with-deps chromium
+      run: npx playwright install --with-deps chromium firefox

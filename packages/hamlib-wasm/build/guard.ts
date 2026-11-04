@@ -17,7 +17,6 @@ const PATH_DECLARATION =
   /^\s*(?:export\s+)?const\s+(?:PACKAGE_DIR|REPO_ROOT|NATIVE_DIR|CACHE_DIR|BUILD_DIR|SOURCE_DIR|DIST_DIR|DIST_NATIVE_DIR|THIRD_PARTY_DIR)\s*=\s*(?:path\.(?:join|resolve)|'|")/m;
 
 const BUILD_SCOPE = 'packages/hamlib-wasm/build/';
-const REACT_SCRIPT_SCOPE = 'examples/react/scripts/';
 
 function trackedFiles(): string[] {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
@@ -55,7 +54,7 @@ export function verifyRepository(): void {
     const content = readFileSync(path.join(REPO_ROOT, file), 'utf8');
 
     if (
-      (file.startsWith(BUILD_SCOPE) || file.startsWith(REACT_SCRIPT_SCOPE))
+      file.startsWith(BUILD_SCOPE)
       && !file.endsWith('paths.ts')
       && PATH_DECLARATION.test(content)
     ) {

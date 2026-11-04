@@ -30,7 +30,7 @@ package version.
   guessed `repository`: the repository has no remote until it is first pushed.
   The release job stamps `repository`/`homepage`/`bugs` from
   `GITHUB_REPOSITORY` before invoking semantic-release, so provenance links to
-  the real repository. Outside CI, `scripts/run-release.mjs` refuses to run
+  the real repository. Outside CI, `packages/hamlib-wasm/build/release-publish.ts` refuses to run
   without a `repository` field (a dry run may set
   `RELEASE_ALLOW_MISSING_REPOSITORY=1`).
 
@@ -120,7 +120,7 @@ Commit scopes are limited by `.commitlintrc.json` to `hamlib`, `api`, `build`,
 `chore(deps): update the release tooling`).
 
 No release is produced when the commits contain nothing releasable: the release
-job still succeeds, and `scripts/run-release.mjs` writes `released=false`.
+job still succeeds, and `packages/hamlib-wasm/build/release-publish.ts` writes `released=false`.
 
 ## Branches and the `next` prerelease flow
 
@@ -153,15 +153,18 @@ prerelease version stays on npm forever and remains installable through
 
 ## What CI runs
 
-- `.github/workflows/ci.yml` runs on pull requests and pushes to `main`:
-  `npm ci` followed by `mise run check`, with the Hamlib input cache and the
-  Playwright browser cache restored.
+- `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, manual
+  dispatch and a weekly schedule. Every run executes `mise run check-release`
+  through the shared `.github/actions/setup` action (mise, `npm ci`, the Hamlib
+  input cache and the Playwright browser cache); pull requests also lint their
+  commit messages, and everything except pull requests runs the clean-room
+  relink (`mise run verify-release`).
 - `.github/workflows/release.yml` runs on pushes to `main` and `next` (and via
   `workflow_dispatch`). Its `verify` job restores the same caches and runs
   `mise run check-release` (which is `mise run check` +
   `mise run verify-package` + `mise run audit-backends`), then uploads the
   verified `packages/hamlib-wasm/dist`. Its `release` job checks out full
-  history, runs `node scripts/run-release.mjs`, and never rebuilds the package.
+  history, runs `mise run release`, and never rebuilds the package.
 
 Do not add separate build or test commands to the workflows: keep the release
 gate in the `mise` tasks so local and CI behavior stay identical.
@@ -178,7 +181,7 @@ git config core.hooksPath .githooks
 messages. The release-block guard is a separate local check and works offline:
 
 ```sh
-node scripts/release-commit-guard.mjs
+mise run release-guard
 ```
 
 It compares the `release:` block in `packages/hamlib-wasm/hamlib.config.yaml`
@@ -209,7 +212,7 @@ GITHUB_TOKEN=<token with repo access to the scratch repository> \
 
 `--dry-run` does not publish to npm, push tags, or create a GitHub Release. It
 prints the next version and the generated notes, including the
-`## Bundled components` section from `scripts/hamlib-release-notes.mjs`.
+`## Bundled components` section from `packages/hamlib-wasm/build/release-notes.ts`.
 `--no-ci` prevents semantic-release from requiring a CI environment. A dry run
 does not exercise OIDC or Trusted Publishing; only the real workflow does that.
 
@@ -240,7 +243,7 @@ delete or move the tag to "fix" it. Repair only the missing artifact.
    ```sh
    gh release create "v<version>" --verify-tag --generate-notes
    gh release view "v<version>" --json body -q .body > /tmp/release-notes.md
-   node scripts/hamlib-release-notes.mjs >> /tmp/release-notes.md
+   node packages/hamlib-wasm/build/release-notes.ts >> /tmp/release-notes.md
    gh release edit "v<version>" --notes-file /tmp/release-notes.md
    ```
 

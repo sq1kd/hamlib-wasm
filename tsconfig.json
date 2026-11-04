@@ -11,7 +11,6 @@
     { "path": "packages/hamlib-codegen" },
     { "path": "packages/hamlib-wasm" },
     { "path": "packages/hamlib-wasm/tsconfig.build.json" },
-    { "path": "examples/basic" },
     { "path": "examples/react" },
     { "path": "examples/node" },
     { "path": "tests/codegen" },

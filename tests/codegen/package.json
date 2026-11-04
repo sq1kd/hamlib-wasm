@@ -4,9 +4,5 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "description": "Unit tests for the hamlib-codegen generator: classification, type mapping, struct projections, emitted method names and the Embind declaration parser",
-  "scripts": {
-    "test": "vitest run --config vitest.config.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  }
+  "description": "Unit tests for the hamlib-codegen generator: classification, type mapping, struct projections, emitted method names and the Embind declaration parser"
 }
