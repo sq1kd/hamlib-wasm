@@ -54,6 +54,13 @@ export interface SerialPortLike {
   setSignals(signals: SerialOutputSignals): Promise<void>;
   getSignals(): Promise<SerialInputSignals>;
   getInfo?(): SerialPortInfo;
+  /**
+   * Output lines this transport asserts when it opens a port, when it asserts
+   * any.  Web Serial leaves both deasserted and omits this; a transport that
+   * asserts DTR/RTS by default reports it, so Hamlib's `ser_get_dtr()` /
+   * `ser_get_rts()` readback tells the device's truth rather than a guess.
+   */
+  initialSignals?(): { rts: boolean; dtr: boolean };
 }
 
 /** Port chooser filters, as Web Serial's `SerialPortFilter` declares them. */

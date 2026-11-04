@@ -4,7 +4,7 @@
  * `tests/harness/src/main.ts` publishes the package on `window`; the example
  * publishes nothing and is driven through its DOM instead.
  */
-import type { EasyCapabilities, EasyHamlib } from 'hamlib-wasm';
+import type { EasyHamlib, EasyOperationCapabilities, EasyOptions } from 'hamlib-wasm';
 import type {
   Hamlib,
   HamlibOptions,
@@ -35,8 +35,8 @@ export type Captured<T> =
 
 export interface HamlibHarness {
   createHamlib(options?: HamlibOptions): Promise<Hamlib>;
-  createEasy(options?: HamlibOptions): Promise<EasyHamlib>;
-  capabilitiesOf(model: RigModel): EasyCapabilities;
+  createEasy(options?: EasyOptions): Promise<EasyHamlib>;
+  capabilitiesOf(model: RigModel): EasyOperationCapabilities;
   /** A transport over `port`, recording every call the facade makes on it. */
   fakeTransport(port: SerialPortLike): SerialTransport & { calls: string[] };
   isHamlibError(value: unknown): boolean;

@@ -11,13 +11,14 @@
  * What "easy" means here, concretely:
  *
  *  - `refresh()` composes the reads a UI always wants (frequency, mode,
- *    passband, and PTT when the model reports it) into one awaited snapshot,
- *    and remembers it as {@link EasyRig.state}.
+ *    passband, PTT and the levels the instance was configured for) into one
+ *    awaited snapshot, and remembers it as {@link EasyRig.state}.
  *  - `setMode(mode)` fills in the model's normal passband through Hamlib's own
  *    `passband_normal`, so a caller does not have to know its width.
  *  - `setPtt(true)` and {@link PttState} replace the string vocabulary.
  *  - `on()`/`watch()` give a UI an event stream without polling by hand; the
- *    calls still serialize on the module's single queue.
+ *    calls still serialize on the module's single queue.  A `watch()` declares
+ *    which fields it needs, so a meter poll never drags the frequency along.
  *  - {@link EasyRig.capabilities} answers "can this model do X" as booleans,
  *    derived from the same `rig_caps` matrix the catalogue exposes.
  *
@@ -76,13 +77,39 @@ export type PttState = 'off' | 'on' | 'on-mic' | 'on-data';
 
 const PTT_STATES: readonly PttState[] = ['off', 'on', 'on-mic', 'on-data'];
 
-/**
- * One of Hamlib's own passband helpers, selected by name.
- *
- * `normal` is the width the model advertises for a mode; `narrow` and `wide`
- * are the backend's own narrower and wider choices.
- */
+/** One of Hamlib's own passband helpers, selected by name. */
 export type PassbandSelector = 'normal' | 'narrow' | 'wide';
+
+/**
+ * The rig levels this entry can read.
+ *
+ * These are Hamlib's own level names, not a translation of them: a read is
+ * `rig_get_level` after `rig_parse_level`.  `RFPOWER` is the setpoint,
+ * `RFPOWER_METER` the measured forward power.
+ *
+ * A level is only ever read when the instance was configured for it (see
+ * {@link EasyOptions.levels}) and the model advertises it, so a page that
+ * shows no meters pays no CAT traffic for them.
+ */
+export type LevelName = 'STRENGTH' | 'SWR' | 'ALC' | 'RFPOWER' | 'RFPOWER_METER';
+
+const LEVEL_NAMES: readonly LevelName[] = ['STRENGTH', 'SWR', 'ALC', 'RFPOWER', 'RFPOWER_METER'];
+
+/** The telemetry a {@link EasyRig.watch} registration can read. */
+export type RigField = 'frequency' | 'mode' | 'ptt' | 'levels';
+
+const RIG_FIELDS: readonly RigField[] = ['frequency', 'mode', 'ptt', 'levels'];
+
+/** What a watch registration reads when it names no fields. */
+const DEFAULT_WATCH_FIELDS: readonly RigField[] = ['frequency', 'mode', 'ptt'];
+
+/**
+ * Consecutive failed reads after which a level is dropped for the session.
+ *
+ * One failure can be a transient, so the second one disables it; the cost of
+ * retrying forever is the model's port timeout on every poll.
+ */
+const LEVEL_FAILURE_LIMIT = 2;
 
 /** Narrow a Hamlib PTT string to the public union. */
 function toPttState(value: string): PttState {
@@ -97,9 +124,9 @@ function toPttState(value: string): PttState {
  * advertises and omits the rest rather than inventing a value.  `mode` and
  * `passband` always appear together or not at all.
  *
- * {@link EasyRig.state} and the `state` event only ever carry a snapshot from a
- * *completed* refresh: when a supported read fails, the previous successful
- * snapshot stays in place and no partial one is published.
+ * {@link EasyRig.state} and the `state` event only ever carry a snapshot from
+ * completed reads: a field whose read failed keeps the value from the previous
+ * successful read, and no partial snapshot replaces the whole state.
  */
 export interface RigState {
   /** Frequency in Hz; absent when the model cannot read frequency. */
@@ -110,10 +137,15 @@ export interface RigState {
   passband?: number;
   /** Present only when the model can read PTT. */
   ptt?: PttState;
+  /**
+   * The levels this instance is configured for and the model advertises,
+   * merged across reads.  Absent until one of them has been read.
+   */
+  levels?: Partial<Record<LevelName, number>>;
 }
 
-/** The operations a model supports, as booleans a UI can test. */
-export interface EasyCapabilities {
+/** What a model can do, as booleans a UI can test. */
+export interface EasyOperationCapabilities {
   getFrequency: boolean;
   setFrequency: boolean;
   getMode: boolean;
@@ -122,27 +154,42 @@ export interface EasyCapabilities {
   setPtt: boolean;
 }
 
+/** {@link EasyOperationCapabilities} plus the levels this rig will read. */
+export interface EasyCapabilities extends EasyOperationCapabilities {
+  /**
+   * Configured levels this model advertises, in configuration order.
+   *
+   * Empty when `createEasy()` was given no `levels`, and possibly shorter than
+   * the configured list when the model implements only some of them.
+   */
+  levels: readonly LevelName[];
+}
+
 /** The events an {@link EasyRig} emits. */
 export interface EasyRigEvents {
-  /** A completed {@link EasyRig.refresh}. */
+  /** A completed read, merged into the remembered snapshot. */
   state: RigState;
   frequency: number;
   mode: RigModeState;
   ptt: PttState;
+  /** The levels one read produced; only the levels it actually read. */
+  levels: Partial<Record<LevelName, number>>;
   /** A call that failed; the same error is thrown to its caller. */
   error: HamlibError;
 }
 
 type Listener<T> = (value: T) => void;
 
-/** Minimal typed emitter: no dependency, no wildcard, no replay. */
+/**
+ * Minimal typed emitter: no dependency, no wildcard, no replay.
+ *
+ * `emit` iterates a snapshot of the current listeners, so a listener that
+ * unsubscribes another one does not disturb delivery of the event already on
+ * its way.  Whether a *later* event is delivered is the publisher's decision
+ * (see `EasyRigHandle#publish`), not the emitter's.
+ */
 class Emitter<Events> {
   readonly #listeners = new Map<keyof Events, Set<Listener<never>>>();
-  readonly #live: () => boolean;
-
-  constructor(live: () => boolean) {
-    this.#live = live;
-  }
 
   on<K extends keyof Events>(event: K, listener: Listener<Events[K]>): () => void {
     const listeners = this.#listeners.get(event) ?? new Set<Listener<never>>();
@@ -156,14 +203,24 @@ class Emitter<Events> {
   }
 
   emit<K extends keyof Events>(event: K, value: Events[K]): void {
-    for (const listener of this.#listeners.get(event) ?? []) {
-      if (!this.#live()) {
-        return;
-      }
+    const listeners = [...(this.#listeners.get(event) ?? [])];
 
+    for (const listener of listeners) {
       (listener as Listener<Events[K]>)(value);
     }
   }
+}
+
+/** Options for {@link createEasy}. */
+export interface EasyOptions extends HamlibOptions {
+  /**
+   * Levels this instance may read, in the order they should be reported.
+   *
+   * Default: none - `refresh()` and `watch()` then issue no level reads at
+   * all.  A level named here is still only read when the model advertises it;
+   * see {@link EasyCapabilities.levels}.
+   */
+  levels?: readonly LevelName[];
 }
 
 /** Options for {@link EasyHamlib.open}. */
@@ -184,6 +241,26 @@ export interface OpenEasyRigOptions {
   port?: SerialPortLike;
 }
 
+/** Options for {@link EasyRig.watch}. */
+export interface WatchOptions {
+  /** Poll period in milliseconds. */
+  intervalMs: number;
+  /**
+   * Fields this registration reads, each tick.
+   *
+   * Default: `['frequency', 'mode', 'ptt']`.  Only the fields named here are
+   * read, so a registration that wants an S-meter alone issues one command per
+   * tick, not the whole telemetry set.  Registrations with different intervals
+   * run on separate timers.
+   */
+  fields?: readonly RigField[];
+  /**
+   * Levels to read; implies adding `'levels'` to `fields`.  Default: every
+   * level the instance is configured for.
+   */
+  levels?: readonly LevelName[];
+}
+
 /**
  * A connected rig, with a state snapshot and events.
  *
@@ -202,19 +279,19 @@ export interface EasyRig {
    * guess and a {@link EasyHamlib.detectBaudRate} scan on the next connect.
    */
   readonly baudRate: number;
-  /** What this model can do, as booleans. */
+  /** What this model can do, as booleans, and the levels this rig will read. */
   readonly capabilities: EasyCapabilities;
   /** `false` once `close()` has been called, or the underlying rig closed. */
   readonly connected: boolean;
   /**
-   * The last snapshot a completed `refresh()` published, if any.  A failed
-   * refresh leaves it unchanged.
+   * The last merged snapshot a completed read published, if any.  A failed
+   * read leaves the fields it could not read at their previous values.
    */
   readonly state: RigState | undefined;
   /**
    * The underlying 1:1 rig, for the operations this entry does not cover
-   * (split, levels, memory, antenna, clock, …).  Its methods are gated exactly
-   * as `hamlib-wasm/hamlib` documents.
+   * (split, memory, antenna, clock, …).  Its methods are gated exactly as
+   * `hamlib-wasm/hamlib` documents.
    */
   readonly raw: Rig;
 
@@ -234,23 +311,35 @@ export interface EasyRig {
   /** Set push-to-talk to on (`true`) or off (`false`). */
   setPtt(on: boolean): Promise<void>;
   /**
+   * Read one level as configured for this instance.
+   *
+   * Throws `UNSUPPORTED_OPERATION` for a level the model does not advertise
+   * and `INVALID_ARGUMENT` for one the instance was not configured for, so a
+   * typo fails loudly instead of costing a CAT round trip.
+   */
+  level(name: LevelName): Promise<number>;
+  /**
    * Read the telemetry the model advertises - frequency, mode with passband,
-   * and PTT when the model can - as one compound operation, and remember it as
-   * {@link EasyRig.state}.  Fields the model cannot read are omitted, never
-   * invented; a read that fails throws and leaves the previous snapshot in
-   * place.
+   * PTT when the model can, and every configured level it advertises - as one
+   * compound operation, and remember it as {@link EasyRig.state}.  Fields the
+   * model cannot read are omitted, never invented; a read that fails throws
+   * and leaves the previous snapshot in place.
    */
   refresh(): Promise<RigState>;
   /** Subscribe to one event; the returned function unsubscribes. */
   on<K extends keyof EasyRigEvents>(event: K, listener: Listener<EasyRigEvents[K]>): () => void;
   /**
-   * Poll every `intervalMs` while the returned function has not been called.
-   * Registrations compose: the smallest requested interval wins, removing one
-   * leaves the others polling, and removing the last stops the scheduler.  A
-   * tick that arrives while the previous poll is still in flight is skipped,
-   * so a slow rig cannot build a queue of reads.
+   * Poll the fields named in `options` while the returned function has not
+   * been called.  Registrations compose: each interval runs its own timer,
+   * removing one leaves the others polling, and removing the last stops the
+   * scheduler.  A tick that arrives while that interval's previous poll is
+   * still in flight is skipped, so a slow rig cannot build a queue of reads.
+   *
+   * A watch tick is best effort: a field that fails reports an `error` event
+   * and leaves the rest of the snapshot untouched.  Use {@link refresh} when
+   * all-or-nothing matters.
    */
-  watch(intervalMs: number): () => void;
+  watch(options: WatchOptions): () => void;
   /**
    * Stop polling synchronously, then close the rig.  Idempotent; no snapshot
    * or event is published once it has been called.
@@ -294,20 +383,18 @@ export interface EasyHamlib {
  * Which of the operations {@link EasyRig} uses a model implements.
  *
  * Exported because a caller driving `hamlib-wasm/hamlib` directly still wants
- * the same booleans: the catalogue's `capabilities` is the raw list of
- * generated operation names, and this is the one interpretation of it the easy
- * layer makes.
+ * the same booleans: the catalogue's `capabilities` is the raw set of generated
+ * operation names, and this is the one interpretation of it the easy layer
+ * makes.
  */
-export function capabilitiesOf(model: RigModel): EasyCapabilities {
-  const supported = new Set(model.capabilities);
-
+export function capabilitiesOf(model: RigModel): EasyOperationCapabilities {
   return {
-    getFrequency: supported.has('getFrequency'),
-    setFrequency: supported.has('setFrequency'),
-    getMode: supported.has('getMode'),
-    setMode: supported.has('setMode'),
-    getPtt: supported.has('getPtt'),
-    setPtt: supported.has('setPtt'),
+    getFrequency: model.capabilities.has('getFrequency'),
+    setFrequency: model.capabilities.has('setFrequency'),
+    getMode: model.capabilities.has('getMode'),
+    setMode: model.capabilities.has('setMode'),
+    getPtt: model.capabilities.has('getPtt'),
+    setPtt: model.capabilities.has('setPtt'),
   };
 }
 
@@ -326,6 +413,25 @@ function asHamlibError(error: unknown, operation: string): HamlibError {
 /** One live polling registration; its identity is the unsubscribe handle. */
 interface PollSubscription {
   readonly intervalMs: number;
+  readonly fields: ReadonlySet<RigField>;
+  readonly levels: readonly LevelName[];
+}
+
+/** The timer one distinct interval drives. */
+interface PollGroup {
+  readonly timer: ReturnType<typeof setInterval>;
+  polling: boolean;
+}
+
+/** Merge a partial read into the remembered snapshot. */
+function mergeState(previous: RigState | undefined, next: RigState): RigState {
+  const merged: RigState = { ...previous, ...next };
+
+  if (previous?.levels !== undefined || next.levels !== undefined) {
+    merged.levels = { ...previous?.levels, ...next.levels };
+  }
+
+  return merged;
 }
 
 /** `RigHandle` also implements the compound seam (`src/native/seam.ts`). */
@@ -333,20 +439,37 @@ type CompoundRig = Rig & CompoundHost;
 
 class EasyRigHandle implements EasyRig {
   readonly #rig: CompoundRig;
-  readonly #events = new Emitter<EasyRigEvents>(() => this.#live());
-  readonly #capabilities: EasyCapabilities;
+  readonly #events = new Emitter<EasyRigEvents>();
+  readonly #operations: EasyOperationCapabilities;
+  readonly #configuredLevels: readonly LevelName[];
+  readonly #advertisedLevels: readonly LevelName[];
   readonly #onClose: (rig: EasyRigHandle) => void;
   readonly #subscriptions = new Set<PollSubscription>();
+  readonly #groups = new Map<number, PollGroup>();
+  /**
+   * Levels whose reads keep failing, and the consecutive failure count.
+   *
+   * `has_get_level` describes what a backend declares, not what it answers: a
+   * model can advertise a meter whose read the backend cannot complete, and
+   * every attempt then costs the port timeout.  After two consecutive failures
+   * the level is dropped for the session, so a broken meter cannot starve the
+   * rest of the telemetry; reopening the rig re-probes it.
+   */
+  readonly #levelFailures = new Map<LevelName, number>();
 
   #state: RigState | undefined;
-  #timer: ReturnType<typeof setInterval> | undefined;
-  #intervalMs = 0;
-  #polling = false;
   #closed = false;
 
-  constructor(rig: Rig, onClose: (rig: EasyRigHandle) => void) {
+  constructor(
+    rig: Rig,
+    configuredLevels: readonly LevelName[],
+    advertisedLevels: readonly LevelName[],
+    onClose: (rig: EasyRigHandle) => void,
+  ) {
     this.#rig = rig as CompoundRig;
-    this.#capabilities = capabilitiesOf(rig.model);
+    this.#operations = capabilitiesOf(rig.model);
+    this.#configuredLevels = configuredLevels;
+    this.#advertisedLevels = advertisedLevels;
     this.#onClose = onClose;
   }
 
@@ -359,7 +482,7 @@ class EasyRigHandle implements EasyRig {
   }
 
   get capabilities(): EasyCapabilities {
-    return this.#capabilities;
+    return { ...this.#operations, levels: this.#advertisedLevels };
   }
 
   get connected(): boolean {
@@ -410,28 +533,72 @@ class EasyRigHandle implements EasyRig {
     }));
   }
 
+  async level(name: LevelName): Promise<number> {
+    this.#requireLevel(name);
+
+    return this.#call('level', () => this.#rig.runCompound('level', (operations) => (
+      operations.getLevel(name)
+    )));
+  }
+
   async refresh(): Promise<RigState> {
     return this.#call('refresh', () => this.#rig.runCompound('refresh', async (operations) => {
       const state: RigState = {};
 
       /* Read only what the model advertises; never invent a field. */
-      if (this.#capabilities.getFrequency) {
+      if (this.#operations.getFrequency) {
         state.frequency = await operations.getFrequency();
       }
 
-      if (this.#capabilities.getMode) {
+      if (this.#operations.getMode) {
         const mode = await operations.getMode();
 
         state.mode = mode.mode;
         state.passband = mode.passband;
       }
 
-      if (this.#capabilities.getPtt) {
+      if (this.#operations.getPtt) {
         state.ptt = toPttState(await operations.getPtt());
       }
 
+      if (this.#advertisedLevels.length > 0) {
+        const levels: Partial<Record<LevelName, number>> = {};
+        const failures: HamlibError[] = [];
+
+        /* A meter is decoration: one level a backend advertises but answers
+         * slowly or refuses must not fail the core snapshot.  The core fields
+         * above stay all-or-nothing; level failures are reported as `error`
+         * events after the snapshot is published. */
+        for (const name of this.#advertisedLevels) {
+          if (this.#unreadable(name)) {
+            continue;
+          }
+
+          try {
+            levels[name] = await operations.getLevel(name);
+            this.#levelFailures.delete(name);
+          } catch (error) {
+            failures.push(this.#recordLevelFailure(name, error));
+          }
+        }
+
+        if (Object.keys(levels).length > 0) {
+          state.levels = levels;
+        }
+
+        this.#publish(state);
+
+        for (const failure of failures) {
+          if (this.#live()) {
+            this.#events.emit('error', failure);
+          }
+        }
+
+        return this.#state ?? state;
+      }
+
       this.#publish(state);
-      return state;
+      return this.#state ?? state;
     }));
   }
 
@@ -439,7 +606,13 @@ class EasyRigHandle implements EasyRig {
     return this.#events.on(event, listener);
   }
 
-  watch(intervalMs: number): () => void {
+  watch(options: WatchOptions): () => void {
+    if (!this.connected) {
+      throw new HamlibError('rig is closed', { code: 'RIG_CLOSED', operation: 'watch' });
+    }
+
+    const { intervalMs } = options;
+
     if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
       throw new HamlibError(
         `watch interval must be a positive number of milliseconds, got ${String(intervalMs)}`,
@@ -447,7 +620,43 @@ class EasyRigHandle implements EasyRig {
       );
     }
 
-    const subscription: PollSubscription = { intervalMs };
+    const fields = new Set<RigField>(options.fields ?? DEFAULT_WATCH_FIELDS);
+
+    for (const field of fields) {
+      if (!RIG_FIELDS.includes(field)) {
+        throw new HamlibError(
+          `unknown watch field ${String(field)}; use one of ${RIG_FIELDS.join(', ')}`,
+          { code: 'INVALID_ARGUMENT', operation: 'watch' },
+        );
+      }
+    }
+
+    /* Naming levels implies reading them. */
+    const levels = options.levels === undefined
+      ? [...this.#advertisedLevels]
+      : [...options.levels];
+
+    if (options.levels !== undefined) {
+      fields.add('levels');
+    }
+
+    if (fields.has('levels') && levels.length === 0) {
+      throw new HamlibError(
+        'watch asked for levels, but this instance has none configured '
+        + '(pass `levels` to createEasy) or the model advertises none',
+        { code: 'INVALID_ARGUMENT', operation: 'watch' },
+      );
+    }
+
+    for (const name of levels) {
+      this.#requireLevel(name);
+    }
+
+    const subscription: PollSubscription = {
+      intervalMs,
+      fields,
+      levels: [...new Set(levels)],
+    };
 
     this.#subscriptions.add(subscription);
     this.#configureScheduler();
@@ -474,36 +683,42 @@ class EasyRigHandle implements EasyRig {
   #shutdown(): void {
     this.#closed = true;
     this.#subscriptions.clear();
-    this.#stopScheduler();
+    this.#stopAll();
     this.#onClose(this);
   }
 
   /**
-   * Publish a completed snapshot.
+   * Publish a completed read, merged into the remembered snapshot.
    *
    * A read that started before `close()` (or before the raw rig was closed)
    * must not resurrect the wrapper: once closed, nothing is published.  A
-   * listener may itself close the rig while we are dispatching, so every
-   * delivery re-checks - no event follows a close.
+   * listener may itself close the rig while we are dispatching, so that is
+   * re-checked before every following event - the event already in flight
+   * still reaches every listener that was registered for it.
    */
-  #publish(state: RigState): void {
+  #publish(partial: RigState): void {
     if (!this.#live()) {
       return;
     }
 
-    this.#state = state;
-    this.#events.emit('state', state);
+    const snapshot = mergeState(this.#state, partial);
+    this.#state = snapshot;
+    this.#events.emit('state', snapshot);
 
-    if (state.frequency !== undefined) {
-      this.#events.emit('frequency', state.frequency);
+    if (partial.frequency !== undefined && this.#live()) {
+      this.#events.emit('frequency', partial.frequency);
     }
 
-    if (state.mode !== undefined && state.passband !== undefined) {
-      this.#events.emit('mode', { mode: state.mode, passband: state.passband });
+    if (partial.mode !== undefined && partial.passband !== undefined && this.#live()) {
+      this.#events.emit('mode', { mode: partial.mode, passband: partial.passband });
     }
 
-    if (state.ptt !== undefined) {
-      this.#events.emit('ptt', state.ptt);
+    if (partial.ptt !== undefined && this.#live()) {
+      this.#events.emit('ptt', partial.ptt);
+    }
+
+    if (partial.levels !== undefined && Object.keys(partial.levels).length > 0 && this.#live()) {
+      this.#events.emit('levels', partial.levels);
     }
   }
 
@@ -512,66 +727,223 @@ class EasyRigHandle implements EasyRig {
     return !this.#closed && this.#rig.connected;
   }
 
-  /** Drive the one scheduler from the registrations currently held. */
+  /**
+   * Start a timer for every interval in use, stop timers nobody asked for.
+   *
+   * One timer per interval, not one for the smallest: a 250 ms meter poll must
+   * not turn a 1 s frequency poll into four reads a second.
+   */
   #configureScheduler(): void {
-    if (this.#closed || !this.#rig.connected || this.#subscriptions.size === 0) {
-      this.#stopScheduler();
+    if (this.#closed) {
+      this.#stopAll();
       return;
     }
 
-    let intervalMs = Number.POSITIVE_INFINITY;
+    const wanted = new Set<number>();
 
     for (const subscription of this.#subscriptions) {
-      intervalMs = Math.min(intervalMs, subscription.intervalMs);
+      wanted.add(subscription.intervalMs);
     }
 
-    if (this.#timer !== undefined && this.#intervalMs === intervalMs) {
-      return;
+    for (const intervalMs of wanted) {
+      if (this.#groups.has(intervalMs)) { continue; }
+
+      const group: PollGroup = {
+        timer: setInterval(() => {
+          void this.#tick(intervalMs);
+        }, intervalMs),
+        polling: false,
+      };
+
+      this.#groups.set(intervalMs, group);
+
+      /* The first registration at an interval polls straight away, as a fresh
+       * watch() always has. */
+      void this.#tick(intervalMs);
     }
 
-    const starting = this.#timer === undefined;
-
-    this.#stopScheduler();
-    this.#intervalMs = intervalMs;
-    this.#timer = setInterval(() => {
-      void this.#tick();
-    }, intervalMs);
-
-    /* The first registration polls straight away, as a fresh watch() did. */
-    if (starting) {
-      void this.#tick();
+    for (const intervalMs of [...this.#groups.keys()]) {
+      if (!wanted.has(intervalMs)) {
+        this.#stopGroup(intervalMs);
+      }
     }
   }
 
-  #stopScheduler(): void {
-    if (this.#timer !== undefined) {
-      clearInterval(this.#timer);
-      this.#timer = undefined;
+  #stopGroup(intervalMs: number): void {
+    const group = this.#groups.get(intervalMs);
+
+    if (!group) { return; }
+
+    clearInterval(group.timer);
+    this.#groups.delete(intervalMs);
+  }
+
+  #stopAll(): void {
+    for (const intervalMs of [...this.#groups.keys()]) {
+      this.#stopGroup(intervalMs);
     }
   }
 
-  /** One poll tick: skip when the previous refresh has not settled yet. */
-  async #tick(): Promise<void> {
-    if (this.#polling) {
+  /** One poll tick for one interval: read the union of the fields watched there. */
+  async #tick(intervalMs: number): Promise<void> {
+    const group = this.#groups.get(intervalMs);
+
+    if (!group || group.polling) {
       return;
     }
 
-    if (this.#closed || !this.#rig.connected) {
+    if (!this.connected) {
       /* The raw rig was closed behind the wrapper (or disposal ran): stop
        * rather than leave a scheduler retaining the handle forever. */
-      this.#stopScheduler();
+      this.#stopGroup(intervalMs);
       return;
     }
 
-    this.#polling = true;
+    const fields = new Set<RigField>();
+    const levels = new Set<LevelName>();
+
+    for (const subscription of this.#subscriptions) {
+      if (subscription.intervalMs !== intervalMs) { continue; }
+
+      for (const field of subscription.fields) {
+        fields.add(field);
+      }
+
+      for (const name of subscription.levels) {
+        levels.add(name);
+      }
+    }
+
+    group.polling = true;
 
     try {
-      await this.refresh();
+      const { partial, failures } = await this.#call('watch', () => (
+        this.#rig.runCompound('watch', async (operations) => {
+          const read: RigState = {};
+          const errors: HamlibError[] = [];
+
+          if (fields.has('frequency') && this.#operations.getFrequency) {
+            try {
+              read.frequency = await operations.getFrequency();
+            } catch (error) {
+              errors.push(asHamlibError(error, 'getFrequency'));
+            }
+          }
+
+          if (fields.has('mode') && this.#operations.getMode) {
+            try {
+              const mode = await operations.getMode();
+
+              read.mode = mode.mode;
+              read.passband = mode.passband;
+            } catch (error) {
+              errors.push(asHamlibError(error, 'getMode'));
+            }
+          }
+
+          if (fields.has('ptt') && this.#operations.getPtt) {
+            try {
+              read.ptt = toPttState(await operations.getPtt());
+            } catch (error) {
+              errors.push(asHamlibError(error, 'getPtt'));
+            }
+          }
+
+          if (fields.has('levels') && levels.size > 0) {
+            const values: Partial<Record<LevelName, number>> = {};
+
+            for (const name of levels) {
+              if (this.#unreadable(name)) {
+                continue;
+              }
+
+              try {
+                values[name] = await operations.getLevel(name);
+                this.#levelFailures.delete(name);
+              } catch (error) {
+                errors.push(this.#recordLevelFailure(name, error));
+              }
+            }
+
+            if (Object.keys(values).length > 0) {
+              read.levels = values;
+            }
+          }
+
+          return { partial: read, failures: errors };
+        })
+      ));
+
+      this.#publish(partial);
+
+      for (const failure of failures) {
+        if (this.#live()) {
+          this.#events.emit('error', failure);
+        }
+      }
     } catch {
-      /* refresh() already emitted the error; the timer must keep running. */
+      /* The compound itself failed; #call already emitted the error and the
+       * timer must keep running. */
     } finally {
-      this.#polling = false;
+      const current = this.#groups.get(intervalMs);
+
+      if (current) {
+        current.polling = false;
+      }
     }
+  }
+
+  /** Whether this level has been dropped after repeated failed reads. */
+  #unreadable(name: LevelName): boolean {
+    return (this.#levelFailures.get(name) ?? 0) >= LEVEL_FAILURE_LIMIT;
+  }
+
+  /**
+   * Count one failed level read; report the underlying error, and one more
+   * naming the level when it is dropped.
+   */
+  #recordLevelFailure(name: LevelName, error: unknown): HamlibError {
+    const failure = asHamlibError(error, `getLevel(${name})`);
+    const count = (this.#levelFailures.get(name) ?? 0) + 1;
+
+    this.#levelFailures.set(name, count);
+
+    if (count === LEVEL_FAILURE_LIMIT) {
+      return new HamlibError(
+        `${this.#rig.model.manufacturer} ${this.#rig.model.model} claims ${name} `
+        + `but the read failed ${count} times (${failure.message}); `
+        + 'polling it is disabled until the rig is reopened',
+        { code: 'UNSUPPORTED_OPERATION', operation: 'getLevel', cause: failure },
+      );
+    }
+
+    return failure;
+  }
+
+  /** Reject a level the instance is not configured for or the model lacks. */
+  #requireLevel(name: LevelName): void {
+    if (!LEVEL_NAMES.includes(name)) {
+      throw new HamlibError(
+        `unknown level ${String(name)}; use one of ${LEVEL_NAMES.join(', ')}`,
+        { code: 'INVALID_ARGUMENT', operation: 'level' },
+      );
+    }
+
+    if (this.#advertisedLevels.includes(name)) {
+      return;
+    }
+
+    if (!this.#configuredLevels.includes(name)) {
+      throw new HamlibError(
+        `level ${name} is not configured; pass it to createEasy({ levels: [...] })`,
+        { code: 'INVALID_ARGUMENT', operation: 'level' },
+      );
+    }
+
+    throw new HamlibError(
+      `${this.#rig.model.manufacturer} ${this.#rig.model.model} does not report ${name}`,
+      { code: 'UNSUPPORTED_OPERATION', operation: 'level' },
+    );
   }
 
   async #call<T>(operation: string, work: () => Promise<T>): Promise<T> {
@@ -582,7 +954,9 @@ class EasyRigHandle implements EasyRig {
 
       /* A command that failed while the rig was being closed must not emit
        * after the close either; the rejection still reaches its caller. */
-      this.#events.emit('error', failure);
+      if (this.#live()) {
+        this.#events.emit('error', failure);
+      }
 
       throw failure;
     }
@@ -591,17 +965,24 @@ class EasyRigHandle implements EasyRig {
 
 class EasyHamlibInstance implements EasyHamlib {
   readonly #hamlib: Hamlib;
+  readonly #levels: readonly LevelName[];
   readonly #rigs = new Set<EasyRigHandle>();
 
   #disposed = false;
   #disposePromise: Promise<void> | undefined;
 
-  private constructor(hamlib: Hamlib) {
+  private constructor(hamlib: Hamlib, levels: readonly LevelName[]) {
     this.#hamlib = hamlib;
+    this.#levels = levels;
   }
 
-  static async create(options: HamlibOptions): Promise<EasyHamlibInstance> {
-    return new EasyHamlibInstance(await createHamlib(options));
+  static async create(options: EasyOptions): Promise<EasyHamlibInstance> {
+    const { levels, ...hamlibOptions } = options;
+
+    return new EasyHamlibInstance(
+      await createHamlib(hamlibOptions),
+      normalizeLevels(levels),
+    );
   }
 
   get version(): string {
@@ -634,7 +1015,18 @@ class EasyHamlibInstance implements EasyHamlib {
       port,
       baudRate: options.baudRate,
     });
-    const easy = new EasyRigHandle(rig, (handle) => {
+    let advertised: readonly LevelName[];
+
+    try {
+      advertised = await advertisedLevels(rig, this.#levels);
+    } catch (error) {
+      /* The capability probe is a native call; if it fails the rig has no
+       * owner yet, so close it instead of leaking the port. */
+      await rig.close().catch(() => {});
+      throw error;
+    }
+
+    const easy = new EasyRigHandle(rig, this.#levels, advertised, (handle) => {
       this.#rigs.delete(handle);
     });
 
@@ -680,14 +1072,56 @@ class EasyHamlibInstance implements EasyHamlib {
   }
 }
 
+/** Deduplicate and validate the configured level list. */
+function normalizeLevels(levels: readonly LevelName[] | undefined): readonly LevelName[] {
+  const wanted: LevelName[] = [];
+
+  for (const name of levels ?? []) {
+    if (!LEVEL_NAMES.includes(name)) {
+      throw new HamlibError(
+        `unknown level ${String(name)}; use one of ${LEVEL_NAMES.join(', ')}`,
+        { code: 'INVALID_ARGUMENT', operation: 'createEasy' },
+      );
+    }
+
+    if (!wanted.includes(name)) {
+      wanted.push(name);
+    }
+  }
+
+  return wanted;
+}
+
+/**
+ * Which configured levels this model advertises.
+ *
+ * `hasGetLevel` reads the model's level mask - no CAT traffic - so this costs
+ * one pure call per configured level, once per open.
+ */
+async function advertisedLevels(
+  rig: Rig,
+  configured: readonly LevelName[],
+): Promise<readonly LevelName[]> {
+  const advertised: LevelName[] = [];
+
+  for (const name of configured) {
+    if ((await rig.hasGetLevel(name)) !== 0) {
+      advertised.push(name);
+    }
+  }
+
+  return advertised;
+}
+
 /**
  * Load Hamlib and read its rig model catalogue.
  *
  * ```ts
- * const hamlib = await createEasy();
+ * const hamlib = await createEasy({ levels: ['STRENGTH', 'SWR'] });
  * const model = hamlib.models.find((entry) => entry.model === 'TS-480');
  * const rig = await hamlib.open({ modelId: model.id });   // asks for the port
  * console.log(await rig.refresh());                        // 14074000 USB 2400
+ * rig.watch({ intervalMs: 500, fields: ['levels'], levels: ['STRENGTH'] });
  * await rig.setFrequency(7_074_000);
  * await rig.setPtt(true);
  * await rig.close();
@@ -697,6 +1131,6 @@ class EasyHamlibInstance implements EasyHamlib {
  * One instance owns one Wasm module and one call queue; a second instance is a
  * second module with its own memory.
  */
-export async function createEasy(options: HamlibOptions = {}): Promise<EasyHamlib> {
+export async function createEasy(options: EasyOptions = {}): Promise<EasyHamlib> {
   return EasyHamlibInstance.create(options);
 }

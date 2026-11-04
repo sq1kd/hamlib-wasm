@@ -10,7 +10,7 @@
  * Only the surface the hooks touch is implemented; the casts in `createEasy`
  * say so out loud, and anything else the real interfaces carry is absent.
  */
-import type { EasyHamlib, EasyRig, OpenEasyRigOptions, RigModel, RigState } from 'hamlib-wasm';
+import type { EasyHamlib, EasyRig, OpenEasyRigOptions, RigModel, RigState, WatchOptions } from 'hamlib-wasm';
 
 /** The `HamlibError` the hooks construct and test with. */
 export class HamlibError extends Error {
@@ -42,7 +42,7 @@ export const MODEL: RigModel = {
   serialParity: 'none',
   serialHandshake: 'none',
   support: 'verified',
-  capabilities: [],
+  capabilities: new Set(['getFrequency', 'setFrequency', 'getMode', 'setMode', 'getPtt', 'setPtt']),
   canGetFrequency: true,
   canSetFrequency: true,
   canGetMode: true,
@@ -60,7 +60,7 @@ export interface StubRig {
   readonly connected: boolean;
   readonly closed: boolean;
   on(event: StubEvent, listener: (value: unknown) => void): () => void;
-  watch(intervalMs: number): () => void;
+  watch(options: WatchOptions): () => void;
   close(): Promise<void>;
   /** Publish a snapshot, the way a poll or a refresh would. */
   emitState(state: RigState): void;
@@ -103,7 +103,7 @@ export function newRig(): StubRig {
         set.delete(listener);
       };
     },
-    watch(_intervalMs: number): () => void {
+    watch(_options: WatchOptions): () => void {
       return () => {};
     },
     async close(): Promise<void> {

@@ -311,3 +311,38 @@ test('a passband action cannot undo a mode selected after it', async ({ page }) 
   expect(result.mode).toBe('CW');
   expect(result.connected).toBe(true);
 });
+
+test('a write issued while a watch tick holds the queue is not nested', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createEasy({ levels: ['STRENGTH'] });
+    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
+
+    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+
+    const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
+
+    /* Every reply is slow, so the meter tick occupies its queue slot while the
+     * write arrives from outside.  A compound body's own calls run directly;
+     * an unrelated call must still be queued, not refused as "nested". */
+    window.__fakeSerial.replyDelayMs = 250;
+    const stop = rig.watch({ intervalMs: 50, fields: ['frequency', 'levels'] });
+    await window.__testHelpers.sleep(120);
+
+    const failure = await window.__testHelpers.capture(() => rig.setFrequency(7_074_000));
+
+    window.__fakeSerial.replyDelayMs = 0;
+    await window.__testHelpers.sleep(600);
+
+    const state = rig.state;
+    stop();
+    await rig.close();
+    await hamlib.dispose();
+
+    return { failure, frequency: state?.frequency ?? null };
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.failure.ok).toBe(true);
+  expect(result.frequency).toBe(7_074_000);
+});

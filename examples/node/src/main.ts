@@ -60,7 +60,7 @@ type Command =
 class UsageError extends Error {}
 
 /** The token after a value flag, or a usage error naming the flag that lacks one. */
-function valueOf(argv: readonly string[], index: number, flag: string): string {
+function argumentAfter(argv: readonly string[], index: number, flag: string): string {
   const value = argv[index + 1];
 
   if (value === undefined) {
@@ -102,15 +102,15 @@ function parseArguments(argv: readonly string[]): Command {
         list = true;
         break;
       case '--port':
-        path = valueOf(argv, index, flag);
+        path = argumentAfter(argv, index, flag);
         index += 1;
         break;
       case '--model':
-        model = valueOf(argv, index, flag);
+        model = argumentAfter(argv, index, flag);
         index += 1;
         break;
       case '--baud':
-        baudRate = parseBaudRate(valueOf(argv, index, flag));
+        baudRate = parseBaudRate(argumentAfter(argv, index, flag));
         index += 1;
         break;
       default:

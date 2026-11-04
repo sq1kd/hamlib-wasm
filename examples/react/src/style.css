@@ -349,6 +349,24 @@ button:not(:disabled):hover {
   grid-column: 1 / -1;
 }
 
+/* The mode row is a fieldset now; the browser's own chrome is not wanted. */
+fieldset.rig-modes {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.knob-wrap {
+  display: inline-flex;
+  border-radius: 50%;
+}
+
+.knob-wrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
 .rig-modes button[aria-pressed='true'] {
   background: var(--accent);
   border-color: var(--accent);

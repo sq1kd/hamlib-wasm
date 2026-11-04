@@ -56,6 +56,10 @@ export interface NativeOperations {
   /** Bound to the bespoke facade body in native/facade.cpp. */
   closeRig(handle: number): Asyncify<CodeResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
+  destroy(): Asyncify<CodeResult>;
+  /** Bound to the bespoke facade body in native/facade.cpp. */
+  liveHandles(): Asyncify<number>;
+  /** Bound to the bespoke facade body in native/facade.cpp. */
   getPtt(handle: number): Asyncify<PttResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
   setPtt(handle: number, state: string): Asyncify<PttResult>;
@@ -278,7 +282,7 @@ type Expect<T extends true> = T;
  * push-to-talk over the serial RTS/DTR line declares no `get_ptt`/`set_ptt`
  * function pointer, yet PTT works through the port.
  */
-export type RigFlag = 'canGetFrequency' | 'canSetFrequency' | 'canGetMode' | 'canSetMode' | 'canGetPtt' | 'canSetPtt';
+export type RigFlag = 'canGetPtt' | 'canSetPtt';
 
 /**
  * Operations gated on one of those flags, so `src/hamlib.ts` can fold them

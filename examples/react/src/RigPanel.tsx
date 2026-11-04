@@ -5,9 +5,13 @@
  * that is what makes the easy/native comparison meaningful.
  */
 import { useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactElement,
+} from 'react';
 
-import type { EasyCapabilities, RigState } from 'hamlib-wasm';
+import type { EasyCapabilities, LevelName, RigState } from 'hamlib-wasm';
 
 /**
  * Common Hamlib mode names.
@@ -40,6 +44,21 @@ export interface RigPanelProps {
 
 function group(hz: number): string {
   return hz.toLocaleString('en-US');
+}
+
+/** A level's unit, as Hamlib reports it. */
+function formatLevel(name: LevelName, value: number): string {
+  switch (name) {
+    case 'STRENGTH':
+      return `${value.toFixed(0)} dB`;
+    case 'SWR':
+      return value.toFixed(1);
+    case 'RFPOWER':
+    case 'RFPOWER_METER':
+      return `${value.toFixed(1)} W`;
+    default:
+      return value.toFixed(1);
+  }
 }
 
 /** The tuning knob: drag right to step up, left to step down. */
@@ -92,27 +111,51 @@ function TuningKnob(
     }
   };
 
+  const keyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (!enabled) {
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      onTune(-1);
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      onTune(1);
+    }
+  };
+
   return (
-    <svg
-      className="knob"
-      data-testid="tuning-knob"
-      viewBox="-50 -50 100 100"
+    <div
+      className="knob-wrap"
       role="slider"
+      tabIndex={enabled ? 0 : -1}
       aria-label="Tuning"
+      aria-valuemin={-50}
+      aria-valuemax={50}
       aria-valuenow={angle}
-      onPointerDown={down}
-      onPointerMove={move}
-      onPointerUp={up}
-      onPointerCancel={up}
+      aria-disabled={!enabled}
+      onKeyDown={keyDown}
       style={{ cursor: enabled ? 'grab' : 'not-allowed' }}
     >
-      <circle className="knob-body" r="46" />
-      <circle className="knob-rim" r="46" />
-      <circle className="knob-cap" r="30" />
-      <g transform={`rotate(${String(angle)})`}>
-        <rect className="knob-mark" x="-2" y="-44" width="4" height="16" rx="2" />
-      </g>
-    </svg>
+      <svg
+        className="knob"
+        data-testid="tuning-knob"
+        viewBox="-50 -50 100 100"
+        aria-hidden="true"
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+      >
+        <circle className="knob-body" r="46" />
+        <circle className="knob-rim" r="46" />
+        <circle className="knob-cap" r="30" />
+        <g transform={`rotate(${String(angle)})`}>
+          <rect className="knob-mark" x="-2" y="-44" width="4" height="16" rx="2" />
+        </g>
+      </svg>
+    </div>
   );
 }
 
@@ -175,6 +218,18 @@ export function RigPanel(props: RigPanelProps): ReactElement {
               {state?.ptt ?? '—'}
             </dd>
           </div>
+          {capabilities.levels.map((name) => {
+            const value = state?.levels?.[name];
+
+            return (
+              <div key={name}>
+                <dt>{name}</dt>
+                <dd data-testid={`level-${name}`}>
+                  {value === undefined ? '—' : formatLevel(name, value)}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       </div>
 
@@ -241,7 +296,7 @@ export function RigPanel(props: RigPanelProps): ReactElement {
           </button>
         </div>
 
-        <div className="rig-modes" role="group" aria-label="Mode">
+        <fieldset className="rig-modes" aria-label="Mode">
           {MODES.map((mode) => (
             <button
               key={mode}
@@ -254,7 +309,7 @@ export function RigPanel(props: RigPanelProps): ReactElement {
               {mode}
             </button>
           ))}
-        </div>
+        </fieldset>
 
         <div className="rig-passband">
           <span className="rig-label">Passband</span>

@@ -14,7 +14,7 @@ if (container === null) {
 
 createRoot(container).render(
   <StrictMode>
-    <HamlibProvider>
+    <HamlibProvider options={{ levels: ['STRENGTH', 'SWR'] }}>
       <App />
     </HamlibProvider>
   </StrictMode>,

@@ -13,10 +13,6 @@
     .field("serialStopBits", &ModelInfo::serialStopBits)
     .field("serialParity", &ModelInfo::serialParity)
     .field("serialHandshake", &ModelInfo::serialHandshake)
-    .field("canGetFrequency", &ModelInfo::canGetFrequency)
-    .field("canSetFrequency", &ModelInfo::canSetFrequency)
-    .field("canGetMode", &ModelInfo::canGetMode)
-    .field("canSetMode", &ModelInfo::canSetMode)
     .field("canGetPtt", &ModelInfo::canGetPtt)
     .field("canSetPtt", &ModelInfo::canSetPtt);
 
@@ -220,6 +216,16 @@
         return facade().closeRig(handle);
     });
 
+    emscripten::function("destroy", +[]()
+    {
+        return facade().destroy();
+    });
+
+    emscripten::function("liveHandles", +[]()
+    {
+        return facade().liveHandles();
+    });
+
     emscripten::function("getPtt", +[](int handle)
     {
         return facade().getPtt(handle);
@@ -235,22 +241,22 @@
         return facade().getRigInfo(handle);
     });
 
-    emscripten::function("getExtLevel", +[](int handle, int token)
+    emscripten::function("getExtLevel", +[](int handle, double token)
     {
         return facade().getExtLevel(handle, token);
     });
 
-    emscripten::function("setExtLevel", +[](int handle, int token, double value)
+    emscripten::function("setExtLevel", +[](int handle, double token, double value)
     {
         return facade().setExtLevel(handle, token, value);
     });
 
-    emscripten::function("getExtParm", +[](int handle, int token)
+    emscripten::function("getExtParm", +[](int handle, double token)
     {
         return facade().getExtParm(handle, token);
     });
 
-    emscripten::function("setExtParm", +[](int handle, int token, double value)
+    emscripten::function("setExtParm", +[](int handle, double token, double value)
     {
         return facade().setExtParm(handle, token, value);
     });

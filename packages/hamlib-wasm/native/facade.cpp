@@ -52,10 +52,6 @@ struct ModelInfo
     int serialStopBits;
     std::string serialParity;
     std::string serialHandshake;
-    bool canGetFrequency;
-    bool canSetFrequency;
-    bool canGetMode;
-    bool canSetMode;
     bool canGetPtt;
     bool canSetPtt;
 };
@@ -101,12 +97,32 @@ extern "C"
 {
     int hamlibWsRegisterPort(const char *path, int token);
     int hamlibWsUnregisterPort(const char *path);
+    /* Release every registered port from JavaScript; used by destroy() and by
+     * the TypeScript layer when a native call is stuck. */
+    int hamlibWsForceCloseAll(void);
 }
 
 namespace
 {
 
 const unsigned int kMaxHandle = 0x7fffffffU;
+
+/* `hamlib_token_t` is `long`, 32 bits in this build; JavaScript hands tokens
+ * back as numbers, so a value outside the range - or a fraction - is refused
+ * instead of being narrowed silently. */
+const double kMaxToken = 2147483647.0;
+
+bool tokenFromDouble(double value, hamlib_token_t *token)
+{
+    if (!(value >= 0.0) || value > kMaxToken) { return false; }
+
+    const long narrowed = (long) value;
+
+    if ((double) narrowed != value) { return false; }
+
+    *token = (hamlib_token_t) narrowed;
+    return true;
+}
 
 std::string takeTransportError()
 {
@@ -237,10 +253,9 @@ int collectModel(const struct rig_caps *caps, void *data)
     info.serialStopBits = caps->serial_stop_bits;
     info.serialParity = parityToString(caps->serial_parity);
     info.serialHandshake = handshakeToString(caps->serial_handshake);
-    info.canGetFrequency = caps->get_freq != NULL;
-    info.canSetFrequency = caps->set_freq != NULL;
-    info.canGetMode = caps->get_mode != NULL;
-    info.canSetMode = caps->set_mode != NULL;
+    /* get_freq/set_freq/get_mode/set_mode are not projected here: the
+     * capability list the generator emits already carries those operations,
+     * and TypeScript derives the booleans from it. */
     info.canGetPtt = caps->get_ptt != NULL || serialPttCapable(caps->ptt_type);
     info.canSetPtt = caps->set_ptt != NULL || serialPttCapable(caps->ptt_type);
 
@@ -474,6 +489,43 @@ public:
         return result;
     }
 
+    /*
+     * Release everything this module owns.
+     *
+     * dispose() closes the rigs and releases the ports it knows about; this is
+     * the backstop: it closes anything still registered, clears the handle map
+     * and empties the JavaScript port registry.  Wasm memory itself is
+     * reclaimed when the module is collected - Emscripten has no unload - so
+     * this is the deterministic part of teardown.
+     */
+    CodeResult destroy()
+    {
+        webserial_clear_error();
+
+        for (std::map<int, RIG *>::iterator it = rigs_.begin(); it != rigs_.end(); ++it)
+        {
+            rig_close(it->second);
+            rig_cleanup(it->second);
+        }
+
+        rigs_.clear();
+        nextHandle_ = 1;
+
+        /* Best effort by design: the ports belong to the caller and the
+         * instance is being discarded. */
+        hamlibWsForceCloseAll();
+
+        CodeResult result;
+        result.code = RIG_OK;
+        return result;
+    }
+
+    /* RIG handles currently registered: a probe for the lifecycle tests. */
+    int liveHandles() const
+    {
+        return (int) rigs_.size();
+    }
+
     PttResult getPtt(int handle)
     {
         webserial_clear_error();
@@ -553,7 +605,13 @@ public:
 
         if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
 
-        hamlib_token_t tok = (hamlib_token_t) token;
+        hamlib_token_t tok;
+
+        if (!tokenFromDouble(token, &tok))
+        {
+            return failure<NumberResult>(-RIG_EINVAL);
+        }
+
         value_t value{};
         int rc = rig_get_ext_level(rig, RIG_VFO_CURR, tok, &value);
 
@@ -573,7 +631,13 @@ public:
 
         if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        hamlib_token_t tok = (hamlib_token_t) token;
+        hamlib_token_t tok;
+
+        if (!tokenFromDouble(token, &tok))
+        {
+            return failure<CodeResult>(-RIG_EINVAL);
+        }
+
         value_t packed{};
 
         if (extValueIsFloat(rig, tok)) { packed.f = (float) value; }
@@ -596,7 +660,13 @@ public:
 
         if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
 
-        hamlib_token_t tok = (hamlib_token_t) token;
+        hamlib_token_t tok;
+
+        if (!tokenFromDouble(token, &tok))
+        {
+            return failure<NumberResult>(-RIG_EINVAL);
+        }
+
         value_t value{};
         int rc = rig_get_ext_parm(rig, tok, &value);
 
@@ -616,7 +686,13 @@ public:
 
         if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        hamlib_token_t tok = (hamlib_token_t) token;
+        hamlib_token_t tok;
+
+        if (!tokenFromDouble(token, &tok))
+        {
+            return failure<CodeResult>(-RIG_EINVAL);
+        }
+
         value_t packed{};
 
         if (extValueIsFloat(rig, tok)) { packed.f = (float) value; }

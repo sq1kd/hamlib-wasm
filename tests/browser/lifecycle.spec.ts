@@ -166,7 +166,7 @@ test('a later instance can use the same port after a raced disposal', async ({ p
 });
 
 for (const action of ['close', 'dispose'] as const) {
-  test(`${action} from a state listener cancels remaining listeners and field events`, async ({ page }) => {
+  test(`${action} from a state listener finishes that event but suppresses the rest`, async ({ page }) => {
     const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
       const hamlib = await window.__hamlibHarness.createEasy({});
       const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -198,12 +198,14 @@ for (const action of ['close', 'dispose'] as const) {
 
     const result = expectOk(captured);
 
-    expect(result.events).toEqual(['state:first']);
+    /* Snapshot dispatch: the event already on its way reaches both listeners,
+     * and no field event follows the close. */
+    expect(result.events).toEqual(['state:first', 'state:second']);
     expect(result.connected).toBe(false);
     expect((await readFakeSerial(page)).isOpen).toBe(false);
   });
 
-  test(`${action} from an error listener cancels remaining listeners but preserves rejection`, async ({ page }) => {
+  test(`${action} from an error listener preserves rejection and the error event`, async ({ page }) => {
     const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
       const hamlib = await window.__hamlibHarness.createEasy({});
       const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -233,7 +235,7 @@ for (const action of ['close', 'dispose'] as const) {
 
     const result = expectOk(captured);
 
-    expect(result.events).toEqual(['error:first']);
+    expect(result.events).toEqual(['error:first', 'error:second']);
     expect(expectFailure(result.failure).operation).toBe('setMode');
     expect((await readFakeSerial(page)).isOpen).toBe(false);
   });

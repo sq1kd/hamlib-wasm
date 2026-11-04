@@ -26,7 +26,7 @@
  */
 
 import createNativeModule from './native/hamlib-wasm.mjs';
-import type { MainModule } from './native/hamlib-wasm.mjs';
+import type { MainModule, RigModelInfo, RigModelList } from './native/hamlib-wasm.mjs';
 
 import {
   describeLineSettingsLimitation,
@@ -77,8 +77,8 @@ export type { RigConfparam } from './native/confparams.js';
 
 type NativeModule = MainModule;
 
-type NativeModelList = ReturnType<NativeModule['listModels']>;
-type NativeModel = NonNullable<ReturnType<NativeModelList['get']>>;
+type NativeModelList = RigModelList;
+type NativeModel = RigModelInfo;
 
 /** The one asset the pinned Emscripten build loads. */
 const WASM_ASSET_NAME = 'hamlib-wasm.wasm';
@@ -111,6 +111,30 @@ function locateAsset(file: string): string | URL {
 
 /** Hamlib's RIG_OK. */
 const RIG_OK = 0;
+
+/**
+ * How long one native call may hold the queue by default.
+ *
+ * Hamlib's own command timeouts are seconds; this only catches a transport
+ * promise that never settles, so it is generous enough not to fire on a slow
+ * CAT exchange and short enough that a UI learns about a dead port.
+ */
+const DEFAULT_CALL_TIMEOUT_MS = 30_000;
+
+function normalizeCallTimeout(value: number | undefined): number {
+  if (value === undefined) {
+    return DEFAULT_CALL_TIMEOUT_MS;
+  }
+
+  if (!Number.isFinite(value) || value < 0) {
+    throw new HamlibError(
+      `callTimeoutMs must be a non-negative number, got ${String(value)}`,
+      { code: 'INVALID_ARGUMENT', operation: 'createHamlib' },
+    );
+  }
+
+  return Math.floor(value);
+}
 
 /** What a rig model can do over a serial transport. */
 export interface RigCapabilities {
@@ -154,10 +178,14 @@ export interface RigModel extends RigCapabilities {
   support: BrowserSupport;
   /**
    * Names of the generated operations this model implements, from its
-   * `rig_caps` function pointers.  Absent means the matching generated method
-   * on {@link Rig} is refused with `UNSUPPORTED_OPERATION` before reaching Wasm.
+   * `rig_caps` function pointers.  A name that is absent means the matching
+   * generated method on {@link Rig} is refused with `UNSUPPORTED_OPERATION`
+   * before reaching Wasm.
+   *
+   * A set, not an array: it is built once per model from the native capability
+   * list and every gate tests membership.
    */
-  readonly capabilities: readonly string[];
+  readonly capabilities: ReadonlySet<string>;
   /**
    * Why the browser build cannot drive the model, when it cannot.
    *
@@ -207,6 +235,18 @@ export interface HamlibOptions {
    * and import `hamlib-wasm/node` for `listPorts()` and its options.
    */
   transport?: SerialTransport;
+  /**
+   * How long one native call may occupy the module's call queue before it is
+   * declared stuck, in milliseconds.  `0` disables the watchdog.
+   *
+   * Hamlib's own timeouts bound CAT traffic, so this only fires when the layer
+   * underneath it never settles - a transport whose promise is never resolved.
+   * Emscripten's Asyncify cannot unwind a suspended C stack, so a stuck call
+   * cannot be cancelled: the caller's promise is rejected with `RIG_TIMEOUT`,
+   * every later call on the instance fails with `RIG_HUNG`, and the instance
+   * must be disposed and replaced.
+   */
+  callTimeoutMs?: number;
 }
 
 /** Options for {@link Hamlib.open}. */
@@ -345,10 +385,28 @@ function hamlibError(result: NativeResult, operation: string): HamlibError {
  * Emscripten's Asyncify unwinds the C stack of the single in-flight native
  * call, so native calls must never overlap.  Queueing them also guarantees a
  * call never starts while another one is suspended.
+ *
+ * A watchdog bounds how long one queued call may hold the chain.  It cannot
+ * interrupt the native call - Asyncify has no way to unwind a suspended C
+ * stack - so a call that overruns is abandoned: the caller is rejected with
+ * `RIG_TIMEOUT`, the instance is marked hung, and every later call fails with
+ * `RIG_HUNG` instead of queueing behind a stack that will never return.
  */
 class Serializer {
+  readonly #timeoutMs: number;
+
   #tail: Promise<unknown> = Promise.resolve();
   #closed = false;
+  #hung = false;
+
+  constructor(timeoutMs: number) {
+    this.#timeoutMs = timeoutMs;
+  }
+
+  /** Whether a call overran and the native stack can no longer be driven. */
+  get hung(): boolean {
+    return this.#hung;
+  }
 
   /** Queue work for a live instance. */
   enqueue<T>(operation: string, work: () => T | Promise<T>): Promise<T> {
@@ -361,27 +419,84 @@ class Serializer {
       );
     }
 
-    return this.#chain(work);
+    if (this.#hung) {
+      return Promise.reject(hungError(operation));
+    }
+
+    return this.#chain(operation, work);
   }
 
   /** Queue cleanup work, which stays possible after disposal. */
-  drain<T>(work: () => T | Promise<T>): Promise<T> {
-    return this.#chain(work);
+  drain<T>(operation: string, work: () => T | Promise<T>): Promise<T> {
+    if (this.#hung) {
+      /* Nothing may re-enter the module: the suspended call still owns the
+       * C stack.  Disposal handles a hung instance on the JavaScript side. */
+      return Promise.reject(hungError(operation));
+    }
+
+    return this.#chain(operation, work);
   }
 
   close(): void {
     this.#closed = true;
   }
 
-  #chain<T>(work: () => T | Promise<T>): Promise<T> {
+  #chain<T>(operation: string, work: () => T | Promise<T>): Promise<T> {
     /* Run regardless of whether the previous operation failed. */
     const result = this.#tail.then(work, work);
     this.#tail = result.then(
       () => undefined,
       () => undefined,
     );
-    return result;
+
+    if (this.#timeoutMs <= 0) {
+      return result;
+    }
+
+    const { promise, resolve, reject } = Promise.withResolvers<T>();
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) { return; }
+
+      settled = true;
+      this.#hung = true;
+      reject(
+        new HamlibError(
+          `${operation} did not settle within ${this.#timeoutMs} ms; `
+          + 'the Hamlib instance is unusable and must be disposed',
+          { code: 'RIG_TIMEOUT', operation },
+        ),
+      );
+    }, this.#timeoutMs);
+
+    result.then(
+      (value) => {
+        if (settled) { return; }
+
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        if (settled) { return; }
+
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+
+    return promise;
   }
+}
+
+function hungError(operation: string): HamlibError {
+  return new HamlibError(
+    'the Hamlib instance is hung after an operation that never settled; '
+    + 'dispose it and create a new one',
+    { code: 'RIG_HUNG', operation },
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -395,57 +510,54 @@ interface RigContext {
   forget(rig: RigHandle): void;
 }
 
-/** What a {@link CompoundScope} borrows from the rig that owns it. */
-interface CompoundOwner {
-  readonly compoundNative: NativeOperations;
-  compoundHandle(): number;
-  compoundAvailable(operation: string): void;
-  compoundFailed(result: NativeResult, operation: string): Error;
-}
-
 /**
  * The generated surface a compound body drives while the owning rig holds the
  * queue slot.
  *
- * Its execution plumbing is the same capability gate, handle and error
- * conversion as {@link RigHandle}; the one difference is that a call runs
- * directly instead of re-entering the queue, because re-enqueueing behind the
- * slot the body is already inside would deadlock.  It is activated around one
- * body and deactivated when that body settles, so a reference that escapes the
- * callback cannot start native work later.
+ * It exists because the queue cannot be inferred from a flag: a concurrent call
+ * on the same rig, issued while a compound body is awaiting, must still queue
+ * normally, and only the body's own calls may run directly.  This object is
+ * handed to exactly one body and deactivated when that body settles, so a
+ * reference that escapes cannot start native work later, while every external
+ * call keeps going through {@link RigHandle}.
  */
 class CompoundScope extends GeneratedRigMethods {
-  readonly #owner: CompoundOwner;
   #active = false;
 
-  constructor(owner: CompoundOwner) {
+  constructor(
+    private readonly rigNative: () => NativeOperations,
+    private readonly rigHandle: () => number,
+    private readonly rigAvailable: (operation: string) => void,
+    private readonly rigFailed: (result: NativeResult, operation: string) => Error,
+  ) {
     super();
-    this.#owner = owner;
   }
 
-  /** Let the body drive the operations; the owning handle calls this only. */
+  get active(): boolean {
+    return this.#active;
+  }
+
   activate(): void {
     this.#active = true;
   }
 
-  /** Release after the body settled, whether it resolved or threw. */
   deactivate(): void {
     this.#active = false;
   }
 
   protected native(): NativeOperations {
     this.#assertActive();
-    return this.#owner.compoundNative;
+    return this.rigNative();
   }
 
   protected handle(): number {
     this.#assertActive();
-    return this.#owner.compoundHandle();
+    return this.rigHandle();
   }
 
   protected available(operation: string): void {
     this.#assertActive();
-    this.#owner.compoundAvailable(operation);
+    this.rigAvailable(operation);
   }
 
   protected serialized<T>(_operation: string, work: () => Promise<T>): Promise<T> {
@@ -456,7 +568,8 @@ class CompoundScope extends GeneratedRigMethods {
   }
 
   protected failed(result: NativeResult, operation: string): Error {
-    return this.#owner.compoundFailed(result, operation);
+    this.#assertActive();
+    return this.rigFailed(result, operation);
   }
 
   #assertActive(): void {
@@ -492,7 +605,14 @@ class RigHandle extends GeneratedRigMethods implements Rig, CompoundHost {
     this.#model = model;
     this.#handle = handle;
     this.#baudRate = baudRate;
-    this.#scope = new CompoundScope(this);
+    this.#scope = new CompoundScope(
+      () => this.#context.native,
+      () => this.#handle,
+      (operation) => {
+        this.available(operation);
+      },
+      (result, operation) => hamlibError(result, operation),
+    );
   }
 
   get model(): RigModel {
@@ -523,7 +643,7 @@ class RigHandle extends GeneratedRigMethods implements Rig, CompoundHost {
 
   protected available(operation: string): void {
     this.#requireCapability(
-      this.#model.capabilities.includes(operation),
+      this.#model.capabilities.has(operation),
       operation,
       `use ${operation}`,
     );
@@ -534,22 +654,6 @@ class RigHandle extends GeneratedRigMethods implements Rig, CompoundHost {
   }
 
   /* --- the compound seam (src/native/seam.ts) ------------------------- */
-
-  get compoundNative(): NativeOperations {
-    return this.#context.native;
-  }
-
-  compoundHandle(): number {
-    return this.#handle;
-  }
-
-  compoundAvailable(operation: string): void {
-    this.available(operation);
-  }
-
-  compoundFailed(result: NativeResult, operation: string): Error {
-    return this.failed(result, operation);
-  }
 
   /**
    * Run `body` as one unit on the module's call queue.
@@ -585,7 +689,7 @@ class RigHandle extends GeneratedRigMethods implements Rig, CompoundHost {
     /* Cleanup must run even when the instance is already disposed; the native
      * side releases the port even when rig_close reports an error. */
     try {
-      await this.#context.queue.drain(async () => {
+      await this.#context.queue.drain('close', async () => {
         const result = await this.#context.native.closeRig(this.#handle);
         this.#handle = 0;
 
@@ -650,6 +754,14 @@ class RigHandle extends GeneratedRigMethods implements Rig, CompoundHost {
 /** The JavaScript side of the serial registry inside the Wasm module. */
 interface SerialRegistry {
   storePort(port: SerialPortLike): number;
+  /**
+   * Close every registered port from the JavaScript side, ignoring errors.
+   *
+   * Only used when the instance is hung: the native stack still owns the
+   * module, so nothing may be called through Embind, but the port objects are
+   * plain JavaScript and can still be released.
+   */
+  forceCloseAll?(): void;
 }
 
 function assertSerialPort(value: unknown, operation: string): asserts value is SerialPortLike {
@@ -681,6 +793,18 @@ function assertSerialPort(value: unknown, operation: string): asserts value is S
 const BAUD_RATE_LADDER: readonly number[] = [
   300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600,
 ];
+
+/**
+ * Probe failures that end the search instead of moving to the next rate.
+ *
+ * Silence is what a wrong rate looks like, so a timeout keeps trying.  A
+ * configuration or permission refusal is about the port, not the rate, so
+ * trying the remaining candidates would only repeat it.
+ */
+const FATAL_PROBE_CODES: ReadonlySet<number> = new Set([
+  2, /* RIG_ECONF */
+  22, /* RIG_EACCESS */
+]);
 
 /**
  * Rates to try for `model`, highest first.
@@ -775,12 +899,26 @@ function classifyModel(
  * serial RTS/DTR line declares no `get_ptt`/`set_ptt` function pointer, so the
  * catalogue entry carries that capability itself.
  */
-function collectCapabilities(model: NativeModel, native: NativeModule): string[] {
-  const capabilities = Array.from(native.capabilities(model.id));
+function collectCapabilities(model: NativeModel, native: NativeModule): ReadonlySet<string> {
+  const capabilities = new Set<string>();
+  const list = native.capabilities(model.id);
+
+  try {
+    for (let index = 0; index < list.size(); index++) {
+      const name = list.get(index);
+
+      if (name !== undefined) {
+        capabilities.add(String(name));
+      }
+    }
+  } finally {
+    /* The Embind vector owns Wasm memory; Array.from would leak it. */
+    list.delete();
+  }
 
   for (const [operation, flag] of FLAG_GATED_OPERATIONS) {
     if (model[flag]) {
-      capabilities.push(operation);
+      capabilities.add(operation);
     }
   }
 
@@ -807,6 +945,7 @@ function collectModels(list: NativeModelList, native: NativeModule): RigModel[] 
         serialHandshake: toHandshake(model.serialHandshake),
       };
       const { support, limitation } = classifyModel(manufacturer, name, settings);
+      const capabilities = collectCapabilities(model, native);
 
       models.push({
         id: model.id,
@@ -822,11 +961,15 @@ function collectModels(list: NativeModelList, native: NativeModule): RigModel[] 
         serialHandshake: settings.serialHandshake,
         support,
         ...(limitation === undefined ? {} : { limitation }),
-        capabilities: collectCapabilities(model, native),
-        canGetFrequency: model.canGetFrequency,
-        canSetFrequency: model.canSetFrequency,
-        canGetMode: model.canGetMode,
-        canSetMode: model.canSetMode,
+        capabilities,
+        /* One source: the capability set is the generated-operation list, and
+         * these booleans are its projection for UIs.  PTT is the exception -
+         * a backend that drives it over RTS/DTR declares no `get_ptt`, so the
+         * catalogue carries that fact itself. */
+        canGetFrequency: capabilities.has('getFrequency'),
+        canSetFrequency: capabilities.has('setFrequency'),
+        canGetMode: capabilities.has('getMode'),
+        canSetMode: capabilities.has('setMode'),
         canGetPtt: model.canGetPtt,
         canSetPtt: model.canSetPtt,
       });
@@ -849,7 +992,7 @@ class HamlibInstance implements Hamlib, RigContext {
   readonly #rigs = new Set<RigHandle>();
   readonly #paths = new Set<string>();
 
-  readonly queue = new Serializer();
+  readonly queue: Serializer;
 
   #portCounter = 0;
   #disposed = false;
@@ -861,6 +1004,7 @@ class HamlibInstance implements Hamlib, RigContext {
     transport: SerialTransport,
     models: RigModel[],
     version: string,
+    callTimeoutMs: number,
   ) {
     this.#native = native;
     this.#registry = registry;
@@ -868,6 +1012,7 @@ class HamlibInstance implements Hamlib, RigContext {
     this.#models = models;
     this.#modelsById = new Map(models.map((model) => [model.id, model]));
     this.#version = version;
+    this.queue = new Serializer(callTimeoutMs);
   }
 
   static async create(options: HamlibOptions): Promise<HamlibInstance> {
@@ -900,6 +1045,7 @@ class HamlibInstance implements Hamlib, RigContext {
       await selectTransport(options.transport),
       models,
       await native.version(),
+      normalizeCallTimeout(options.callTimeoutMs),
     );
   }
 
@@ -1063,19 +1209,37 @@ class HamlibInstance implements Hamlib, RigContext {
 
         /* Each candidate is a complete open under a shortened port budget: the
          * facade reports success only when the rig answered, and closes again
-         * whatever it opened, so a silent rate simply moves on. */
+         * whatever it opened, so a silent rate simply moves on.  A refusal that
+         * is not silence - a setting the port rejects, a port the OS denies -
+         * ends the search instead of being retried at every rate. */
+        let lastFailure: NativeResult | undefined;
+
         for (const rate of candidates) {
           const probed = await this.#native.probeBaudRate(modelId, path, rate);
 
           if (probed.code === RIG_OK) {
             return rate;
           }
+
+          if (FATAL_PROBE_CODES.has(Math.abs(probed.code))) {
+            throw hamlibError(probed, `detectBaudRate(${rate})`);
+          }
+
+          lastFailure ??= probed;
         }
+
+        const detail = typeof lastFailure?.error === 'string' && lastFailure.error
+          ? ` (last failure: ${lastFailure.error})`
+          : '';
 
         throw new HamlibError(
           `${model.manufacturer} ${model.model} did not answer at any of `
-          + `${candidates.join(', ')} baud`,
-          { code: 'RIG_UNRESPONSIVE', operation: 'detectBaudRate' },
+          + `${candidates.join(', ')} baud${detail}`,
+          {
+            code: 'RIG_UNRESPONSIVE',
+            operation: 'detectBaudRate',
+            ...(lastFailure === undefined ? {} : { cause: lastFailure }),
+          },
         );
       });
     } finally {
@@ -1101,8 +1265,35 @@ class HamlibInstance implements Hamlib, RigContext {
     const failures: unknown[] = [];
 
     /* Every accepted open runs on the shared chain.  A barrier here waits for
-     * them, so the snapshot below covers every rig and port they created. */
-    await this.queue.drain(() => {});
+     * them, so the snapshot below covers every rig and port they created.  On a
+     * hung instance the barrier itself fails with RIG_HUNG; that is the state
+     * the caller already knows about, not a cleanup failure, so it is not
+     * reported twice. */
+    try {
+      await this.queue.drain('dispose', () => {});
+    } catch (error) {
+      if (!this.queue.hung) {
+        failures.push(error);
+      }
+    }
+
+    if (this.queue.hung) {
+      /* The suspended native call still owns the module: nothing may cross
+       * Embind again, but the port objects are plain JavaScript and can be
+       * released.  The instance is dead either way. */
+      try {
+        this.#registry.forceCloseAll?.();
+      } catch (error) {
+        failures.push(error);
+      }
+
+      this.#rigs.clear();
+      this.#paths.clear();
+
+      if (failures.length > 0) { throw failures[0]; }
+
+      return;
+    }
 
     for (const rig of [...this.#rigs]) {
       try {
@@ -1120,6 +1311,15 @@ class HamlibInstance implements Hamlib, RigContext {
       }
     }
 
+    /* Releases the native handle map and the JavaScript registry.  Wasm
+     * memory itself is reclaimed when the module is collected: Emscripten
+     * offers no unload, so this is the deterministic part. */
+    try {
+      await this.queue.drain('destroy', () => this.#native.destroy());
+    } catch (error) {
+      failures.push(error);
+    }
+
     if (failures.length > 0) {
       throw failures[0];
     }
@@ -1127,7 +1327,7 @@ class HamlibInstance implements Hamlib, RigContext {
 
   /** Unregister one logical path; the native handle is already closed. */
   async #releasePath(path: string): Promise<void> {
-    await this.queue.drain(async () => {
+    await this.queue.drain('dispose', async () => {
       const result = await this.#native.unregisterPort(path);
 
       if (result.code !== RIG_OK) {

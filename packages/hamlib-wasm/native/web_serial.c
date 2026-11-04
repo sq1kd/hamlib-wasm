@@ -139,9 +139,9 @@ int webserial_owns_fd(int fd)
     return 0;
 }
 
-void webserial_register_handle(int fd, const char *path)
+int webserial_register_handle(int fd, const char *path)
 {
-    if (fd <= 0 || webserial_owns_fd(fd)) { return; }
+    if (fd <= 0 || webserial_owns_fd(fd)) { return RIG_OK; }
 
     for (int i = 0; i < WEBSERIAL_MAX_HANDLES; ++i)
     {
@@ -150,11 +150,15 @@ void webserial_register_handle(int fd, const char *path)
             ws_handles[i].fd = fd;
             SNPRINTF(ws_handles[i].path, sizeof(ws_handles[i].path), "%s",
                      path ? path : "");
-            return;
+            return RIG_OK;
         }
     }
 
+    /* Reporting success here would leave the descriptor unowned, so the read
+     * and write wrappers would fall through to libc and the port would be
+     * driven by the host filesystem.  Fail the open instead. */
     rig_debug(RIG_DEBUG_ERR, "%s: handle table is full\n", __func__);
+    return -RIG_ENOMEM;
 }
 
 void webserial_unregister_handle(int fd)
@@ -307,7 +311,14 @@ int HAMLIB_API serial_open(hamlib_port_t *rp)
         return ws_map_error(handle, -RIG_EIO);
     }
 
-    webserial_register_handle(handle, rp->pathname);
+    status = webserial_register_handle(handle, rp->pathname);
+
+    if (status != RIG_OK)
+    {
+        hamlibWsClosePort(handle);
+        return status;
+    }
+
     rp->fd = handle;
     return RIG_OK;
 }
@@ -388,7 +399,14 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
         return ws_map_error(handle, -RIG_EIO);
     }
 
-    webserial_register_handle(handle, rp->pathname);
+    status = webserial_register_handle(handle, rp->pathname);
+
+    if (status != RIG_OK)
+    {
+        hamlibWsClosePort(handle);
+        return status;
+    }
+
     rp->fd = handle;
     return RIG_OK;
 }

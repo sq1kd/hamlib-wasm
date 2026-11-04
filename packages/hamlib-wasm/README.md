@@ -24,7 +24,7 @@ testing it.
 import { createEasy, HamlibError } from 'hamlib-wasm';
 import type { EasyHamlib, EasyRig, RigState } from 'hamlib-wasm';
 
-const hamlib: EasyHamlib = await createEasy();
+const hamlib: EasyHamlib = await createEasy({ levels: ['STRENGTH'] });
 hamlib.version;                       // "Hamlib <version> …"
 hamlib.models;                        // RigModel[], sorted by manufacturer then model
 
@@ -40,11 +40,17 @@ await rig.setMode('USB');                              // passband filled in fro
 await rig.setPassband('narrow');                       // current mode + width, in one compound
 await rig.setPtt(true);
 
-const stop = rig.watch(1000);                          // refresh() every second
+const stop = rig.watch({ intervalMs: 1000, fields: ['frequency', 'mode'] });
+const stopMeter = rig.watch({ intervalMs: 500, levels: ['STRENGTH'] });  // one SM0 per tick
 rig.on('state', (next) => console.log(next));
+rig.on('levels', (values) => console.log(values.STRENGTH));
 stop();
+stopMeter();
+
+await rig.level('STRENGTH');                           // one read, configured + advertised
 
 rig.capabilities.setFrequency;                         // booleans, from rig_caps
+rig.capabilities.levels;                               // configured levels the model has
 rig.raw;                                               // the 1:1 Rig, for anything below
 
 await rig.close();                                     // idempotent
@@ -86,15 +92,34 @@ What it adds, and what it deliberately does not:
 * A write never invents state - Hamlib's own cache decides what the next read
   reports - and a read the model cannot perform still fails with the native
   `UNSUPPORTED_OPERATION` error rather than returning a plausible value.
-* `watch()` registers a poll and registrations compose: the smallest interval
-  wins, removing one leaves the others polling, and removing the last stops the
-  scheduler.  A tick that arrives while the previous poll is still in flight is
-  skipped, so a slow rig cannot build a backlog of reads.  `close()` and
-  `dispose()` stop polling synchronously, cancel publication, and leave no
-  timer behind - including when the underlying rig was closed through
-  `rig.raw`. If a listener closes or disposes during dispatch, remaining
-  listeners of that same event and later field events are not delivered. This
-  also applies to error listeners; the failed command still rejects to its caller.
+* `watch({ intervalMs, fields, levels })` registers a poll that reads only the
+  fields it names.  Each interval runs its own timer, so a fast meter poll does
+  not speed up a slow frequency poll; removing one registration leaves the
+  others polling, and removing the last stops its timer.  A tick that arrives
+  while that interval's previous poll is still in flight is skipped, so a slow
+  rig cannot build a backlog of reads.  A tick is best effort - a field that
+  fails emits `error` and leaves the rest of the snapshot untouched - while
+  `refresh()` remains all-or-nothing.  `close()` and `dispose()` stop polling
+  synchronously, cancel publication, and leave no timer behind, including when
+  the underlying rig was closed through `rig.raw`.
+* Events dispatch over a snapshot of their listeners: a listener that closes or
+  disposes during dispatch does not cancel the event already on its way to the
+  other listeners, but nothing further is published after the close - field
+  events included.  Error listeners follow the same rule, and the failed
+  command still rejects to its caller.
+* Levels are opt-in.  `createEasy({ levels })` names the ones the instance may
+  read; the close/open gate costs one pure `has_get_level` call per configured
+  level, and `refresh()`/`watch()` read only those the model advertises.  A
+  level outside the configured set is `INVALID_ARGUMENT`; one the model does not
+  report is `UNSUPPORTED_OPERATION`.  Hamlib's level cache is 500 ms, so polling
+  a level faster than that mostly re-reads the cache.
+* A level is decoration, not core telemetry: `refresh()` reads the core fields
+  all-or-nothing and then reads levels best-effort, reporting a failed level as
+  an `error` event while still returning the snapshot.  A level whose read
+  fails twice in a row is dropped for the session - `has_get_level` describes
+  what a backend declares, and a declared meter that cannot be read would
+  otherwise cost the port timeout on every poll.  Reopening the rig re-probes
+  it.
 * `hamlib.open()` hands back one owned rig.  An instance tracks its easy
   handles, and an open that races with `dispose()` is closed again instead of
   being published, so `dispose()` never leaves a live wrapper or a port behind.
@@ -196,8 +221,9 @@ createRoot(document.getElementById('root')).render(
 ```
 
 `HamlibProvider` loads one instance (and disposes it on unmount); `useEasyRig`
-owns one rig and closes it on unmount; `useRigState` subscribes to the state
-event and optionally polls; `useRigError` reports the last operation failure.
+owns one rig and closes it on unmount; `useRigState(rig, { pollMs, fields,
+levels })` subscribes to the state event and optionally polls exactly the
+fields named; `useRigError` reports the last operation failure.
 StrictMode double-invocation is handled: an effect that unmounts before its
 module or rig finished opening disposes what it created.
 
@@ -247,7 +273,7 @@ Every failure is a `HamlibError` with:
 
 | Field | Meaning |
 | --- | --- |
-| `code` | Stable code: `TRANSPORT_UNAVAILABLE`, `PORT_PERMISSION_DENIED`, `TRANSPORT_FAILURE`, `HAMLIB_ERROR`, `RIG_UNRESPONSIVE`, `INVALID_ARGUMENT`, `UNSUPPORTED_OPERATION`, `RIG_CLOSED`, `DISPOSED` |
+| `code` | Stable code: `TRANSPORT_UNAVAILABLE`, `PORT_PERMISSION_DENIED`, `TRANSPORT_FAILURE`, `HAMLIB_ERROR`, `RIG_UNRESPONSIVE`, `INVALID_ARGUMENT`, `UNSUPPORTED_OPERATION`, `RIG_CLOSED`, `RIG_TIMEOUT`, `RIG_HUNG`, `DISPOSED` |
 | `operation` | Stable operation name, e.g. `"open"` or `"getFrequency"` |
 | `hamlibCode` / `hamlibMessage` | Hamlib's own error code and text |
 | `cause` | The underlying error, when a transport raised one |
@@ -257,6 +283,13 @@ Every failure is a `HamlibError` with:
 `createEasy()` / `createHamlib()` load the Emscripten module and resolve the
 `.wasm` asset next to the installed package with `new URL(..., import.meta.url)`.
 Pass `locateFile` to override it.
+
+Every native call runs under a watchdog: `callTimeoutMs` (30 s by default)
+bounds how long one call may hold the module queue.  Asyncify cannot unwind a
+suspended C stack, so an overrun is not cancelled - the caller receives
+`RIG_TIMEOUT`, later calls receive `RIG_HUNG`, and `dispose()` closes the port
+from the JavaScript side without re-entering the module.  Create a new instance
+to continue.
 
 ## Node and Electron
 

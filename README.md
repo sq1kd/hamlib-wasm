@@ -25,15 +25,18 @@ Five entry points, so it is always clear which surface is in use:
 ```ts
 import { createEasy } from 'hamlib-wasm';
 
-const hamlib = await createEasy();
+const hamlib = await createEasy({ levels: ['STRENGTH'] });  // no level reads otherwise
 const rig = await hamlib.open({ modelId });       // asks for the port: user gesture
 
-const { frequency, mode, passband } = await rig.refresh();  // only advertised fields
+const { frequency, mode, passband, levels } = await rig.refresh();  // advertised fields only
 await rig.setFrequency(14_074_000);
 await rig.setMode('USB');                         // passband filled in from the model
 await rig.setPtt(true);                           // an explicit on command, not a toggle
 
-rig.on('state', console.log);                     // or rig.watch(1000) to poll
+rig.on('state', console.log);
+rig.watch({ intervalMs: 1000, fields: ['frequency', 'mode'] });  // no level traffic
+rig.watch({ intervalMs: 500, fields: ['levels'], levels: ['STRENGTH'] });  // one SM0 per tick
+
 await rig.close();
 await hamlib.dispose();
 ```
@@ -80,7 +83,9 @@ await hamlib.dispose();
 | `tests/hardware` | Opt-in, read-only checks against a real rig through the shipped Node transport |
 | `tests/harness` | Pages that publish the built package (`index.html`) and drive the React hooks (`hooks.html`) for the specs |
 | `tests/consumer` | External consumer fixture, typechecked against the packed tarball |
-| `.github/workflows/pages.yml` | Builds `examples/react` and publishes it to GitHub Pages |
+| `.github/workflows` | `ci.yml` (the local `mise run check` gate), `release.yml` (semantic-release with npm trusted publishing), `licensing.yml`, and `pages.yml.off` (the demo deploy, disabled until the repository is published) |
+| `scripts` | Release plumbing: semantic-release entry, Hamlib provenance notes, the release-block commit guard |
+| `release.config.cjs` / `RELEASING.md` | semantic-release configuration and the publishing runbook |
 | `docs` | Investigation notes, the implementation plan and the implementation record |
 
 Build products live in `.cache/hamlib/<version>` (downloaded upstream source and
@@ -97,9 +102,14 @@ mise run build                       # Hamlib wasm, package, both examples
 mise run fetch-native                # fetch, verify, patch and extract the pinned release
 mise run generate                    # regenerate the binding surface from the config + upstream AST
 mise run baseline-record             # re-record the upstream behavioural baseline
-mise run typecheck                   # every project, including the packed-consumer fixture
-mise run test                        # hook/Node unit tests + deterministic transport/browser scenarios
+mise run check                       # the local gate: lint, types, generated files, unit + browser tests
+mise run check-release               # check + packed-tarball audit + backend audit
+mise run typecheck                   # every project plus `check-generated`, including the packed consumer
+mise run lint                        # Biome (lint only; the formatter is deliberately off)
+mise run check-generated             # fail when the committed bindings are stale
+mise run test                        # hook/codegen/Node unit tests + deterministic browser scenarios
 mise run test-hooks                  # only the DOM-less React hook unit tests
+mise run test-codegen                # only the generator unit tests
 mise run test-node                   # only the Node transport checks against the built package
 mise run test-hardware               # read-only checks against a real attached rig (opt-in)
 mise run example-node                # list this machine's serial ports through the Node entry point
@@ -109,6 +119,8 @@ mise run verify-package              # verify the actual npm tarball
 mise run verify-relink               # clean-room relink with modified Hamlib
 mise run verify-release              # package + relink concurrently
 mise run release-bump -- --version … # update the pinned Hamlib release
+mise run release-guard               # require a feat/fix commit when the pin changes
+mise run release-dry-run             # semantic-release dry run (GITHUB_TOKEN, scratch remote)
 mise run dev                         # Vanilla example dev server
 mise run dev-react                   # React landing page dev server
 ```
@@ -120,6 +132,14 @@ strictly (no fuzz, no rejects), installs the project owned `src/serial.c`,
 configures a static single threaded Emscripten build, checks the committed
 generated files against the upstream headers, links, and verifies the emitted
 Embind declaration against that same config.
+
+### Verifying before a push
+
+`mise run check` is the one gate: Biome, `tsc` on every project, the generated
+bindings vs the config, the hook/codegen/Node unit tests and the Playwright
+suite.  `mise run bootstrap` points Git at `.githooks/commit-msg`, so every
+commit message is checked against Conventional Commits - semantic-release derives
+the version from them.
 
 ### Upstream refresh
 
@@ -208,6 +228,24 @@ graph TD
   what it opened is closed again instead of published. Polling is
   subscription-based, so several consumers can watch one rig; the last
   unsubscribe, `close()` and `dispose()` each stop the scheduler.
+* **Scoped polling** - a `watch()` registration names the fields it reads, and
+  each interval runs its own timer, so a 500 ms meter poll does not drag a 1 s
+  frequency poll to 500 ms, and a page with no meters issues no level reads at
+  all. A tick is best effort: a field that fails reports an `error` and leaves
+  the rest of the snapshot alone, while `refresh()` stays all-or-nothing.
+* **Levels are opt-in** - `createEasy({ levels })` decides which levels the
+  instance may read (`STRENGTH`, `SWR`, `ALC`, `RFPOWER`, `RFPOWER_METER`), and
+  a level is still only read when the model's own `has_get_level` mask
+  advertises it. The gate costs one pure call per configured level at open.
+  Levels are decoration: `refresh()` returns its core snapshot even when a
+  level read fails (reporting it as an `error`), and a level that fails twice is
+  dropped for the session so a declared-but-unreadable meter cannot cost the
+  port timeout on every poll.
+* **A hung call cannot wedge the page silently** - every native call runs under
+  a watchdog (`callTimeoutMs`, 30 s by default). Asyncify cannot unwind a
+  suspended C stack, so an overrun is not cancelled: the caller gets
+  `RIG_TIMEOUT`, later calls get `RIG_HUNG`, and `dispose()` releases the port
+  from the JavaScript side without crossing the module again.
 * **Hamlib's cache is left intact** - its setters keep the 500 ms cache
   coherent, so a read after a write reports what was just written (notably for
   PTT, where the Kenwood backend additionally caches its `IF` response).
@@ -247,14 +285,15 @@ graph TD
 
 Serial CAT control, in a secure context desktop Chromium family browser over
 Web Serial and anywhere Node 24+ runs over node-serialport: frequency, mode,
-passband and PTT for the models Hamlib reports as `RIG_PORT_SERIAL`, including
+passband, PTT and opt-in levels (`STRENGTH`, `SWR`, `ALC`, `RFPOWER`,
+`RFPOWER_METER`) for the models Hamlib reports as `RIG_PORT_SERIAL`, including
 CAT based PTT and serial RTS/DTR PTT.
 
 What the entries cover:
 
 | Entry | Surface |
 | --- | --- |
-| `hamlib-wasm` | `createEasy`, `EasyRig` (`refresh`, `setFrequency`, `setMode`, `setPassband`, `setPtt`, `baudRate`, `on`, `watch`), `detectBaudRate` and `EasyRig.raw` for everything below; `refresh` returns only the fields the model advertises and `watch` registers composable polls |
+| `hamlib-wasm` | `createEasy({ levels })`, `EasyRig` (`refresh`, `level`, `setFrequency`, `setMode`, `setPassband`, `setPtt`, `baudRate`, `on`, `watch`), `detectBaudRate` and `EasyRig.raw` for everything below; `refresh` returns only the advertised fields, and `watch({ intervalMs, fields, levels })` reads exactly what a consumer asked for |
 | `hamlib-wasm/hamlib` | 100 methods on `Rig`, one per bound Hamlib operation, plus `baudRate`, `detectBaudRate`, the catalogue and the error type |
 | `hamlib-wasm/native` | The raw Emscripten module, its generated declaration and the Wasm asset |
 | `hamlib-wasm/node` | `nodeSerialTransport()` behind the same `SerialTransport` contract, `listPorts()` for what the operating system reports, and `requestPort({ path })` |

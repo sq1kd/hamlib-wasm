@@ -59,6 +59,18 @@ export type HamlibErrorCode =
   | 'UNSUPPORTED_OPERATION'
   /** The rig has been closed. */
   | 'RIG_CLOSED'
+  /**
+   * A native call did not settle within the configured `callTimeoutMs`.
+   *
+   * The call is abandoned and the instance becomes unusable; see
+   * {@link HamlibOptions.callTimeoutMs}.
+   */
+  | 'RIG_TIMEOUT'
+  /**
+   * The instance is hung: an earlier call overran and never returned, so the
+   * native stack cannot be re-entered.  Dispose it and create a new one.
+   */
+  | 'RIG_HUNG'
   /** The Hamlib instance has been disposed. */
   | 'DISPOSED';
 

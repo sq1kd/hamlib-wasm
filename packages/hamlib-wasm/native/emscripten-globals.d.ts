@@ -67,6 +67,12 @@ interface SerialPortLike {
   readonly writable: WritableStream<Uint8Array> | null;
   setSignals(signals: SerialOutputSignals): Promise<void>;
   getSignals(): Promise<SerialInputSignals>;
+  /**
+   * Output lines this transport asserts when it opens a port, if it asserts
+   * any.  Web Serial leaves both deasserted and omits this; the Node adapter
+   * reports what `serialport` applies, so `ser_get_dtr()` tells the truth.
+   */
+  initialSignals?(): { rts: boolean; dtr: boolean };
 }
 
 type WakeReason = 'data' | 'timeout' | 'error';
@@ -98,8 +104,6 @@ interface PortState {
   rxBytes: number;
   lastRts: number;
   lastDtr: number;
-  rtsKnown: boolean;
-  dtrKnown: boolean;
 }
 
 interface PortRecord {
@@ -138,6 +142,9 @@ interface HamlibWsApi {
   WS_ERR_ACCESS: number;
   WS_ERR_BUSY: number;
 
+  /** Bytes the RX pump may buffer before a read is overdue and the port fails. */
+  RX_QUEUE_LIMIT: number;
+
   /* token -> port, waiting for the facade to bind it to a logical path */
   pendingPorts: Map<number, SerialPortLike>;
   /* logical path -> record */
@@ -147,6 +154,12 @@ interface HamlibWsApi {
   nextToken: number;
   nextHandle: number;
   lastError: ErrorRecord | null;
+
+  /**
+   * Release every port from JavaScript without crossing the Wasm boundary.
+   * Only used when a native call is stuck and the module cannot be re-entered.
+   */
+  forceCloseAll(): void;
 
   recordError(name: string, message: string, context?: string): void;
   fail(error: unknown, context: string): number;
@@ -159,7 +172,7 @@ interface HamlibWsApi {
   queueClear(queue: ByteQueue): void;
   wake(state: PortState, reason: WakeReason): void;
   startPump(state: PortState): Promise<void>;
-  makeState(options: SerialOptions): PortState;
+  makeState(options: SerialLineSettings, rts: number, dtr: number): PortState;
   allocHandle(record: PortRecord): number;
   teardown(record: PortRecord, state: PortState): Promise<number>;
   openPort(

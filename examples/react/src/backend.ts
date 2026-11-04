@@ -72,6 +72,7 @@ export const NO_CAPABILITIES: EasyCapabilities = {
   setMode: false,
   getPtt: false,
   setPtt: false,
+  levels: [],
 };
 
 const PTT_STATES: readonly PttState[] = ['off', 'on', 'on-mic', 'on-data'];
@@ -106,7 +107,12 @@ async function passbandWidth(rig: Rig, mode: string, kind: PassbandKind): Promis
 /** The easy surface: the panel's defaults, straight from the library. */
 export function useEasyBackend(log: Log): Backend {
   const { rig, connecting, error: connectError, connect, disconnect } = useEasyRig();
-  const state = useRigState(rig, { pollMs: POLL_MS });
+  /* The demo shows a meter, so its poll asks for the levels too; the library
+   * reads none otherwise. */
+  const state = useRigState(rig, {
+    pollMs: POLL_MS,
+    fields: ['frequency', 'mode', 'ptt', 'levels'],
+  });
   const operationError = useRigError(rig);
 
   const call = useCallback(async <T,>(label: string, run: () => Promise<T>): Promise<void> => {
@@ -381,7 +387,9 @@ export function useNativeBackend(log: Log): Backend {
       rigRef.current = rig;
 
       const model = hamlib.models.find((candidate) => candidate.id === modelId);
-      const next = model === undefined ? NO_CAPABILITIES : capabilitiesOf(model);
+      const next = model === undefined
+        ? NO_CAPABILITIES
+        : { ...capabilitiesOf(model), levels: [] };
 
       capsRef.current = next;
       setCapabilities(next);

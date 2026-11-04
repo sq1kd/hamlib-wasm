@@ -44,10 +44,11 @@ results:
       - [ serialStopBits, int ]
       - [ serialParity, string ]
       - [ serialHandshake, string ]
-      - [ canGetFrequency, bool ]
-      - [ canSetFrequency, bool ]
-      - [ canGetMode, bool ]
-      - [ canSetMode, bool ]
+      # canGetFrequency/canSetFrequency/canGetMode/canSetMode are deliberately
+      # absent: the capability list already carries the generated operation, so
+      # the catalogue derives those four booleans from it.  PTT stays here
+      # because a backend that drives it over the RTS/DTR line declares no
+      # get_ptt/set_ptt function pointer.
       - [ canGetPtt, bool ]
       - [ canSetPtt, bool ]
   CodeResult:
@@ -160,6 +161,23 @@ operations:
     calls:
       - rig_close
       - rig_cleanup
+  # Releases everything the module owns: every rig still registered, the handle
+  # map and the JavaScript port registry.  Called by dispose(); Wasm memory
+  # itself is reclaimed when the module is collected.
+  - name: destroy
+    scope: module
+    args: []
+    result: CodeResult
+    calls:
+      - rig_close
+      - rig_cleanup
+  # Number of RIG handles currently registered.  A lifecycle probe: a test can
+  # prove that closing and disposing really released the native side.
+  - name: liveHandles
+    scope: module
+    args: []
+    result: int
+    calls: []
   - name: getPtt
     scope: rig
     capability: canGetPtt
@@ -188,7 +206,7 @@ operations:
     scope: rig
     args:
       - [ handle, int ]
-      - [ token, int ]
+      - [ token, double ]
     result: NumberResult
     calls:
       - rig_get_ext_level
@@ -196,7 +214,7 @@ operations:
     scope: rig
     args:
       - [ handle, int ]
-      - [ token, int ]
+      - [ token, double ]
       - [ value, double ]
     result: CodeResult
     calls:
@@ -205,7 +223,7 @@ operations:
     scope: rig
     args:
       - [ handle, int ]
-      - [ token, int ]
+      - [ token, double ]
     result: NumberResult
     calls:
       - rig_get_ext_parm
@@ -213,7 +231,7 @@ operations:
     scope: rig
     args:
       - [ handle, int ]
-      - [ token, int ]
+      - [ token, double ]
       - [ value, double ]
     result: CodeResult
     calls:

@@ -240,8 +240,11 @@ class NodeSerialPortAdapter implements SerialPortLike {
   #readable: ReadableStream<Uint8Array> | null = null;
   #writable: WritableStream<Uint8Array> | null = null;
   #listeners: PortListeners | null = null;
+  /** The in-flight open, so a concurrent close waits for it instead of no-oping. */
+  #opening: Promise<void> | null = null;
   /** The complete output state `set()` applies; `serialport` resets the flags a
-   * call leaves out, so every flag is always sent. */
+   * call leaves out, so every flag is always sent.  These are also what the
+   * adapter asserts on open, which is what `initialSignals()` reports. */
   #output: NodeSetOptions = { brk: false, cts: false, dtr: true, rts: true };
 
   constructor(path: string, SerialPort: SerialPortConstructorLike) {
@@ -263,7 +266,7 @@ class NodeSerialPortAdapter implements SerialPortLike {
   }
 
   async open(settings: SerialLineSettings): Promise<void> {
-    if (this.#port) {
+    if (this.#port || this.#opening) {
       throw new HamlibError('the port is already open', {
         code: 'INVALID_ARGUMENT',
         operation: 'open',
@@ -282,14 +285,36 @@ class NodeSerialPortAdapter implements SerialPortLike {
       autoOpen: false,
     });
 
-    await this.#call<void>((callback) => port.open(callback), 'open');
+    const opening = this.#call<void>((callback) => port.open(callback), 'open').then(() => {
+      this.#port = port;
+      this.#output = { brk: false, cts: false, dtr: true, rts: true };
+      this.#attach(port);
+    });
 
-    this.#port = port;
-    this.#output = { brk: false, cts: false, dtr: true, rts: true };
-    this.#attach(port);
+    this.#opening = opening;
+
+    try {
+      await opening;
+    } finally {
+      if (this.#opening === opening) {
+        this.#opening = null;
+      }
+    }
   }
 
   async close(): Promise<void> {
+    /* A close that races the open must not be a no-op: without this wait the
+     * opened port would be assigned after the early return and leak. */
+    const opening = this.#opening;
+
+    if (opening) {
+      try {
+        await opening;
+      } catch {
+        /* The open failed; there is no port to close. */
+      }
+    }
+
     const port = this.#port;
 
     if (!port) {
@@ -307,6 +332,17 @@ class NodeSerialPortAdapter implements SerialPortLike {
       this.#readable = null;
       this.#writable = null;
     }
+  }
+
+  /**
+   * The lines `serialport` asserts as it opens.
+   *
+   * `serialport`'s bindings raise DTR and RTS on open; reporting that is what
+   * makes `ser_get_dtr()`/`ser_get_rts()` agree with the device instead of
+   * claiming both deasserted.
+   */
+  initialSignals(): { rts: boolean; dtr: boolean } {
+    return { rts: this.#output.rts === true, dtr: this.#output.dtr === true };
   }
 
   async setSignals(signals: SerialOutputSignals): Promise<void> {

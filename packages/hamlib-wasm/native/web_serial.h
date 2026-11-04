@@ -64,8 +64,9 @@ extern "C" {
 /* True when fd is a handle this transport handed out and has not closed. */
 int webserial_owns_fd(int fd);
 
-/* Record a freshly opened handle for `path`.  No-op when the table is full. */
-void webserial_register_handle(int fd, const char *path);
+/* Record a freshly opened handle for `path`.  RIG_OK, or -RIG_ENOMEM when the
+ * table is full - the caller must then close the handle again. */
+int webserial_register_handle(int fd, const char *path);
 
 /* Forget a handle.  No-op for unknown values, so it is safe to call twice. */
 void webserial_unregister_handle(int fd);

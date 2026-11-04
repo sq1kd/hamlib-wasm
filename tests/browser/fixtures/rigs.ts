@@ -63,6 +63,14 @@
       filterValue: 0,
       transmitting: false,
       silent: false,
+      /* Raw TS-480 meters: `SM0` carries four digits and `RM;` returns all
+       * three meter readings at once.  The values sit on calibration points in
+       * the backend's own tables (S9+? no: raw 11 is 0 dB, raw 4 is SWR 1.5),
+       * so the decoded readings are exact rather than interpolated. */
+      strengthRaw: 11,
+      swrRaw: 4,
+      compRaw: 0,
+      alcRaw: 0,
     };
 
     var commands: string[] = [];
@@ -101,6 +109,10 @@
           case 'FW':
             state.filterValue = Number(argument);
             return null;
+          case 'SM':
+            /* `SM0;` (the TS-480 S-meter); the reply echoes the prefix and
+             * adds four digits, which is the shape the backend parses. */
+            return command + pad(state.strengthRaw, 4);
           case 'TX':
             state.transmitting = true;
             return null;
@@ -131,6 +143,12 @@
           return 'FW' + pad(state.filterValue, 4);
         case 'IF':
           return ifPayload();
+        case 'RM':
+          /* SWR, COMP and ALC in one reply, exactly 24 bytes including the
+           * terminator the caller appends. */
+          return 'RM1' + pad(state.swrRaw, 4)
+            + ';RM2' + pad(state.compRaw, 4)
+            + ';RM3' + pad(state.alcRaw, 4);
         case 'FR':
           return 'FR0';
         case 'FT':
@@ -566,6 +584,9 @@
     var FRAME_LENGTH = 5;
     var READ_OP_DATA = [0x00, 0x00, 0x00, 0x02, 0x10];
     var OP_DATA_LENGTH = 19;
+    var SET_FREQ = 0x0a;
+    var SET_MODE = 0x0c;
+    var READ_STATUS = 0xf7;
 
     var state = {
       frequency: 7050000,
@@ -578,13 +599,18 @@
     var commands: string[] = [];
     var buffer: number[] = [];
 
-    /** True when the buffered frame is `frame`. */
-    function sameFrame(frame: number[]): boolean {
+    /** True when `candidate` is `frame`. */
+    function sameFrame(candidate: number[], frame: number[]): boolean {
       for (var i = 0; i < FRAME_LENGTH; i++) {
-        if (buffer[i] !== frame[i]) { return false; }
+        if (candidate[i] !== frame[i]) { return false; }
       }
 
       return true;
+    }
+
+    /** One BCD byte as its decimal value (0x71 is 71). */
+    function bcdByte(byte: number): number {
+      return ((byte >> 4) * 10) + (byte & 0x0f);
     }
 
     /** The operating data block, receive frequency in octets 2..4. */
@@ -612,17 +638,35 @@
         var replies: Uint8Array[] = [];
 
         while (buffer.length >= FRAME_LENGTH) {
+          var frame = buffer.slice(0, FRAME_LENGTH);
+          buffer = buffer.slice(FRAME_LENGTH);
+
           var text = '';
 
           for (var j = 0; j < FRAME_LENGTH; j++) {
-            text += ' ' + pad(buffer[j]!.toString(16).toUpperCase(), 2);
+            text += ' ' + pad(frame[j]!.toString(16).toUpperCase(), 2);
           }
 
           commands.push(text.trim());
 
-          if (sameFrame(READ_OP_DATA)) { replies.push(opData()); }
+          if (sameFrame(frame, READ_OP_DATA)) {
+            replies.push(opData());
+          } else if (frame[4] === SET_FREQ) {
+            /* The backend writes the tuning step in BCD, least significant
+             * byte first; the emulator applies it so a later read reports the
+             * frequency that was actually set. */
+            var units = bcdByte(frame[2]!) * 10000
+              + bcdByte(frame[1]!) * 100
+              + bcdByte(frame[0]!);
 
-          buffer = buffer.slice(FRAME_LENGTH);
+            state.frequency = units * 10;
+          } else if (frame[4] === SET_MODE) {
+            state.modeDigit = frame[3]!;
+          } else if (frame[4] === READ_STATUS) {
+            /* Meter-only status: one byte, accepted by the backend's read of
+             * up to five. */
+            replies.push(new Uint8Array([0x30]));
+          }
         }
 
         return replies;

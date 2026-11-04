@@ -39,8 +39,8 @@ test('two watchers coexist and removing one leaves the other polling', async ({ 
 
     rig.on('state', () => { samples += 1; });
 
-    const stopA = rig.watch(150);
-    const stopB = rig.watch(40);
+    const stopA = rig.watch({ intervalMs: 150 });
+    const stopB = rig.watch({ intervalMs: 40 });
 
     /* A's interval is the slower one, so growth after B is removed can only
      * come from A still being registered. */
@@ -83,7 +83,7 @@ test('a slow read never accumulates poll work', async ({ page }) => {
      * second while the watch interval is 30 ms. */
     window.__fakeSerial.replyDelayMs = 400;
     const base = window.__fakeSerial.commands.length;
-    const stop = rig.watch(30);
+    const stop = rig.watch({ intervalMs: 30 });
 
     await window.__testHelpers.sleep(900);
 
@@ -120,7 +120,7 @@ test('disposal with an active watcher closes the port and stops polling', async 
 
     rig.on('state', () => { samples += 1; });
 
-    const stop = rig.watch(40);
+    const stop = rig.watch({ intervalMs: 40 });
 
     await window.__testHelpers.sleep(300);
 
@@ -168,7 +168,7 @@ test('closing the raw rig behind the wrapper stops the scheduler', async ({ page
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
-    rig.watch(40);
+    rig.watch({ intervalMs: 40 });
     await window.__testHelpers.sleep(250);
 
     /* The escape hatch closes the port without going through the wrapper. */
@@ -247,7 +247,7 @@ test('a second instance can reuse the port after the first cleaned up', async ({
 
     const rigA = await first.open({ modelId: model.id, baudRate: model.serialRateMax });
 
-    rigA.watch(40);
+    rigA.watch({ intervalMs: 40 });
     await rigA.close();
     await first.dispose();
 
@@ -274,4 +274,29 @@ test('a second instance can reuse the port after the first cleaned up', async ({
   expect(result.closeCount).toBe(2);
   expect(result.isOpen).toBe(false);
   expect(result.closedWithLockedStreams).toBe(false);
+});
+
+test('watching a closed rig is refused', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createEasy({});
+    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
+
+    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+
+    const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
+    await rig.close();
+
+    const refusal = window.__testHelpers.capture(() => {
+      rig.watch({ intervalMs: 100 });
+      return null;
+    });
+
+    await hamlib.dispose();
+    return refusal;
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.ok).toBe(false);
+  expect(result.ok ? null : result.error.code).toBe('RIG_CLOSED');
 });

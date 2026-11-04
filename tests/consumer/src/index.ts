@@ -160,7 +160,7 @@ export async function runEasyFlow(
   port: SerialPort,
   locateFile: HamlibOptions['locateFile'],
 ): Promise<EasySummary> {
-  const hamlib: EasyHamlib = await createEasy({ locateFile });
+  const hamlib: EasyHamlib = await createEasy({ locateFile, levels: ['STRENGTH'] });
   const version: string = hamlib.version;
   const model: RigModel | undefined = hamlib.models.find(
     (candidate: RigModel) => candidate.model === 'TS-480',
@@ -181,10 +181,15 @@ export async function runEasyFlow(
   const unsubscribe: () => void = rig.on('state', (state: RigState) => {
     void state.frequency;
   });
-  const stopWatching: () => void = rig.watch(1000);
+  const stopWatching: () => void = rig.watch({
+    intervalMs: 1000,
+    fields: ['frequency', 'mode'],
+  });
+  const stopMeter: () => void = rig.watch({ intervalMs: 500, levels: ['STRENGTH'] });
 
   unsubscribe();
   stopWatching();
+  stopMeter();
 
   const state: RigState = await rig.refresh();
   await rig.setFrequency(7_074_000);
@@ -193,6 +198,10 @@ export async function runEasyFlow(
 
   const ptt: PttState = rig.state?.ptt ?? 'off';
   const capabilities: EasyCapabilities = rig.capabilities;
+  const strength: number | undefined = state.levels?.STRENGTH;
+  const advertised: readonly string[] = capabilities.levels;
+  void strength;
+  void advertised;
 
   /* Anything the easy surface does not cover is still reachable. */
   const raw: Rig = rig.raw;

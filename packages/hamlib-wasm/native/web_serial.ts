@@ -57,6 +57,12 @@ addToLibrary({
     WS_ERR_ACCESS: -5,
     WS_ERR_BUSY: -6,
 
+    /* Bytes the pump may buffer before the reader is treated as stuck.
+     * Hamlib's own read loop keeps the queue near empty; a rig that far ahead
+     * of the CAT exchange means nothing is draining it, and buffering without
+     * bound only postpones the failure. */
+    RX_QUEUE_LIMIT: 65536,
+
     /* token -> port, waiting for the facade to bind it to a logical path */
     pendingPorts: new Map<number, SerialPortLike>(),
     /* logical path -> record */
@@ -173,6 +179,49 @@ addToLibrary({
       return this.WS_OK;
     },
 
+    /*
+     * Release every port from JavaScript alone.
+     *
+     * Called by `HamlibInstance.dispose()` when a native call is stuck: the
+     * suspended Asyncify stack owns the module, so nothing may cross Embind,
+     * but the port objects are ordinary JavaScript and the device must not be
+     * left open.  Best effort by design - the instance is dead either way.
+     */
+    forceCloseAll(): void {
+      this.handles.clear();
+      this.pendingPorts.clear();
+
+      for (const record of this.ports.values()) {
+        const state = record.state;
+        record.state = null;
+        record.openCount = 0;
+
+        if (state) {
+          state.closed = true;
+
+          if (state.reader) {
+            try {
+              void state.reader.cancel().catch(function () {
+                /* Already closed or errored. */
+              });
+            } catch {
+              /* Nothing left to release. */
+            }
+          }
+        }
+
+        try {
+          void Promise.resolve(record.port.close()).catch(function () {
+            /* Best effort. */
+          });
+        } catch {
+          /* Best effort. */
+        }
+      }
+
+      this.ports.clear();
+    },
+
     /* --- byte queue ----------------------------------------------------- */
 
     queuePush(queue: ByteQueue, chunk: Uint8Array): void {
@@ -250,6 +299,22 @@ addToLibrary({
               state.rxBytes += result.value.length;
               self.queuePush(state.queue, result.value);
               self.wake(state, 'data');
+
+              if (state.queue.length > self.RX_QUEUE_LIMIT) {
+                /* Nothing is draining the port: stop reading and report it,
+                 * rather than growing a buffer no CAT exchange will consume. */
+                const message = `serial receive buffer exceeded ${self.RX_QUEUE_LIMIT} bytes`;
+                state.failure = { name: 'Error', message };
+                self.recordError('Error', message, 'read');
+
+                try {
+                  await reader.cancel();
+                } catch {
+                  /* The stream may already be closed or errored. */
+                }
+
+                break;
+              }
             }
           }
         } catch (error) {
@@ -267,7 +332,7 @@ addToLibrary({
 
     /* --- open/close ----------------------------------------------------- */
 
-    makeState(options: SerialLineSettings): PortState {
+    makeState(options: SerialLineSettings, rts: number, dtr: number): PortState {
       return {
         options: options,
         queue: { chunks: [], offset: 0, length: 0 },
@@ -279,10 +344,11 @@ addToLibrary({
         writeChain: null,
         pumpPromise: null,
         rxBytes: 0,
-        lastRts: 0,
-        lastDtr: 0,
-        rtsKnown: false,
-        dtrKnown: false,
+        /* What the transport asserts as it opens: Web Serial leaves both
+         * deasserted, `serialport` does not, and the readback must not claim
+         * a line the device never saw. */
+        lastRts: rts,
+        lastDtr: dtr,
       };
     },
 
@@ -394,7 +460,8 @@ addToLibrary({
         return this.fail(error, 'open');
       }
 
-      const state = this.makeState(options);
+      const initial = record.port.initialSignals?.() ?? { rts: false, dtr: false };
+      const state = this.makeState(options, initial.rts ? 1 : 0, initial.dtr ? 1 : 0);
       record.state = state;
       record.openCount = 1;
 
@@ -636,14 +703,10 @@ addToLibrary({
 
       if (rts >= 0) {
         signals.requestToSend = rts !== 0;
-        state.lastRts = rts !== 0 ? 1 : 0;
-        state.rtsKnown = true;
       }
 
       if (dtr >= 0) {
         signals.dataTerminalReady = dtr !== 0;
-        state.lastDtr = dtr !== 0 ? 1 : 0;
-        state.dtrKnown = true;
       }
 
       if (brk >= 0) {
@@ -654,6 +717,16 @@ addToLibrary({
         await entry.record.port.setSignals(signals);
       } catch (error) {
         return this.fail(error, 'setSignals');
+      }
+
+      /* The readback reports what the device accepted, not what was asked:
+       * a transport may reject one of the lines. */
+      if (rts >= 0) {
+        state.lastRts = rts !== 0 ? 1 : 0;
+      }
+
+      if (dtr >= 0) {
+        state.lastDtr = dtr !== 0 ? 1 : 0;
       }
 
       return this.WS_OK;
@@ -824,5 +897,11 @@ addToLibrary({
   hamlibWsClearLastError__deps: ['$HamlibWs'],
   hamlibWsClearLastError: function (): number {
     return HamlibWs.clearLastError();
+  },
+
+  hamlibWsForceCloseAll__deps: ['$HamlibWs'],
+  hamlibWsForceCloseAll: function (): number {
+    HamlibWs.forceCloseAll();
+    return 0;
   },
 });

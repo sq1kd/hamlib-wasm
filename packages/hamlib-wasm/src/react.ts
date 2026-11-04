@@ -36,9 +36,11 @@ import type { ReactElement, ReactNode } from 'react';
 import { HamlibError, createEasy } from './index.js';
 import type {
   EasyHamlib,
+  EasyOptions,
   EasyRig,
-  HamlibOptions,
+  LevelName,
   OpenEasyRigOptions,
+  RigField,
   RigModel,
   RigState,
 } from './index.js';
@@ -46,14 +48,18 @@ import type {
 export type {
   EasyCapabilities,
   EasyHamlib,
+  EasyOperationCapabilities,
+  EasyOptions,
   EasyRig,
   EasyRigEvents,
   HamlibOptions,
+  LevelName,
   OpenEasyRigOptions,
   PassbandSelector,
   PortFilter,
   PortRequest,
   PttState,
+  RigField,
   RigModel,
   RigState,
   SerialInputSignals,
@@ -62,6 +68,7 @@ export type {
   SerialPortInfo,
   SerialPortLike,
   SerialTransport,
+  WatchOptions,
 } from './index.js';
 export { HamlibError, createEasy, webSerialTransport } from './index.js';
 
@@ -97,7 +104,7 @@ export interface HamlibProviderProps {
    * `useMemo`) - changing its identity does not re-create the module, because
    * a second Wasm instance is never what a re-render wants.
    */
-  options?: HamlibOptions;
+  options?: EasyOptions;
 }
 
 /**
@@ -112,7 +119,7 @@ export function HamlibProvider({ children, options }: HamlibProviderProps): Reac
     error: undefined,
     loading: true,
   });
-  const optionsRef = useRef<HamlibOptions | undefined>(options);
+  const optionsRef = useRef<EasyOptions | undefined>(options);
 
   useEffect(() => {
     let live = true;
@@ -306,6 +313,15 @@ export function useEasyRig(): UseEasyRigResult {
 export interface UseRigStateOptions {
   /** Poll every `pollMs`; `0` (the default) reads only on demand. */
   pollMs?: number;
+  /**
+   * Fields the poll reads; see {@link WatchOptions.fields}.  Omitted, the
+   * poll reads frequency, mode and PTT - not levels.
+   *
+   * Compared by value, so a literal array in render does not restart the poll.
+   */
+  fields?: readonly RigField[];
+  /** Levels the poll reads; implies the `'levels'` field. */
+  levels?: readonly LevelName[];
 }
 
 /**
@@ -318,6 +334,10 @@ export function useRigState(
 ): RigState | undefined {
   const [state, setState] = useState<RigState | undefined>(rig?.state);
   const pollMs = options.pollMs ?? 0;
+  /* Value keys, not the arrays: an inline `fields` literal is a new identity on
+   * every render and would restart the poll each time. */
+  const fieldsKey = options.fields?.join(',') ?? '';
+  const levelsKey = options.levels?.join(',') ?? '';
 
   useEffect(() => {
     if (rig === undefined) {
@@ -328,13 +348,32 @@ export function useRigState(
     setState(rig.state);
 
     const unsubscribe = rig.on('state', setState);
-    const stop = pollMs > 0 ? rig.watch(pollMs) : undefined;
+    /* A poll must not ask for a level the instance cannot read: `watch()`
+     * refuses that, and a throw from an effect would take the tree with it.
+     * The hook therefore polls the intersection of what was asked for and what
+     * the rig advertises. */
+    const advertised = new Set<LevelName>(rig.capabilities.levels);
+    const fields = fieldsKey === ''
+      ? undefined
+      : fieldsKey.split(',').filter(
+        (field) => field !== 'levels' || advertised.size > 0,
+      ) as RigField[];
+    const levels = levelsKey === ''
+      ? undefined
+      : levelsKey.split(',').filter((name) => advertised.has(name as LevelName)) as LevelName[];
+    const stop = pollMs > 0
+      ? rig.watch({
+        intervalMs: pollMs,
+        ...(fields === undefined ? {} : { fields }),
+        ...(levels === undefined || levels.length === 0 ? {} : { levels }),
+      })
+      : undefined;
 
     return () => {
       unsubscribe();
       stop?.();
     };
-  }, [rig, pollMs]);
+  }, [rig, pollMs, fieldsKey, levelsKey]);
 
   return state;
 }

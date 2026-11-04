@@ -2,7 +2,7 @@
   "$comment": "Generated coverage report: which upstream declarations this generator binds and which it refuses, and why, plus the pinned signature of every symbol a bespoke operation calls.  Diff it on an upstream bump to see what changed.",
   "release": "4.7.2",
   "summary": {
-    "bespoke": 19,
+    "bespoke": 21,
     "generated": 89,
     "refused": 87
   },
