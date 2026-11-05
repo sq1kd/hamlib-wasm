@@ -15,6 +15,9 @@
  *     classified into a shape and either generated or listed as a refusal with
  *     a reason.
  *
+ * The pinned `src/` directory adds the upstream Doxygen comments, which the
+ * public contract carries as TSDoc (see `docs.ts`).
+ *
  * Outputs: the generated C++ includes, the strict TypeScript contract and
  * method classes, and a committed coverage report (coverage.json) recording
  * which declarations are bound, which are refused, and the exact signature of
@@ -40,6 +43,7 @@ import ts from 'typescript';
 import { loadAst, type AstIndex } from './ast.ts';
 import { classifyAll } from './classify.ts';
 import { loadConfig, type Model } from './config.ts';
+import { loadUpstreamDocs, type UpstreamDoc } from './docs.ts';
 import {
   embindArity,
   emitCapabilities,
@@ -65,6 +69,7 @@ interface Options {
   readonly config: string;
   readonly packageDir: string;
   readonly headers: string;
+  readonly sources: string;
   readonly emitted: string | null;
 }
 
@@ -79,7 +84,13 @@ function parseArgs(argv: readonly string[]): Options {
       update = true;
     } else if (arg === '--check') {
       update = false;
-    } else if (arg === '--config' || arg === '--package' || arg === '--headers' || arg === '--emitted') {
+    } else if (
+      arg === '--config'
+      || arg === '--package'
+      || arg === '--headers'
+      || arg === '--sources'
+      || arg === '--emitted'
+    ) {
       const value = argv[++index];
 
       if (value === undefined) {
@@ -92,7 +103,7 @@ function parseArgs(argv: readonly string[]): Options {
     }
   }
 
-  for (const required of ['--config', '--package', '--headers']) {
+  for (const required of ['--config', '--package', '--headers', '--sources']) {
     if (!values.has(required)) {
       fail(`${required} is required`);
     }
@@ -103,6 +114,7 @@ function parseArgs(argv: readonly string[]): Options {
     config: values.get('--config') as string,
     packageDir: values.get('--package') as string,
     headers: values.get('--headers') as string,
+    sources: values.get('--sources') as string,
     emitted: values.get('--emitted') ?? null,
   };
 }
@@ -373,6 +385,7 @@ function render(
   model: Model,
   release: string,
   ast: AstIndex,
+  upstream: ReadonlyMap<string, UpstreamDoc>,
 ): Outputs {
   const symbols = calledSymbols(model);
   const recorded = readSignatures(paths.coverage);
@@ -443,7 +456,10 @@ function render(
     [paths.operations, emitOperations(operations)],
     [paths.capabilities, emitCapabilities(operations, members)],
     [paths.embind, emitEmbind(model, operations)],
-    [paths.contract, emitContract(model, operations)],
+    [paths.contract, emitContract(model, operations, {
+      upstream,
+      parameters: (symbol) => ast.functions.get(symbol)?.[0]?.params.map((param) => param.name) ?? [],
+    })],
     [paths.coverage, `${JSON.stringify(coverage, null, 2)}\n`],
     ...methodFiles.map(
       ([relative, content]) => [path.join(paths.methodsDir, relative), content] as const,
@@ -465,7 +481,8 @@ function main(): void {
   const paths = outputPaths(packageDir);
   const { model, release } = loadConfig(path.resolve(options.config));
   const ast = loadAst(path.resolve(options.headers));
-  const built = render(paths, options, model, release, ast);
+  const upstream = loadUpstreamDocs(path.resolve(options.sources));
+  const built = render(paths, options, model, release, ast, upstream);
   const files = built.files;
 
   /* Method files are regrouped as operations move between families, so a file

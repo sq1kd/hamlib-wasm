@@ -8,6 +8,7 @@ keeps its own license; the npm package as a whole is
 | --- | --- |
 | Original code: TypeScript API, adapters and transports, the native C/C++ bridge, generated bindings, build tooling, tests and examples | MIT (`LICENSES/MIT.txt`) |
 | Hamlib, including our changes to it, compiled into `dist/native/hamlib-wasm.wasm` | LGPL-2.1-or-later (`LICENSES/LGPL-2.1-or-later.txt`) |
+| Hamlib's API documentation, carried as the doc comments of the generated `RawRig` methods (`dist/native/generated/operations.*`) | LGPL-2.1-or-later (`LICENSES/LGPL-2.1-or-later.txt`) |
 | Upstream Hamlib source archive in the corresponding-source kit | File-level mixture, including GPL-2.0-or-later and GPL-3.0-or-later files that are not linked into the WASM |
 | Emscripten runtime and sysroot (musl, compiler-rt, libc++) | Their own permissive terms (`LICENSES/Emscripten.txt`, `LICENSES/LLVM.txt`) |
 
