@@ -43,8 +43,8 @@ export const HAMLIB_ERROR_MESSAGES: Readonly<Record<number, string>> = {
  * | --- | --- |
  * | `TRANSPORT_UNAVAILABLE` | No transport can run here: a browser without Web Serial, or Node without `serialport` installed |
  * | `PORT_PERMISSION_DENIED` | The user dismissed the port chooser or blocked the port |
- * | `TRANSPORT_FAILURE` | The serial port itself failed, e.g. it was unplugged or refused the line settings |
- * | `HAMLIB_ERROR` | Hamlib reported an error; `hamlibCode`/`hamlibMessage` say which.  An `open` that gets no answer from the rig - usually a baud rate that does not match the radio's menu - fails this way |
+ * | `TRANSPORT_FAILURE` | The serial port itself failed outside a CAT exchange, e.g. it refused the line settings when opened |
+ * | `HAMLIB_ERROR` | Hamlib reported an error; `hamlibCode`/`hamlibMessage` say which.  An `open` that gets no answer from the rig - usually a baud rate that does not match the radio's menu - fails this way, and so does a call after the device was unplugged (`-6`, I/O error) |
  * | `RIG_UNRESPONSIVE` | `detectBaudRate` tried every rate the model declares and the rig answered at none |
  * | `INVALID_ARGUMENT` | An argument was rejected before anything was sent to the rig |
  * | `UNSUPPORTED_OPERATION` | The model cannot perform the operation; nothing was sent |
