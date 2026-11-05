@@ -198,7 +198,7 @@ const EXCLUDED_PATTERNS: readonly RegExp[] = [
  * `rig_ext_level|func|parm_foreach` and call `rig_has_vfo_op`, and
  * `rig_has_scan` is the documented sibling predicate.)
  *
- * Three groups, all reachable only as extra API noise on the 1:1 surface:
+ * Three groups, all reachable only as extra API noise on the raw surface:
  *
  *  - bare codec names whose `rig_sprintf_*` twin is the call a client makes
  *    (`rig_strfunc`, `rig_strparm`, `rig_strscan`, `rig_strvfop`,

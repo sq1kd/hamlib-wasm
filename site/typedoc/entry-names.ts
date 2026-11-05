@@ -1,8 +1,8 @@
 /**
  * TypeDoc plugin: name each documented module after its import specifier.
  *
- * TypeDoc names a module after its source file (`index`, `hamlib`, ...), but a
- * reader imports `hamlib-wasm`, `hamlib-wasm/hamlib` and so on, which is what
+ * TypeDoc names a module after its source file (`index`, `raw`, ...), but a
+ * reader imports `hamlib-wasm`, `hamlib-wasm/raw` and so on, which is what
  * the reference should say.
  */
 import { Converter, ReflectionKind } from 'typedoc';
@@ -10,7 +10,7 @@ import type { Application } from 'typedoc';
 
 const NAMES: Readonly<Record<string, string>> = {
   index: 'hamlib-wasm',
-  hamlib: 'hamlib-wasm/hamlib',
+  hamlib: 'hamlib-wasm/raw',
   react: 'hamlib-wasm/react',
   node: 'hamlib-wasm/node',
 };

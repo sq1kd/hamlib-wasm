@@ -3,7 +3,7 @@
  *
  * Proves that the generator's output is reachable through the public API: the
  * capability matrix is derived from `struct rig_caps`, generated operations
- * are real typed methods on `Rig`, and an operation the model does not
+ * are real typed methods on `RawRig`, and an operation the model does not
  * implement is refused before the rig is touched.
  */
 import { expect, test } from '@playwright/test';
@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
 
 test('exposes the generated capability matrix and drives a generated operation', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 

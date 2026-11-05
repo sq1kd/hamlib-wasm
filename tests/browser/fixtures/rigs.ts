@@ -572,7 +572,7 @@
    *
    * Its backend declares frequency only - no `get_mode`, no `get_ptt`, no
    * `set_ptt` - which is what makes it the capability-limited fixture: the
-   * catalogue reports a serial model whose easy telemetry is one field.
+   * catalogue reports a serial model whose telemetry is one field.
    *
    * `00 00 00 00 0e` opens (the backend only writes it, so the emulator stays
    * quiet), and `00 00 00 02 10` reads the 19 octet operating data block whose

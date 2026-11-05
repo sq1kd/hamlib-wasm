@@ -2,7 +2,7 @@
 
 The same package as the browser example, driven from a terminal. Ports come
 from node-serialport rather than a page's Web Serial chooser, because
-`createEasy()` / `createHamlib()` select the transport the runtime has:
+`createHamlib()` / `createRawHamlib()` select the transport the runtime has:
 `hamlib-wasm/node` is imported here for `listPorts()`, not to wire the
 transport. The catalogue, the model ids, the baud-rate search and `refresh()`
 are unchanged.
@@ -49,7 +49,7 @@ On Windows a port is a name like `COM3`, not a filesystem path.
   implements `navigator.serial` in the renderer, but the application's main
   process has to answer the `select-serial-port` event and decide whether to
   grant the port; without that handler `requestPort()` never resolves.
-- **Main process** — `createEasy()` / `createHamlib()` select the Node transport
+- **Main process** — `createHamlib()` / `createRawHamlib()` select the Node transport
   on their own where there is no Web Serial; import `hamlib-wasm/node` for
   `listPorts()` and to pass transport options, as this example's `--list` does.
   `serialport`'s bindings are N-API, so Electron needs no native rebuild.

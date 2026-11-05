@@ -1,8 +1,8 @@
 /**
  * Compound-operation ordering.
  *
- * An easy operation that takes several native calls must own one queue slot:
- * nothing - a raw call, a call on another rig, a later easy call - may run
+ * A `Rig` operation that takes several native calls must own one queue slot:
+ * nothing - a raw call, a call on another rig, a later `Rig` call - may run
  * between its steps.  These specs drive the built package through the harness
  * and use the emulator's own command log as the witness, because a plausible
  * final state is not proof of the order that produced it.
@@ -63,7 +63,7 @@ test.beforeEach(async ({ page }) => {
 
 test('a later mode change wins over an earlier one', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -95,7 +95,7 @@ test('a later mode change wins over an earlier one', async ({ page }) => {
 
 test('a refresh reports the values from before the write that follows it', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -136,9 +136,9 @@ test('a refresh reports the values from before the write that follows it', async
   expect(result.afterMode).toBe('FM');
 });
 
-test('a raw call cannot run between the steps of an easy operation', async ({ page }) => {
+test('a raw call cannot run between the steps of a Rig operation', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -167,7 +167,7 @@ test('a raw call cannot run between the steps of an easy operation', async ({ pa
 
 test('a failed operation does not poison the queue', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -206,7 +206,7 @@ test('a slow step cannot let another call overtake the operation', async ({ page
   await setReplyDelay(page, 250);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -238,7 +238,7 @@ test('a pure helper cannot re-enter the module while a write is suspended', asyn
   await setReplyDelay(page, 250);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -285,7 +285,7 @@ test('a passband action cannot undo a mode selected after it', async ({ page }) 
   await setReplyDelay(page, 250);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -324,7 +324,7 @@ test('a passband action cannot undo a mode selected after it', async ({ page }) 
 
 test('a write issued while a watch tick holds the queue is not nested', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({ levels: ['STRENGTH'] });
+    const hamlib = await window.__hamlibHarness.createHamlib({ levels: ['STRENGTH'] });
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }

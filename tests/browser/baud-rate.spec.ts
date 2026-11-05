@@ -61,7 +61,7 @@ test('an open that nothing answers fails loudly instead of reporting a rig', asy
   await useRig(page, 'yaesu-ft710');
 
   const captured = await page.evaluate(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const model = hamlib.models.find((candidate) => candidate.model === 'FT-710');
     const port = await hamlib.requestPort();
 
@@ -107,7 +107,7 @@ test('detectBaudRate finds the rate the rig answers at, then the rig opens', asy
   await useRig(page, 'yaesu-ft710');
 
   const found = await page.evaluate(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const model = hamlib.models.find((candidate) => candidate.model === 'FT-710');
     const port = await hamlib.requestPort();
 
@@ -163,7 +163,7 @@ test('a rig whose declared maximum is right is not searched at all', async ({ pa
   /* The QMX+ case: a CDC interface that answers whatever rate it is opened at,
    * so Hamlib's default is already correct. */
   const found = await page.evaluate(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
     const port = await hamlib.requestPort();
 
@@ -188,7 +188,7 @@ test('a rate outside the model range is refused before the port is touched', asy
   await useRig(page, 'yaesu-ft710');
 
   const captured = await page.evaluate(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const model = hamlib.models.find((candidate) => candidate.model === 'FT-710');
     const port = await hamlib.requestPort();
 

@@ -47,7 +47,7 @@ test.beforeEach(async ({ page }) => {
 
 test('disposal during an accepted open closes the rig and rejects the open', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 
@@ -95,7 +95,7 @@ test('disposal during an accepted open closes the rig and rejects the open', asy
 
 test('disposal is idempotent and releases a port that raced with it', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 
@@ -137,7 +137,7 @@ test('disposal is idempotent and releases a port that raced with it', async ({ p
 
 test('a later instance can use the same port after a raced disposal', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const first = await window.__hamlibHarness.createHamlib();
+    const first = await window.__hamlibHarness.createRawHamlib();
     const port = await first.requestPort();
     const ts480 = first.models.find((model) => model.model === 'TS-480');
 
@@ -152,7 +152,7 @@ test('a later instance can use the same port after a raced disposal', async ({ p
     await Promise.all([pendingOpen, disposal]);
 
     /* Nothing from the disposed instance may still hold the device. */
-    const second = await window.__hamlibHarness.createHamlib();
+    const second = await window.__hamlibHarness.createRawHamlib();
     const rig = await second.open({ modelId: ts480.id, port });
     const frequency = await rig.getFrequency();
     await rig.close();
@@ -174,7 +174,7 @@ test('a later instance can use the same port after a raced disposal', async ({ p
 for (const action of ['close', 'dispose'] as const) {
   test(`${action} from a state listener finishes that event but suppresses the rest`, async ({ page }) => {
     const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
-      const hamlib = await window.__hamlibHarness.createEasy({});
+      const hamlib = await window.__hamlibHarness.createHamlib({});
       const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
       if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -213,7 +213,7 @@ for (const action of ['close', 'dispose'] as const) {
 
   test(`${action} from an error listener preserves rejection and the error event`, async ({ page }) => {
     const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
-      const hamlib = await window.__hamlibHarness.createEasy({});
+      const hamlib = await window.__hamlibHarness.createHamlib({});
       const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
       if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }

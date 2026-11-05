@@ -78,7 +78,7 @@ export interface PortRequest {
   path?: string;
 }
 
-/** Acquires ports.  Implementations: `webSerialTransport()` and `nodeSerialTransport()`; `createHamlib` selects between them by runtime. */
+/** Acquires ports.  Implementations: `webSerialTransport()` and `nodeSerialTransport()`; `createRawHamlib` selects between them by runtime. */
 export interface SerialTransport {
   /** Human readable name used in error messages, e.g. `"Web Serial"`. */
   readonly name: string;

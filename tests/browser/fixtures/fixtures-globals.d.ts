@@ -11,7 +11,7 @@
  * `interface Window` merges with the one lib.dom declares.  The browser spec
  * project excludes this directory because its own declarations for
  * `__hamlibHarness`, `__testHelpers` and `__fakeSerial` are richer (they know
- * `Hamlib`, `MainModule` and `SerialPort`); these types describe the fixture
+ * `RawHamlib`, `MainModule` and `SerialPort`); these types describe the fixture
  * scripts themselves, which only know the plain DOM.
  */
 

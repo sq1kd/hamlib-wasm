@@ -12,7 +12,7 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { createEasy } from 'hamlib-wasm';
+import { createHamlib } from 'hamlib-wasm';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
 import { requireDevice, resolveTarget, selectDevice, writesEnabled } from './target.js';
@@ -26,7 +26,7 @@ describe.skipIf(selection.kind === 'none' || !writes)('hardware: frequency round
     const device = requireDevice(selection);
     const transport = nodeSerialTransport();
     const target = await resolveTarget(transport, device);
-    const hamlib = await createEasy({ transport });
+    const hamlib = await createHamlib({ transport });
 
     try {
       const port = await transport.requestPort({ path: target.path });

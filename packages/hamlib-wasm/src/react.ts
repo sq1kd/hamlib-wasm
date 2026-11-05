@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * hamlib-wasm/react - React bindings for the easy surface.
+ * hamlib-wasm/react - React bindings for the default surface.
  *
  * `react` is an optional peer dependency: importing `hamlib-wasm` or
- * `hamlib-wasm/hamlib` never pulls it in, and this entry is the only one that
+ * `hamlib-wasm/raw` never pulls it in, and this entry is the only one that
  * does.
  *
  * The shape follows the constraints the Wasm module imposes:
  *
  *  - one module per provider, disposed on unmount (a second provider is a
  *    second Wasm instance with its own memory);
- *  - one connected rig per `useEasyRig()` caller, closed on unmount;
+ *  - one connected rig per `useRig()` caller, closed on unmount;
  *  - polling is `useRigState(rig, { pollMs })`, which is the rig's own
  *    `watch()` - the calls serialize on the module queue, so a poll never
  *    overlaps a write;
@@ -33,35 +33,34 @@ import {
 } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
-import { HamlibError, createEasy } from './index.js';
+import { HamlibError, createHamlib } from './index.js';
 import type {
-  EasyHamlib,
-  EasyOptions,
-  EasyRig,
+  Hamlib,
+  HamlibOptions,
+  Rig,
   LevelName,
-  OpenEasyRigOptions,
+  OpenRigOptions,
   RigField,
   RigModel,
   RigState,
 } from './index.js';
 
 export type {
-  EasyCapabilities,
-  EasyHamlib,
-  EasyOperationCapabilities,
-  EasyOptions,
-  EasyRig,
-  EasyRigEvents,
+  Hamlib,
   HamlibOptions,
   LevelName,
-  OpenEasyRigOptions,
+  OpenRigOptions,
   PassbandSelector,
   PortFilter,
   PortRequest,
   PttState,
+  Rig,
+  RigCapabilities,
+  RigEvents,
   RigField,
   RigModel,
   RigState,
+  RigOperationCapabilities,
   SerialInputSignals,
   SerialLineSettings,
   SerialOutputSignals,
@@ -70,7 +69,7 @@ export type {
   SerialTransport,
   WatchOptions,
 } from './index.js';
-export { HamlibError, createEasy, webSerialTransport } from './index.js';
+export { HamlibError, createHamlib, webSerialTransport } from './index.js';
 
 /** Wrap any thrown value as a `HamlibError`. */
 function asHamlibError(error: unknown, operation: string): HamlibError {
@@ -87,7 +86,7 @@ function asHamlibError(error: unknown, operation: string): HamlibError {
 /** What the provider publishes. */
 export interface HamlibContextValue {
   /** The loaded module, or `undefined` while it is still loading. */
-  readonly hamlib: EasyHamlib | undefined;
+  readonly hamlib: Hamlib | undefined;
   /** Why loading failed, when it did. */
   readonly error: HamlibError | undefined;
   readonly loading: boolean;
@@ -98,13 +97,13 @@ const HamlibContext = createContext<HamlibContextValue | undefined>(undefined);
 export interface HamlibProviderProps {
   children?: ReactNode;
   /**
-   * Passed to `createEasy` when the provider mounts.
+   * Passed to `createHamlib` when the provider mounts.
    *
    * Read once: keep this object stable (a module constant, or memoized with
    * `useMemo`) - changing its identity does not re-create the module, because
    * a second Wasm instance is never what a re-render wants.
    */
-  options?: EasyOptions;
+  options?: HamlibOptions;
 }
 
 /**
@@ -119,15 +118,15 @@ export function HamlibProvider({ children, options }: HamlibProviderProps): Reac
     error: undefined,
     loading: true,
   });
-  const optionsRef = useRef<EasyOptions | undefined>(options);
+  const optionsRef = useRef<HamlibOptions | undefined>(options);
 
   useEffect(() => {
     let live = true;
-    let instance: EasyHamlib | undefined;
+    let instance: Hamlib | undefined;
 
     void (async () => {
       try {
-        const created = await createEasy(optionsRef.current ?? {});
+        const created = await createHamlib(optionsRef.current ?? {});
         instance = created;
 
         if (live) {
@@ -141,7 +140,7 @@ export function HamlibProvider({ children, options }: HamlibProviderProps): Reac
         if (live) {
           setValue({
             hamlib: undefined,
-            error: asHamlibError(error, 'createEasy'),
+            error: asHamlibError(error, 'createHamlib'),
             loading: false,
           });
         }
@@ -169,7 +168,7 @@ export function useHamlibContext(): HamlibContextValue {
 }
 
 /** The loaded module.  Throws while it is still loading. */
-export function useHamlib(): EasyHamlib {
+export function useHamlib(): Hamlib {
   const { hamlib } = useHamlibContext();
 
   if (hamlib === undefined) {
@@ -186,9 +185,9 @@ export function useModels(): readonly RigModel[] {
   return useHamlibContext().hamlib?.models ?? NO_MODELS;
 }
 
-export interface UseEasyRigResult {
+export interface UseRigResult {
   /** The connected rig, once `connect()` has resolved. */
-  readonly rig: EasyRig | undefined;
+  readonly rig: Rig | undefined;
   readonly connecting: boolean;
   /** A failed `connect()`.  Rig operations report through `useRigError`. */
   readonly error: HamlibError | undefined;
@@ -196,7 +195,7 @@ export interface UseEasyRigResult {
    * Open a rig.  Without `port`, this runs `requestPort()`, so it must be
    * called from a user gesture.
    */
-  connect(options: OpenEasyRigOptions): Promise<void>;
+  connect(options: OpenRigOptions): Promise<void>;
   /** Close the current rig.  Safe to call when there is none. */
   disconnect(): Promise<void>;
   clearError(): void;
@@ -208,12 +207,12 @@ export interface UseEasyRigResult {
  * Closing on unmount is the default rather than an opt-in: a rig owns a port,
  * and a React tree that forgets to close one leaves the device locked.
  */
-export function useEasyRig(): UseEasyRigResult {
+export function useRig(): UseRigResult {
   const { hamlib } = useHamlibContext();
-  const [rig, setRig] = useState<EasyRig | undefined>(undefined);
+  const [rig, setRig] = useState<Rig | undefined>(undefined);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<HamlibError | undefined>(undefined);
-  const rigRef = useRef<EasyRig | undefined>(undefined);
+  const rigRef = useRef<Rig | undefined>(undefined);
   /**
    * Identity of the connection attempt allowed to touch this hook's state.
    *
@@ -230,7 +229,7 @@ export function useEasyRig(): UseEasyRigResult {
   }, []);
 
   /** Drop the current rig and close it; the caller owns the generation. */
-  const release = useCallback(async (current: EasyRig | undefined): Promise<void> => {
+  const release = useCallback(async (current: Rig | undefined): Promise<void> => {
     rigRef.current = undefined;
     setRig(undefined);
     await current?.close();
@@ -256,7 +255,7 @@ export function useEasyRig(): UseEasyRigResult {
     await release(rigRef.current);
   }, [claim, release]);
 
-  const connect = useCallback(async (options: OpenEasyRigOptions): Promise<void> => {
+  const connect = useCallback(async (options: OpenRigOptions): Promise<void> => {
     if (!hamlib) {
       throw new Error('the Hamlib module is not loaded yet; wait for HamlibProvider to finish');
     }
@@ -329,7 +328,7 @@ export interface UseRigStateOptions {
  * `pollMs` is set, from a poll.
  */
 export function useRigState(
-  rig: EasyRig | undefined,
+  rig: Rig | undefined,
   options: UseRigStateOptions = {},
 ): RigState | undefined {
   const [state, setState] = useState<RigState | undefined>(rig?.state);
@@ -379,7 +378,7 @@ export function useRigState(
 }
 
 /** The most recent operation failure the rig reported, if any. */
-export function useRigError(rig: EasyRig | undefined): HamlibError | undefined {
+export function useRigError(rig: Rig | undefined): HamlibError | undefined {
   const [error, setError] = useState<HamlibError | undefined>(undefined);
 
   useEffect(() => {

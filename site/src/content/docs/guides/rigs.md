@@ -40,7 +40,7 @@ range, and the radio's menu picks the value inside it. A "verified" model can
 still be opened at the wrong rate, which produces silence rather than an error.
 `open()` therefore checks that the rig answered and rejects with the rate it
 tried; `detectBaudRate()` searches the declared range. See
-[Baud rate](../easy/#baud-rate).
+[Baud rate](../rig-api/#baud-rate).
 
 ## Other limitations
 

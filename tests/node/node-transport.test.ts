@@ -9,15 +9,15 @@
  */
 import { afterEach, expect, test } from 'vitest';
 
-import { createHamlib } from 'hamlib-wasm/hamlib';
-import type { Hamlib, SerialTransport } from 'hamlib-wasm/hamlib';
+import { createRawHamlib } from 'hamlib-wasm/raw';
+import type { RawHamlib, SerialTransport } from 'hamlib-wasm/raw';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
 import { FAKE_PATH, rigSerialPortModule } from './rig-serialport.js';
 import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
 
 /** The model id of a catalogue entry, or a failure that names what is missing. */
-function modelIdOf(hamlib: Hamlib, manufacturer: string, model: string): number {
+function modelIdOf(hamlib: RawHamlib, manufacturer: string, model: string): number {
   const entry = hamlib.models.find(
     (candidate) => candidate.manufacturer === manufacturer && candidate.model === model,
   );
@@ -61,7 +61,7 @@ test('lists the ports the module reports', async () => {
 test('opens the requested path at the rig settings and reads the rig', async () => {
   const module = rigSerialPortModule();
   const transport = nodeSerialTransport({ serialport: module });
-  const hamlib = await createHamlib({ transport });
+  const hamlib = await createRawHamlib({ transport });
 
   try {
     const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
@@ -208,7 +208,7 @@ test('surfaces a device that cannot be opened as a Hamlib error, not a crash', a
   };
 
   const transport: SerialTransport = nodeSerialTransport({ serialport: module });
-  const hamlib = await createHamlib({ transport });
+  const hamlib = await createRawHamlib({ transport });
 
   try {
     const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
@@ -242,7 +242,7 @@ test('finds the rate a rig answers at through the adapter', async () => {
 
   const module = rigSerialPortModule('yaesu-ft710');
   const transport = nodeSerialTransport({ serialport: module });
-  const hamlib = await createHamlib({ transport });
+  const hamlib = await createRawHamlib({ transport });
 
   try {
     const modelId = modelIdOf(hamlib, 'Yaesu', 'FT-710');

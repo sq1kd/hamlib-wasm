@@ -1,22 +1,22 @@
 ---
-title: Easy API
-description: createEasy, EasyRig, state snapshots, events and polling.
+title: Rig API
+description: createHamlib, Rig, state snapshots, events and polling.
 ---
 
 `hamlib-wasm` is the entry to reach for first: one rig object, a state
 snapshot, events, and booleans instead of Hamlib's enums. It is a thin layer
-over the [1:1 surface](../hamlib/), which stays one property away as
+over the [raw surface](../raw-api/), which stays one property away as
 `rig.raw`.
 
 ```ts
-import { createEasy, HamlibError } from 'hamlib-wasm';
-import type { EasyHamlib, EasyRig, RigState } from 'hamlib-wasm';
+import { createHamlib, HamlibError } from 'hamlib-wasm';
+import type { Hamlib, Rig, RigState } from 'hamlib-wasm';
 
-const hamlib: EasyHamlib = await createEasy({ levels: ['STRENGTH'] });
+const hamlib: Hamlib = await createHamlib({ levels: ['STRENGTH'] });
 hamlib.version;                       // "Hamlib <version> …"
 hamlib.models;                        // RigModel[], sorted by manufacturer then model
 
-const rig: EasyRig = await hamlib.open({ modelId });   // asks for the port: user gesture
+const rig: Rig = await hamlib.open({ modelId });         // asks for the port: user gesture
 rig.baudRate;                                          // the rate the port was opened at
 
 const state: RigState = await rig.refresh();           // every field optional
@@ -56,8 +56,8 @@ as `rig.state`.
   state is `state.ptt` (or the `ptt` event); do not overwrite it with what was
   requested.
 
-Every easy method is one compound operation on the module's queue, so a raw
-call, a call on another rig or a later easy call cannot interleave with its
+Every `Rig` method is one compound operation on the module's queue, so a raw
+call, a call on another rig or a later `Rig` call cannot interleave with its
 steps.
 
 ## Events and polling
@@ -83,7 +83,7 @@ every poll synchronously.
 
 ## Levels
 
-Levels are opt-in: `createEasy({ levels: ['STRENGTH', 'SWR'] })` names the ones
+Levels are opt-in: `createHamlib({ levels: ['STRENGTH', 'SWR'] })` names the ones
 the instance may read, and `refresh()`/`watch()` read only those the model
 advertises. The available names are `STRENGTH`, `SWR`, `ALC`, `RFPOWER` (the
 setpoint) and `RFPOWER_METER` (measured power).

@@ -1,7 +1,7 @@
 /**
  * Configurable levels, and scoped watching.
  *
- * The easy surface reads a level only when the instance was configured for it
+ * The default surface reads a level only when the instance was configured for it
  * and the model advertises it, and a watch registration reads only the fields
  * it named - so a UI that shows an S-meter does not pay for a frequency read
  * per meter tick, and a page with no meters pays nothing.
@@ -32,7 +32,7 @@ test.beforeEach(async ({ page }) => {
 
 test('reads only the configured levels the model advertises', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({
+    const hamlib = await window.__hamlibHarness.createHamlib({
       levels: ['STRENGTH', 'SWR'],
     });
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -77,7 +77,7 @@ test('reads only the configured levels the model advertises', async ({ page }) =
 
 test('a level watch reads only the level, a frequency watch reads none', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({ levels: ['STRENGTH'] });
+    const hamlib = await window.__hamlibHarness.createHamlib({ levels: ['STRENGTH'] });
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -117,7 +117,7 @@ test('a level watch reads only the level, a frequency watch reads none', async (
 
 test('watching levels on an instance with none configured is refused', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }

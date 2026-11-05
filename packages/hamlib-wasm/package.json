@@ -19,9 +19,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./hamlib": {
-      "types": "./dist/hamlib.d.ts",
-      "default": "./dist/hamlib.js"
+    "./raw": {
+      "types": "./dist/raw.d.ts",
+      "default": "./dist/raw.js"
     },
     "./native/hamlib-wasm.wasm": "./dist/native/hamlib-wasm.wasm",
     "./node": {

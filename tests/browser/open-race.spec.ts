@@ -1,7 +1,7 @@
 /**
  * Connection cancellation at the port-open boundary.
  *
- * The easy layer tracks its handles and marks itself disposed before the
+ * The default layer tracks its handles and marks itself disposed before the
  * native cleanup runs, so an open parked inside `SerialPort.open()` is handed
  * over closed instead of publishing a live wrapper, and the port is released.
  *
@@ -42,7 +42,7 @@ test('disposal during a parked open publishes nothing and releases the port', as
   await holdNextPortOpen(page);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -99,7 +99,7 @@ test('a later open after a cancelled one still works', async ({ page }) => {
   await holdNextPortOpen(page);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
 
     if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
@@ -120,7 +120,7 @@ test('a later open after a cancelled one still works', async ({ page }) => {
     await opening;
 
     /* A fresh instance must be able to take the same port again. */
-    const second = await window.__hamlibHarness.createEasy({});
+    const second = await window.__hamlibHarness.createHamlib({});
     const rig = await second.open({ modelId: model.id, baudRate: model.serialRateMax });
     const state = await rig.refresh();
 

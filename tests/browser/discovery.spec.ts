@@ -39,7 +39,7 @@ test.beforeEach(async ({ page }) => {
 
 test('an IC-746PRO client discovers its extension parameters', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib({});
+    const hamlib = await window.__hamlibHarness.createRawHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');
 
     if (!model) { throw new Error('the IC-746PRO is missing from the catalogue'); }
@@ -88,7 +88,7 @@ test('an IC-746PRO client discovers its extension parameters', async ({ page }) 
 
 test('configuration enumeration returns parameter descriptions', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib({});
+    const hamlib = await window.__hamlibHarness.createRawHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');
 
     if (!model) { throw new Error('the IC-746PRO is missing from the catalogue'); }
@@ -127,7 +127,7 @@ test('configuration enumeration returns parameter descriptions', async ({ page }
 
 test('scan and VFO suboperations are distinguishable before use', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib({});
+    const hamlib = await window.__hamlibHarness.createRawHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');
 
     if (!model) { throw new Error('the IC-746PRO is missing from the catalogue'); }

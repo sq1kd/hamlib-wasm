@@ -9,10 +9,10 @@
  */
 import { expect, test } from 'vitest';
 
-import { createHamlib } from 'hamlib-wasm/hamlib';
+import { createRawHamlib } from 'hamlib-wasm/raw';
 
 test('loads the Wasm module and the rig catalogue in Node', async () => {
-  const hamlib = await createHamlib();
+  const hamlib = await createRawHamlib();
 
   try {
     expect(hamlib.version).toContain('Hamlib');
@@ -31,7 +31,7 @@ test('loads the Wasm module and the rig catalogue in Node', async () => {
 });
 
 test('selects the Node transport when no transport is passed', async () => {
-  const hamlib = await createHamlib();
+  const hamlib = await createRawHamlib();
 
   try {
     /* A path-less request is refused by the Node transport, and only by it:

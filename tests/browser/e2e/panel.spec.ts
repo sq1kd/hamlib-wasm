@@ -2,7 +2,7 @@
  * The React page against a capability-limited model, plus the ownership and
  * error-display contracts the panel depends on.
  *
- * Three things the easy/native backends must agree on are proved here:
+ * Three things the rig/raw backends must agree on are proved here:
  *
  *  - a model whose telemetry is only part of the surface stays connected, shows
  *    the missing fields as unknown, and can be disconnected;
@@ -101,7 +101,7 @@ test('a rig that never answers fails the acquisition loudly and releases the por
   await page.goto(REACT_URL);
   await page.getByTestId('load-demo').click();
   await useRig(page, 'yaesu-frg100');
-  await page.getByTestId('backend-native').check();
+  await page.getByTestId('backend-raw').check();
 
   /* Park the acquisition at the port chooser, silence the emulator, then let it
    * through: the FRG-100 backend's open path writes one frame, and with nothing
@@ -136,10 +136,10 @@ test('a rig that never answers fails the acquisition loudly and releases the por
   expect((await readFakeSerial(page)).closeCount).toBe(1);
 });
 
-test('a rejected command reaches the error display of the native backend', async ({ page }) => {
+test('a rejected command reaches the error display of the raw backend', async ({ page }) => {
   await page.goto(REACT_URL);
   await page.getByTestId('load-demo').click();
-  await page.getByTestId('backend-native').check();
+  await page.getByTestId('backend-raw').check();
 
   await expect(page.getByTestId('model-select')).toBeEnabled();
   await page.getByTestId('connect-button').click();

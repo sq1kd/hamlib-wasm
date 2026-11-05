@@ -8,7 +8,7 @@ import { StrictMode, act, useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { HamlibProvider, useEasyRig } from 'hamlib-wasm/react';
+import { HamlibProvider, useRig } from 'hamlib-wasm/react';
 import type { HamlibOptions } from 'hamlib-wasm';
 
 import { MODEL } from './fake-hamlib';
@@ -72,7 +72,7 @@ export async function renderProbe(options: RenderProbeOptions = {}): Promise<Pro
   };
 
   function Probe(): ReactElement {
-    const { rig, connecting, error, connect, disconnect } = useEasyRig();
+    const { rig, connecting, error, connect, disconnect } = useRig();
     const startedRef = useRef(false);
 
     useEffect(() => {

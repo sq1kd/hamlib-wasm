@@ -52,7 +52,7 @@ export function webSerialTransport(): SerialTransport {
       if (!serial) {
         throw new HamlibError(
           'Web Serial is not available in this runtime; the Node transport is selected '
-          + 'automatically where Node is present, otherwise pass a transport to createHamlib()',
+          + 'automatically where Node is present, otherwise pass a transport to createRawHamlib()',
           { code: 'TRANSPORT_UNAVAILABLE', operation: 'requestPort' },
         );
       }

@@ -378,11 +378,11 @@
   border-bottom: 1px solid var(--border);
 }
 
-.hamlib-demo .log li[data-api='easy'] code {
+.hamlib-demo .log li[data-api='rig'] code {
   color: var(--accent);
 }
 
-.hamlib-demo .log li[data-api='native'] code {
+.hamlib-demo .log li[data-api='raw'] code {
   color: var(--success);
 }
 

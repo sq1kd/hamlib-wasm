@@ -2,7 +2,7 @@
  * The graphical rig: a front panel driven entirely by props.
  *
  * It knows nothing about Hamlib, the backend, or which entry point is in use -
- * that is what makes the easy/native comparison meaningful.
+ * that is what makes the rig/raw comparison meaningful.
  */
 import { useRef, useState } from 'react';
 import type {
@@ -11,7 +11,7 @@ import type {
   ReactElement,
 } from 'react';
 
-import type { EasyCapabilities, LevelName, RigState } from 'hamlib-wasm';
+import type { RigCapabilities, LevelName, RigState } from 'hamlib-wasm';
 
 /**
  * Common Hamlib mode names.
@@ -33,7 +33,7 @@ export type PassbandKind = 'narrow' | 'normal' | 'wide';
 
 export interface RigPanelProps {
   readonly state: RigState | undefined;
-  readonly capabilities: EasyCapabilities;
+  readonly capabilities: RigCapabilities;
   readonly connected: boolean;
   readonly busy: boolean;
   readonly onSetFrequency: (hz: number) => void;

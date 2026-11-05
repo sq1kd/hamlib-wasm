@@ -72,7 +72,7 @@ test('labels verified models and explains the unusable ones', async ({ page }) =
   const captured = await page.evaluate(
     (): Promise<Captured<CatalogueModel[]>> => window.__testHelpers.capture(
       async () => {
-        const hamlib = await window.__hamlibHarness.createHamlib();
+        const hamlib = await window.__hamlibHarness.createRawHamlib();
         const models: CatalogueModel[] = hamlib.models.map((model) => ({
           id: model.id,
           manufacturer: model.manufacturer,
@@ -171,7 +171,7 @@ test('labels verified models and explains the unusable ones', async ({ page }) =
 
 test('refuses a model whose line settings Web Serial cannot express', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const unsupported = hamlib.models.find((model) => model.model === 'AR2700');
 
@@ -220,7 +220,7 @@ test('refuses a model whose line settings Web Serial cannot express', async ({ p
 
 test('fails predictably for a backend that needs a worker thread', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const threaded = hamlib.models.find((model) => model.model === 'D578A');
 
@@ -267,7 +267,7 @@ test('fails predictably for a backend that needs a worker thread', async ({ page
 
 test('reports a device that disappears mid-session', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 

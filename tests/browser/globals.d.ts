@@ -4,14 +4,14 @@
  * `tests/harness/src/main.ts` publishes the package on `window`; the React
  * example publishes nothing and is driven through its DOM instead.
  */
-import type { EasyHamlib, EasyOperationCapabilities, EasyOptions } from 'hamlib-wasm';
+import type { Hamlib, RigOperationCapabilities, HamlibOptions } from 'hamlib-wasm';
 import type {
-  Hamlib,
-  HamlibOptions,
+  RawHamlib,
+  RawHamlibOptions,
   RigModel,
   SerialPortLike,
   SerialTransport,
-} from 'hamlib-wasm/hamlib';
+} from 'hamlib-wasm/raw';
 /* Not a package export: the harness loads the built module directly. */
 import type { MainModule } from '../../packages/hamlib-wasm/dist/native/hamlib-wasm.mjs';
 import type { HookHarness } from '../harness/src/hook-harness-types';
@@ -35,9 +35,9 @@ export type Captured<T> =
   | { ok: false; error: HamlibErrorView };
 
 export interface HamlibHarness {
+  createRawHamlib(options?: RawHamlibOptions): Promise<RawHamlib>;
   createHamlib(options?: HamlibOptions): Promise<Hamlib>;
-  createEasy(options?: EasyOptions): Promise<EasyHamlib>;
-  capabilitiesOf(model: RigModel): EasyOperationCapabilities;
+  capabilitiesOf(model: RigModel): RigOperationCapabilities;
   /** A transport over `port`, recording every call the facade makes on it. */
   fakeTransport(port: SerialPortLike): SerialTransport & { calls: string[] };
   isHamlibError(value: unknown): boolean;

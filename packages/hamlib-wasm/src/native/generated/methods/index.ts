@@ -6,7 +6,7 @@ import { MiscMethods } from './misc.js';
 
 /**
  * Every generated operation as a real, typed method, assembled from the family
- * classes.  `RigHandle` extends this; `tsc` proves the methods satisfy
+ * classes.  `RawRigHandle` extends this; `tsc` proves the methods satisfy
  * `GeneratedPublicOperations`.
  */
 export abstract class GeneratedRigMethods

@@ -3,7 +3,7 @@
  *
  * The demo's own UI hides this: its Connect and Disconnect buttons are disabled
  * while a connection is pending, so no click can cancel one.  The hook harness
- * page drives `useEasyRig`/`useRigState` directly, and the Web Serial double
+ * page drives `useRig`/`useRigState` directly, and the Web Serial double
  * parks inside `SerialPort.open()`, so a spec can cancel an attempt that has
  * already reached the device and then assert both what the hooks published and
  * - through the emulator - that the port was released.

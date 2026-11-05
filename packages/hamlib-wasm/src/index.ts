@@ -5,21 +5,21 @@
  *
  * This is the surface an application should reach for first: one rig object,
  * a state snapshot, events, and booleans instead of Hamlib's enums.  It is a
- * thin façade over `hamlib-wasm/hamlib`, which keeps a method per upstream
- * Hamlib call for anything this entry does not cover (see {@link EasyRig.raw}).
+ * thin façade over `hamlib-wasm/raw`, which keeps a method per upstream
+ * Hamlib call for anything this entry does not cover (see {@link Rig.raw}).
  *
- * What "easy" means here, concretely:
+ * What this layer adds, concretely:
  *
  *  - `refresh()` composes the reads a UI always wants (frequency, mode,
  *    passband, PTT and the levels the instance was configured for) into one
- *    awaited snapshot, and remembers it as {@link EasyRig.state}.
+ *    awaited snapshot, and remembers it as {@link Rig.state}.
  *  - `setMode(mode)` fills in the model's normal passband through Hamlib's own
  *    `passband_normal`, so a caller does not have to know its width.
  *  - `setPtt(true)` and {@link PttState} replace the string vocabulary.
  *  - `on()`/`watch()` give a UI an event stream without polling by hand; the
  *    calls still serialize on the module's single queue.  A `watch()` declares
  *    which fields it needs, so a meter poll never drags the frequency along.
- *  - {@link EasyRig.capabilities} answers "can this model do X" as booleans,
+ *  - {@link Rig.capabilities} answers "can this model do X" as booleans,
  *    derived from the same `rig_caps` matrix the catalogue exposes.
  *
  * It composes; it never fakes.  A write does not invent state (Hamlib's own
@@ -27,18 +27,18 @@
  * perform still fails with the native `UNSUPPORTED_OPERATION` error.
  */
 
-import { HamlibError, createHamlib } from './hamlib.js';
+import { HamlibError, createRawHamlib } from './raw.js';
 import type {
   DetectBaudRateOptions,
-  Hamlib,
-  HamlibOptions,
+  RawHamlib,
+  RawHamlibOptions,
   PortRequest,
-  Rig,
+  RawRig,
   RigMode,
   RigModeState,
   RigModel,
   SerialPortLike,
-} from './hamlib.js';
+} from './raw.js';
 import type { CompoundHost } from './native/seam.js';
 
 export {
@@ -47,15 +47,14 @@ export {
   describeLineSettingsLimitation,
   HamlibError,
   webSerialTransport,
-} from './hamlib.js';
+} from './raw.js';
 export type {
   BrowserSupport,
   DetectBaudRateOptions,
   HamlibErrorCode,
-  HamlibOptions,
   PortFilter,
   PortRequest,
-  RigCapabilities,
+  RigModelCapabilities,
   RigConfparam,
   RigMode,
   RigModeState,
@@ -70,7 +69,7 @@ export type {
   SerialTransport,
   UnusableModel,
   VerifiedModel,
-} from './hamlib.js';
+} from './raw.js';
 
 /** Push-to-talk states Hamlib reports and accepts. */
 export type PttState = 'off' | 'on' | 'on-mic' | 'on-data';
@@ -88,14 +87,14 @@ export type PassbandSelector = 'normal' | 'narrow' | 'wide';
  * `RFPOWER_METER` the measured forward power.
  *
  * A level is only ever read when the instance was configured for it (see
- * {@link EasyOptions.levels}) and the model advertises it, so a page that
+ * {@link HamlibOptions.levels}) and the model advertises it, so a page that
  * shows no meters pays no CAT traffic for them.
  */
 export type LevelName = 'STRENGTH' | 'SWR' | 'ALC' | 'RFPOWER' | 'RFPOWER_METER';
 
 const LEVEL_NAMES: readonly LevelName[] = ['STRENGTH', 'SWR', 'ALC', 'RFPOWER', 'RFPOWER_METER'];
 
-/** The telemetry a {@link EasyRig.watch} registration can read. */
+/** The telemetry a {@link Rig.watch} registration can read. */
 export type RigField = 'frequency' | 'mode' | 'ptt' | 'levels';
 
 const RIG_FIELDS: readonly RigField[] = ['frequency', 'mode', 'ptt', 'levels'];
@@ -119,12 +118,12 @@ function toPttState(value: string): PttState {
 /**
  * A snapshot of what the rig reported, not of what was asked of it.
  *
- * Every field is optional because a model may implement only part of the easy
+ * Every field is optional because a model may implement only part of the
  * telemetry surface: `refresh()` reads exactly the getters the model
  * advertises and omits the rest rather than inventing a value.  `mode` and
  * `passband` always appear together or not at all.
  *
- * {@link EasyRig.state} and the `state` event only ever carry a snapshot from
+ * {@link Rig.state} and the `state` event only ever carry a snapshot from
  * completed reads: a field whose read failed keeps the value from the previous
  * successful read, and no partial snapshot replaces the whole state.
  */
@@ -145,7 +144,7 @@ export interface RigState {
 }
 
 /** What a model can do, as booleans a UI can test. */
-export interface EasyOperationCapabilities {
+export interface RigOperationCapabilities {
   getFrequency: boolean;
   setFrequency: boolean;
   getMode: boolean;
@@ -154,19 +153,19 @@ export interface EasyOperationCapabilities {
   setPtt: boolean;
 }
 
-/** {@link EasyOperationCapabilities} plus the levels this rig will read. */
-export interface EasyCapabilities extends EasyOperationCapabilities {
+/** {@link RigOperationCapabilities} plus the levels this rig will read. */
+export interface RigCapabilities extends RigOperationCapabilities {
   /**
    * Configured levels this model advertises, in configuration order.
    *
-   * Empty when `createEasy()` was given no `levels`, and possibly shorter than
+   * Empty when `createHamlib()` was given no `levels`, and possibly shorter than
    * the configured list when the model implements only some of them.
    */
   levels: readonly LevelName[];
 }
 
-/** The events an {@link EasyRig} emits. */
-export interface EasyRigEvents {
+/** The events an {@link Rig} emits. */
+export interface RigEvents {
   /** A completed read, merged into the remembered snapshot. */
   state: RigState;
   frequency: number;
@@ -186,7 +185,7 @@ type Listener<T> = (value: T) => void;
  * `emit` iterates a snapshot of the current listeners, so a listener that
  * unsubscribes another one does not disturb delivery of the event already on
  * its way.  Whether a *later* event is delivered is the publisher's decision
- * (see `EasyRigHandle#publish`), not the emitter's.
+ * (see `RigHandle#publish`), not the emitter's.
  */
 class Emitter<Events> {
   readonly #listeners = new Map<keyof Events, Set<Listener<never>>>();
@@ -211,37 +210,37 @@ class Emitter<Events> {
   }
 }
 
-/** Options for {@link createEasy}. */
-export interface EasyOptions extends HamlibOptions {
+/** Options for {@link createHamlib}. */
+export interface HamlibOptions extends RawHamlibOptions {
   /**
    * Levels this instance may read, in the order they should be reported.
    *
    * Default: none - `refresh()` and `watch()` then issue no level reads at
    * all.  A level named here is still only read when the model advertises it;
-   * see {@link EasyCapabilities.levels}.
+   * see {@link RigCapabilities.levels}.
    */
   levels?: readonly LevelName[];
 }
 
-/** Options for {@link EasyHamlib.open}. */
-export interface OpenEasyRigOptions {
-  /** Model id taken from {@link EasyHamlib.models}. */
+/** Options for {@link Hamlib.open}. */
+export interface OpenRigOptions {
+  /** Model id taken from {@link Hamlib.models}. */
   modelId: number;
   /**
    * Baud rate.  When omitted, the model's advertised default (the highest rate
    * Hamlib supports for it) is used, and the open verifies that the rig answers
-   * at it; see {@link Rig.baudRate} and {@link EasyHamlib.detectBaudRate} for a
+   * at it; see {@link RawRig.baudRate} and {@link Hamlib.detectBaudRate} for a
    * rig whose rate is not known.
    */
   baudRate?: number;
   /**
-   * An already granted port.  When omitted, {@link EasyHamlib.requestPort} runs
+   * An already granted port.  When omitted, {@link Hamlib.requestPort} runs
    * first, so this must be called from a user gesture.
    */
   port?: SerialPortLike;
 }
 
-/** Options for {@link EasyRig.watch}. */
+/** Options for {@link Rig.watch}. */
 export interface WatchOptions {
   /** Poll period in milliseconds. */
   intervalMs: number;
@@ -269,18 +268,18 @@ export interface WatchOptions {
  * nothing - a poll, a raw call, a call on another rig - can run between its
  * steps.  Order is preserved, not raced.
  */
-export interface EasyRig {
+export interface Rig {
   /** The model this rig was opened with. */
   readonly model: RigModel;
   /**
-   * The baud rate this rig was opened at; see {@link Rig.baudRate}.
+   * The baud rate this rig was opened at; see {@link RawRig.baudRate}.
    *
-   * Worth keeping: passing it back to {@link EasyHamlib.open} skips both the
-   * guess and a {@link EasyHamlib.detectBaudRate} scan on the next connect.
+   * Worth keeping: passing it back to {@link Hamlib.open} skips both the
+   * guess and a {@link Hamlib.detectBaudRate} scan on the next connect.
    */
   readonly baudRate: number;
   /** What this model can do, as booleans, and the levels this rig will read. */
-  readonly capabilities: EasyCapabilities;
+  readonly capabilities: RigCapabilities;
   /** `false` once `close()` has been called, or the underlying rig closed. */
   readonly connected: boolean;
   /**
@@ -289,11 +288,11 @@ export interface EasyRig {
    */
   readonly state: RigState | undefined;
   /**
-   * The underlying 1:1 rig, for the operations this entry does not cover
+   * The underlying raw rig, for the operations this entry does not cover
    * (split, memory, antenna, clock, …).  Its methods are gated exactly as
-   * `hamlib-wasm/hamlib` documents.
+   * `hamlib-wasm/raw` documents.
    */
-  readonly raw: Rig;
+  readonly raw: RawRig;
 
   /** Set the frequency in Hz. */
   setFrequency(hz: number): Promise<void>;
@@ -321,13 +320,13 @@ export interface EasyRig {
   /**
    * Read the telemetry the model advertises - frequency, mode with passband,
    * PTT when the model can, and every configured level it advertises - as one
-   * compound operation, and remember it as {@link EasyRig.state}.  Fields the
+   * compound operation, and remember it as {@link Rig.state}.  Fields the
    * model cannot read are omitted, never invented; a read that fails throws
    * and leaves the previous snapshot in place.
    */
   refresh(): Promise<RigState>;
   /** Subscribe to one event; the returned function unsubscribes. */
-  on<K extends keyof EasyRigEvents>(event: K, listener: Listener<EasyRigEvents[K]>): () => void;
+  on<K extends keyof RigEvents>(event: K, listener: Listener<RigEvents[K]>): () => void;
   /**
    * Poll the fields named in `options` while the returned function has not
    * been called.  Registrations compose: each interval runs its own timer,
@@ -347,8 +346,8 @@ export interface EasyRig {
   close(): Promise<void>;
 }
 
-/** A loaded Hamlib instance, with the easy rig on top. */
-export interface EasyHamlib {
+/** A loaded Hamlib instance, with the stateful rig on top. */
+export interface Hamlib {
   /** Hamlib version string. */
   readonly version: string;
   /** Every rig model reachable over a serial transport, sorted by manufacturer then model. */
@@ -356,20 +355,20 @@ export interface EasyHamlib {
   /** Ask the caller-visible source for a serial port.  Requires a user gesture in the browser. */
   requestPort(options?: PortRequest): Promise<SerialPortLike>;
   /** Open a rig, optionally on an already granted port. */
-  open(options: OpenEasyRigOptions): Promise<EasyRig>;
+  open(options: OpenRigOptions): Promise<Rig>;
   /**
    * Find the baud rate a rig answers at, before opening it.
    *
-   * The same search as {@link Hamlib.detectBaudRate}: the rates the model
+   * The same search as {@link RawHamlib.detectBaudRate}: the rates the model
    * declares are tried in turn and the first one the rig replies at is
-   * returned, port closed.  Hand the result to {@link EasyHamlib.open}, or keep
+   * returned, port closed.  Hand the result to {@link Hamlib.open}, or keep
    * it - `easyRig.baudRate` reports the rate a live rig was opened at, and
    * reconnecting with a known rate skips the scan.
    *
    * ```ts
-   * const port = await easy.requestPort();
-   * const baudRate = await easy.detectBaudRate({ modelId, port });
-   * const rig = await easy.open({ modelId, port, baudRate });
+   * const port = await hamlib.requestPort();
+   * const baudRate = await hamlib.detectBaudRate({ modelId, port });
+   * const rig = await hamlib.open({ modelId, port, baudRate });
    * ```
    *
    * Rejects with `RIG_UNRESPONSIVE` when no rate answered.
@@ -380,14 +379,14 @@ export interface EasyHamlib {
 }
 
 /**
- * Which of the operations {@link EasyRig} uses a model implements.
+ * Which of the operations {@link Rig} uses a model implements.
  *
- * Exported because a caller driving `hamlib-wasm/hamlib` directly still wants
+ * Exported because a caller driving `hamlib-wasm/raw` directly still wants
  * the same booleans: the catalogue's `capabilities` is the raw set of generated
- * operation names, and this is the one interpretation of it the easy layer
+ * operation names, and this is the one interpretation of it this layer
  * makes.
  */
-export function capabilitiesOf(model: RigModel): EasyOperationCapabilities {
+export function capabilitiesOf(model: RigModel): RigOperationCapabilities {
   return {
     getFrequency: model.capabilities.has('getFrequency'),
     setFrequency: model.capabilities.has('setFrequency'),
@@ -434,16 +433,16 @@ function mergeState(previous: RigState | undefined, next: RigState): RigState {
   return merged;
 }
 
-/** `RigHandle` also implements the compound seam (`src/native/seam.ts`). */
-type CompoundRig = Rig & CompoundHost;
+/** `RawRigHandle` also implements the compound seam (`src/native/seam.ts`). */
+type CompoundRig = RawRig & CompoundHost;
 
-class EasyRigHandle implements EasyRig {
+class RigHandle implements Rig {
   readonly #rig: CompoundRig;
-  readonly #events = new Emitter<EasyRigEvents>();
-  readonly #operations: EasyOperationCapabilities;
+  readonly #events = new Emitter<RigEvents>();
+  readonly #operations: RigOperationCapabilities;
   readonly #configuredLevels: readonly LevelName[];
   readonly #advertisedLevels: readonly LevelName[];
-  readonly #onClose: (rig: EasyRigHandle) => void;
+  readonly #onClose: (rig: RigHandle) => void;
   readonly #subscriptions = new Set<PollSubscription>();
   readonly #groups = new Map<number, PollGroup>();
   /**
@@ -461,10 +460,10 @@ class EasyRigHandle implements EasyRig {
   #closed = false;
 
   constructor(
-    rig: Rig,
+    rig: RawRig,
     configuredLevels: readonly LevelName[],
     advertisedLevels: readonly LevelName[],
-    onClose: (rig: EasyRigHandle) => void,
+    onClose: (rig: RigHandle) => void,
   ) {
     this.#rig = rig as CompoundRig;
     this.#operations = capabilitiesOf(rig.model);
@@ -481,7 +480,7 @@ class EasyRigHandle implements EasyRig {
     return this.#rig.baudRate;
   }
 
-  get capabilities(): EasyCapabilities {
+  get capabilities(): RigCapabilities {
     return { ...this.#operations, levels: this.#advertisedLevels };
   }
 
@@ -493,7 +492,7 @@ class EasyRigHandle implements EasyRig {
     return this.#state;
   }
 
-  get raw(): Rig {
+  get raw(): RawRig {
     return this.#rig;
   }
 
@@ -602,7 +601,7 @@ class EasyRigHandle implements EasyRig {
     }));
   }
 
-  on<K extends keyof EasyRigEvents>(event: K, listener: Listener<EasyRigEvents[K]>): () => void {
+  on<K extends keyof RigEvents>(event: K, listener: Listener<RigEvents[K]>): () => void {
     return this.#events.on(event, listener);
   }
 
@@ -643,7 +642,7 @@ class EasyRigHandle implements EasyRig {
     if (fields.has('levels') && levels.length === 0) {
       throw new HamlibError(
         'watch asked for levels, but this instance has none configured '
-        + '(pass `levels` to createEasy) or the model advertises none',
+        + '(pass `levels` to createHamlib) or the model advertises none',
         { code: 'INVALID_ARGUMENT', operation: 'watch' },
       );
     }
@@ -935,7 +934,7 @@ class EasyRigHandle implements EasyRig {
 
     if (!this.#configuredLevels.includes(name)) {
       throw new HamlibError(
-        `level ${name} is not configured; pass it to createEasy({ levels: [...] })`,
+        `level ${name} is not configured; pass it to createHamlib({ levels: [...] })`,
         { code: 'INVALID_ARGUMENT', operation: 'level' },
       );
     }
@@ -963,24 +962,24 @@ class EasyRigHandle implements EasyRig {
   }
 }
 
-class EasyHamlibInstance implements EasyHamlib {
-  readonly #hamlib: Hamlib;
+class HamlibInstance implements Hamlib {
+  readonly #hamlib: RawHamlib;
   readonly #levels: readonly LevelName[];
-  readonly #rigs = new Set<EasyRigHandle>();
+  readonly #rigs = new Set<RigHandle>();
 
   #disposed = false;
   #disposePromise: Promise<void> | undefined;
 
-  private constructor(hamlib: Hamlib, levels: readonly LevelName[]) {
+  private constructor(hamlib: RawHamlib, levels: readonly LevelName[]) {
     this.#hamlib = hamlib;
     this.#levels = levels;
   }
 
-  static async create(options: EasyOptions): Promise<EasyHamlibInstance> {
+  static async create(options: HamlibOptions): Promise<HamlibInstance> {
     const { levels, ...hamlibOptions } = options;
 
-    return new EasyHamlibInstance(
-      await createHamlib(hamlibOptions),
+    return new HamlibInstance(
+      await createRawHamlib(hamlibOptions),
       normalizeLevels(levels),
     );
   }
@@ -1003,7 +1002,7 @@ class EasyHamlibInstance implements EasyHamlib {
     return this.#hamlib.detectBaudRate(options);
   }
 
-  async open(options: OpenEasyRigOptions): Promise<EasyRig> {
+  async open(options: OpenRigOptions): Promise<Rig> {
     this.#assertLive('open');
 
     const port = options.port ?? await this.requestPort();
@@ -1026,22 +1025,22 @@ class EasyHamlibInstance implements EasyHamlib {
       throw error;
     }
 
-    const easy = new EasyRigHandle(rig, this.#levels, advertised, (handle) => {
+    const handle = new RigHandle(rig, this.#levels, advertised, (handle) => {
       this.#rigs.delete(handle);
     });
 
     if (this.#disposed) {
       /* Disposal was accepted while this open waited: hand the rig over closed
        * instead of publishing a live wrapper. */
-      await easy.close();
+      await handle.close();
       throw new HamlibError('Hamlib instance has been disposed', {
         code: 'DISPOSED',
         operation: 'open',
       });
     }
 
-    this.#rigs.add(easy);
-    return easy;
+    this.#rigs.add(handle);
+    return handle;
   }
 
   dispose(): Promise<void> {
@@ -1080,7 +1079,7 @@ function normalizeLevels(levels: readonly LevelName[] | undefined): readonly Lev
     if (!LEVEL_NAMES.includes(name)) {
       throw new HamlibError(
         `unknown level ${String(name)}; use one of ${LEVEL_NAMES.join(', ')}`,
-        { code: 'INVALID_ARGUMENT', operation: 'createEasy' },
+        { code: 'INVALID_ARGUMENT', operation: 'createHamlib' },
       );
     }
 
@@ -1099,7 +1098,7 @@ function normalizeLevels(levels: readonly LevelName[] | undefined): readonly Lev
  * one pure call per configured level, once per open.
  */
 async function advertisedLevels(
-  rig: Rig,
+  rig: RawRig,
   configured: readonly LevelName[],
 ): Promise<readonly LevelName[]> {
   const advertised: LevelName[] = [];
@@ -1117,7 +1116,7 @@ async function advertisedLevels(
  * Load Hamlib and read its rig model catalogue.
  *
  * ```ts
- * const hamlib = await createEasy({ levels: ['STRENGTH', 'SWR'] });
+ * const hamlib = await createHamlib({ levels: ['STRENGTH', 'SWR'] });
  * const model = hamlib.models.find((entry) => entry.model === 'TS-480');
  * const rig = await hamlib.open({ modelId: model.id });   // asks for the port
  * console.log(await rig.refresh());                        // 14074000 USB 2400
@@ -1131,6 +1130,6 @@ async function advertisedLevels(
  * One instance owns one Wasm module and one call queue; a second instance is a
  * second module with its own memory.
  */
-export async function createEasy(options: EasyOptions = {}): Promise<EasyHamlib> {
-  return EasyHamlibInstance.create(options);
+export async function createHamlib(options: HamlibOptions = {}): Promise<Hamlib> {
+  return HamlibInstance.create(options);
 }

@@ -1,11 +1,11 @@
 /**
- * The `useEasyRig` connection state machine, against a stubbed package
+ * The `useRig` connection state machine, against a stubbed package
  * boundary.
  *
  * These are the cases the browser specs cannot order: two attempts whose
  * outcomes arrive in a chosen sequence, and an attempt that settles after the
  * component that started it is gone.  The real hook from the built package runs
- * here; only `createEasy`/`HamlibError` are replaced.
+ * here; only `createHamlib`/`HamlibError` are replaced.
  *
  * A connection is always started *outside* `act`: React's async `act` waits for
  * the work its callback started, and a connection stays pending until the spec
@@ -35,7 +35,7 @@ async function settle(work: () => void): Promise<void> {
   });
 }
 
-describe('useEasyRig connection ownership', () => {
+describe('useRig connection ownership', () => {
   beforeEach(() => {
     stub.reset();
     document.body.replaceChildren();

@@ -1,18 +1,18 @@
 ---
 title: React hooks
-description: HamlibProvider, useEasyRig, useRigState, useRigError and useModels.
+description: HamlibProvider, useRig, useRigState, useRigError and useModels.
 ---
 
-`hamlib-wasm/react` wraps the [easy surface](../easy/) in a provider and a few
+`hamlib-wasm/react` wraps the [default surface](../rig-api/) in a provider and a few
 hooks. `react` is an optional peer dependency; no other entry imports it.
 
 ```tsx
 import { createRoot } from 'react-dom/client';
-import { HamlibProvider, useEasyRig, useModels, useRigError, useRigState } from 'hamlib-wasm/react';
+import { HamlibProvider, useRig, useModels, useRigError, useRigState } from 'hamlib-wasm/react';
 
-function Rig() {
+function RigView() {
   const models = useModels();
-  const { rig, connect, disconnect, connecting, error } = useEasyRig();
+  const { rig, connect, disconnect, connecting, error } = useRig();
   const state = useRigState(rig, { pollMs: 1000 });
   const failure = useRigError(rig);
 
@@ -38,7 +38,7 @@ function Rig() {
 const options = { levels: ['STRENGTH'] } as const;
 
 createRoot(document.getElementById('root')!).render(
-  <HamlibProvider options={options}><Rig /></HamlibProvider>,
+  <HamlibProvider options={options}><RigView /></HamlibProvider>,
 );
 ```
 
@@ -46,10 +46,10 @@ createRoot(document.getElementById('root')!).render(
 
 | Hook | What it does |
 | --- | --- |
-| `HamlibProvider` | Loads one module with `createEasy(options)` and disposes it on unmount. `options` is read once - keep it stable. |
-| `useHamlibContext()` / `useHamlib()` | The loaded `EasyHamlib`, plus `loading` and the load `error`. |
+| `HamlibProvider` | Loads one module with `createHamlib(options)` and disposes it on unmount. `options` is read once - keep it stable. |
+| `useHamlibContext()` / `useHamlib()` | The loaded `Hamlib`, plus `loading` and the load `error`. |
 | `useModels()` | The model catalogue; empty until the module has loaded. |
-| `useEasyRig()` | Owns one rig: `connect(options)`, `disconnect()`, `rig`, `connecting`, `error`. Closes the rig on unmount. |
+| `useRig()` | Owns one rig: `connect(options)`, `disconnect()`, `rig`, `connecting`, `error`. Closes the rig on unmount. |
 | `useRigState(rig, { pollMs, fields, levels })` | Subscribes to the `state` event and, with `pollMs`, registers the rig's own `watch()` for exactly the fields named. |
 | `useRigError(rig)` | The last operation failure the rig reported. |
 

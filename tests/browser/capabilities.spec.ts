@@ -1,7 +1,7 @@
 /**
  * Capability-aware telemetry and command gating.
  *
- * A model may implement only part of the easy telemetry surface.  `refresh()`
+ * A model may implement only part of the telemetry surface.  `refresh()`
  * must read exactly the getters the model advertises and omit the rest - never
  * invent a value - while the connection stays owned and the operations the
  * model cannot perform are refused before reaching Wasm.
@@ -44,7 +44,7 @@ test('a frequency-only model produces a frequency-only snapshot', async ({ page 
   await useRig(page, 'yaesu-frg100');
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'FRG-100');
 
     if (!model) { throw new Error('the FRG-100 is missing from the catalogue'); }
@@ -124,7 +124,7 @@ test('a frequency-only model produces a frequency-only snapshot', async ({ page 
 
 test('a set-only PTT model takes both PTT commands and refuses the read', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createEasy({});
+    const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-140S');
 
     if (!model) { throw new Error('the TS-140S is missing from the catalogue'); }

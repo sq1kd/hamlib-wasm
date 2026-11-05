@@ -11,7 +11,7 @@
 import { SerialPort } from 'serialport';
 import { expect, test } from 'vitest';
 
-import { createHamlib } from 'hamlib-wasm/hamlib';
+import { createRawHamlib } from 'hamlib-wasm/raw';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 import type { SerialPortConstructorLike } from 'hamlib-wasm/node';
 
@@ -32,7 +32,7 @@ test('resolves the real dependency and reports it usable', async () => {
 
 test('reports an absent device as a Hamlib error', async () => {
   const transport = nodeSerialTransport();
-  const hamlib = await createHamlib({ transport });
+  const hamlib = await createRawHamlib({ transport });
 
   try {
     const model = hamlib.models.find(

@@ -17,11 +17,11 @@
  * either - the adapter's shapes are this file's own.
  *
  * ```ts
- * import { createHamlib } from 'hamlib-wasm/hamlib';
+ * import { createRawHamlib } from 'hamlib-wasm/raw';
  * import { nodeSerialTransport } from 'hamlib-wasm/node';
  *
  * const transport = nodeSerialTransport();
- * const hamlib = await createHamlib({ transport });
+ * const hamlib = await createRawHamlib({ transport });
  * const port = await transport.requestPort({ path: '/dev/tty.usbserial-1410' });
  * const rig = await hamlib.open({ modelId, port, baudRate: 9600 });
  * ```

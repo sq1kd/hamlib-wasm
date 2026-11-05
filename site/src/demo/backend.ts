@@ -2,13 +2,13 @@
  * One rig, driven through either API surface.
  *
  * The demo loads a single Hamlib module (`HamlibProvider`) and opens a single
- * `EasyRig` (`useEasyRig`).  What changes between the two modes is only which
+ * `Rig` (`useRig`).  What changes between the two modes is only which
  * calls drive the panel:
  *
- *  - `easy`: the rig's own methods, and `useRigState` polling through the
+ *  - `rig`: the rig's own methods, and `useRigState` polling through the
  *    library's `watch()` - one `refresh()`-style snapshot, the passband filled
  *    in from the model;
- *  - `native`: the same screen through `rig.raw`, the 1:1 `Rig` - explicit
+ *  - `raw`: the same screen through `rig.raw`, the `RawRig` - explicit
  *    `getFrequency()`/`getMode()`/`getPtt()` reads polled by hand and an
  *    explicit passband on every `setMode()`.
  *
@@ -17,13 +17,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { HamlibError } from 'hamlib-wasm';
-import type { EasyCapabilities, EasyRig, PttState, RigState, SerialPortLike } from 'hamlib-wasm';
-import type { Rig } from 'hamlib-wasm/hamlib';
-import { useEasyRig, useRigError, useRigState } from 'hamlib-wasm/react';
+import type { RigCapabilities, Rig, PttState, RigState, SerialPortLike } from 'hamlib-wasm';
+import type { RawRig } from 'hamlib-wasm/raw';
+import { useRig, useRigError, useRigState } from 'hamlib-wasm/react';
 
 import type { PassbandKind } from './RigPanel';
 
-export type Api = 'easy' | 'native';
+export type Api = 'rig' | 'raw';
 
 export interface LogEntry {
   readonly api: Api;
@@ -35,7 +35,7 @@ export type Log = (entry: LogEntry) => void;
 /** How often a connected rig is re-read, in milliseconds. */
 export const POLL_MS = 1000;
 
-const NO_CAPABILITIES: EasyCapabilities = {
+const NO_CAPABILITIES: RigCapabilities = {
   getFrequency: false,
   setFrequency: false,
   getMode: false,
@@ -57,8 +57,8 @@ function asError(error: unknown, operation: string): HamlibError {
     });
 }
 
-/** Read what the model advertises through the 1:1 surface, and only that. */
-async function readRaw(rig: EasyRig, api: Api, log: Log): Promise<RigState> {
+/** Read what the model advertises through the raw surface, and only that. */
+async function readRaw(rig: Rig, api: Api, log: Log): Promise<RigState> {
   const raw = rig.raw;
   const next: RigState = {};
 
@@ -86,7 +86,7 @@ async function readRaw(rig: EasyRig, api: Api, log: Log): Promise<RigState> {
 }
 
 /** Hamlib's own passband helper for the requested width. */
-function passbandWidth(raw: Rig, mode: string, kind: PassbandKind): Promise<number> {
+function passbandWidth(raw: RawRig, mode: string, kind: PassbandKind): Promise<number> {
   switch (kind) {
     case 'narrow':
       return raw.passbandNarrow(mode);
@@ -98,9 +98,9 @@ function passbandWidth(raw: Rig, mode: string, kind: PassbandKind): Promise<numb
 }
 
 export interface Backend {
-  readonly rig: EasyRig | undefined;
+  readonly rig: Rig | undefined;
   readonly state: RigState | undefined;
-  readonly capabilities: EasyCapabilities;
+  readonly capabilities: RigCapabilities;
   readonly connecting: boolean;
   readonly error: HamlibError | undefined;
   connect(modelId: number, baudRate?: number, port?: SerialPortLike): Promise<void>;
@@ -112,22 +112,22 @@ export interface Backend {
 }
 
 export function useBackend(api: Api, log: Log): Backend {
-  const { rig, connecting, error: connectError, connect, disconnect } = useEasyRig();
+  const { rig, connecting, error: connectError, connect, disconnect } = useRig();
 
-  /* easy: the library polls.  The demo shows meters, so it asks for levels. */
-  const easyState = useRigState(api === 'easy' ? rig : undefined, {
+  /* rig: the library polls.  The demo shows meters, so it asks for levels. */
+  const rigState = useRigState(api === 'rig' ? rig : undefined, {
     pollMs: POLL_MS,
     fields: ['frequency', 'mode', 'ptt', 'levels'],
   });
-  const easyError = useRigError(rig);
+  const rigError = useRigError(rig);
 
-  /* native: the app polls, and orders its own multi-call actions. */
-  const [nativeState, setNativeState] = useState<RigState | undefined>(undefined);
-  const [nativeError, setNativeError] = useState<HamlibError | undefined>(undefined);
+  /* raw: the app polls, and orders its own multi-call actions. */
+  const [rawState, setRawState] = useState<RigState | undefined>(undefined);
+  const [rawError, setRawError] = useState<HamlibError | undefined>(undefined);
   const tailRef = useRef<Promise<void>>(Promise.resolve());
 
   /** Queue one panel action so its calls cannot interleave with the next one's. */
-  const enqueue = useCallback((label: string, run: (rig: EasyRig) => Promise<unknown>): void => {
+  const enqueue = useCallback((label: string, run: (rig: Rig) => Promise<unknown>): void => {
     if (rig === undefined) {
       return;
     }
@@ -137,15 +137,15 @@ export function useBackend(api: Api, log: Log): Backend {
       .then(() => run(rig))
       .then(
         () => undefined,
-        (cause: unknown) => { setNativeError(asError(cause, label)); },
+        (cause: unknown) => { setRawError(asError(cause, label)); },
       );
   }, [api, log, rig]);
 
   useEffect(() => {
-    setNativeState(undefined);
-    setNativeError(undefined);
+    setRawState(undefined);
+    setRawError(undefined);
 
-    if (api !== 'native' || rig === undefined) {
+    if (api !== 'raw' || rig === undefined) {
       return;
     }
 
@@ -161,8 +161,8 @@ export function useBackend(api: Api, log: Log): Backend {
       tailRef.current = tailRef.current
         .then(() => readRaw(rig, api, log))
         .then(
-          (next) => { if (live) { setNativeState(next); } },
-          (cause: unknown) => { if (live) { setNativeError(asError(cause, 'refresh')); } },
+          (next) => { if (live) { setRawState(next); } },
+          (cause: unknown) => { if (live) { setRawError(asError(cause, 'refresh')); } },
         )
         .finally(() => { busy = false; });
     };
@@ -176,16 +176,16 @@ export function useBackend(api: Api, log: Log): Backend {
     };
   }, [api, rig, log]);
 
-  const native = api === 'native';
+  const isRaw = api === 'raw';
 
   return {
     rig,
-    state: native ? nativeState : easyState,
+    state: isRaw ? rawState : rigState,
     capabilities: rig === undefined
       ? NO_CAPABILITIES
-      : native ? { ...rig.capabilities, levels: [] } : rig.capabilities,
+      : isRaw ? { ...rig.capabilities, levels: [] } : rig.capabilities,
     connecting,
-    error: connectError ?? (native ? nativeError : easyError),
+    error: connectError ?? (isRaw ? rawError : rigError),
     connect: async (modelId, baudRate, port) => {
       log({
         api,
@@ -197,7 +197,7 @@ export function useBackend(api: Api, log: Log): Backend {
         ...(port === undefined ? {} : { port }),
       });
 
-      if (!native) {
+      if (!isRaw) {
         log({ api, call: `useRigState(rig, { pollMs: ${String(POLL_MS)} })` });
       }
     },
@@ -205,18 +205,18 @@ export function useBackend(api: Api, log: Log): Backend {
       log({ api, call: 'close()' });
       await disconnect();
     },
-    setFrequency: native
+    setFrequency: isRaw
       ? (hz) => { enqueue(`raw.setFrequency(${String(hz)})`, (r) => r.raw.setFrequency(hz)); }
       : (hz) => { log({ api, call: `setFrequency(${String(hz)})` }); void rig?.setFrequency(hz).catch(() => undefined); },
-    setMode: native
+    setMode: isRaw
       ? (mode) => {
         enqueue(`raw.setMode('${mode}', raw.passbandNormal('${mode}'))`, async (r) => {
-          /* The 1:1 surface wants the width; the easy surface fills it in. */
+          /* The raw surface wants the width; Rig fills it in. */
           await r.raw.setMode(mode, await r.raw.passbandNormal(mode));
         });
       }
       : (mode) => { log({ api, call: `setMode('${mode}')` }); void rig?.setMode(mode).catch(() => undefined); },
-    setPassband: native
+    setPassband: isRaw
       ? (kind) => {
         enqueue(`raw.getMode() + raw.setMode(mode, ${kind} width)`, async (r) => {
           const { mode } = await r.raw.getMode();
@@ -225,7 +225,7 @@ export function useBackend(api: Api, log: Log): Backend {
         });
       }
       : (kind) => { log({ api, call: `setPassband('${kind}')` }); void rig?.setPassband(kind).catch(() => undefined); },
-    setPtt: native
+    setPtt: isRaw
       ? (on) => { enqueue(`raw.setPtt('${on ? 'on' : 'off'}')`, (r) => r.raw.setPtt(on ? 'on' : 'off')); }
       : (on) => { log({ api, call: `setPtt(${String(on)})` }); void rig?.setPtt(on).catch(() => undefined); },
   };

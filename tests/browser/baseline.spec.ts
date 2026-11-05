@@ -107,7 +107,7 @@ test('matches the recorded upstream baseline', async ({ page }) => {
   await page.goto(HARNESS_URL);
 
   const sample = await page.evaluate(async (): Promise<Sample> => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = hamlib.models.find(
       (model) => model.manufacturer === 'Kenwood' && model.model === 'TS-480',

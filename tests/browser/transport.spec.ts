@@ -64,7 +64,7 @@ test.beforeEach(async ({ page }) => {
 
 test('lists the serial rig catalogue sorted by manufacturer and model', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
 
     const models: ModelSummary[] = hamlib.models.map((model) => ({
       id: model.id,
@@ -133,7 +133,7 @@ test('reports TRANSPORT_UNAVAILABLE when the browser has no Web Serial', async (
   await removeWebSerial(page);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = window.__fakeSerial.port;
 
     const request = await window.__testHelpers.capture(() => hamlib.requestPort());
@@ -156,7 +156,7 @@ test('reports TRANSPORT_UNAVAILABLE when the browser has no Web Serial', async (
 
 test('rejects a device path, which only the Node transport can open', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
 
     const byPath = await window.__testHelpers.capture(
       () => hamlib.requestPort({ path: '/dev/tty.usbserial-1410' }),
@@ -179,7 +179,7 @@ test('rejects a device path, which only the Node transport can open', async ({ p
 test('uses a caller-supplied transport instead of Web Serial', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const transport = window.__hamlibHarness.fakeTransport(window.__fakeSerial.port);
-    const hamlib = await window.__hamlibHarness.createHamlib({ transport });
+    const hamlib = await window.__hamlibHarness.createRawHamlib({ transport });
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 
     if (!ts480) {
@@ -215,7 +215,7 @@ test('uses a caller-supplied transport instead of Web Serial', async ({ page }) 
 
 test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting input', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = window.__fakeSerial.port;
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 
@@ -264,7 +264,7 @@ test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting inpu
 
 test('opens a rig, drives it over the transport and releases the port', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 
@@ -366,7 +366,7 @@ test('opens a rig, drives it over the transport and releases the port', async ({
 
 test('reports a Hamlib timeout and recovers on the next read', async ({ page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 
@@ -421,7 +421,7 @@ test('surfaces a Hamlib error when the port cannot be opened', async ({ page }) 
   await failNextPortOpen(page, 'TypeError');
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
 

@@ -4,7 +4,7 @@
  * The one error type this package throws, and the codes it reports.
  *
  * Kept in its own module because two layers produce these values: the facade
- * (`src/hamlib.ts`) for everything it can reject before Wasm, and the
+ * (`src/raw.ts`) for everything it can reject before Wasm, and the
  * transports (`src/web-serial.ts`, `src/node.ts`) for what the device layer
  * underneath them raises.
  */
@@ -49,7 +49,7 @@ export type HamlibErrorCode =
   /**
    * No baud rate answered, so there was nothing to open.
    *
-   * Reported by {@link Hamlib.detectBaudRate}: every candidate rate in the
+   * Reported by {@link RawHamlib.detectBaudRate}: every candidate rate in the
    * model's declared range was tried and the rig replied at none of them.
    */
   | 'RIG_UNRESPONSIVE'
@@ -63,7 +63,7 @@ export type HamlibErrorCode =
    * A native call did not settle within the configured `callTimeoutMs`.
    *
    * The call is abandoned and the instance becomes unusable; see
-   * {@link HamlibOptions.callTimeoutMs}.
+   * {@link RawHamlibOptions.callTimeoutMs}.
    */
   | 'RIG_TIMEOUT'
   /**

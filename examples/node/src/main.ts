@@ -3,7 +3,7 @@
  *
  * The Vanilla and React examples acquire a port from a page's Web Serial
  * chooser.  A terminal has no chooser, so this entry names the device itself
- * and lets `createEasy()` select the Node transport, the one this runtime
+ * and lets `createHamlib()` select the Node transport, the one this runtime
  * gets.  `hamlib-wasm/node` is imported for `listPorts()`.  Everything above
  * the transport - the model catalogue, the ids `open()` takes, the baud-rate
  * search and `refresh()` - is the package's ordinary API, unchanged by the
@@ -26,8 +26,8 @@
  */
 import process from 'node:process';
 
-import { createEasy, HamlibError } from 'hamlib-wasm';
-import type { EasyRig, RigModel, RigState } from 'hamlib-wasm';
+import { createHamlib, HamlibError } from 'hamlib-wasm';
+import type { Rig, RigModel, RigState } from 'hamlib-wasm';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 import type { NodeSerialPortListEntry } from 'hamlib-wasm/node';
 
@@ -215,11 +215,11 @@ async function listPorts(): Promise<void> {
  * nothing to release and the port is left exactly as it was found.
  */
 async function openRig(options: OpenCommand): Promise<void> {
-  /* No transport passed: `createEasy()` picks the Node transport itself, since
+  /* No transport passed: `createHamlib()` picks the Node transport itself, since
    * this runtime has no Web Serial.  `hamlib-wasm/node` is here for
    * `listPorts()` below. */
-  const hamlib = await createEasy();
-  let rig: EasyRig | undefined;
+  const hamlib = await createHamlib();
+  let rig: Rig | undefined;
 
   try {
     const model = findModel(hamlib.models, options.model);

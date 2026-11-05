@@ -13,7 +13,7 @@ runtime support and limitations are documented in the package README:
 
 | Path | Purpose |
 | --- | --- |
-| `packages/hamlib-wasm` | The package: the entry points in `src/` (`index.ts`, `hamlib.ts`, `node.ts`, `react.ts`), native sources and build scripts |
+| `packages/hamlib-wasm` | The package: the entry points in `src/` (`index.ts`, `raw.ts`, `node.ts`, `react.ts`), native sources and build scripts |
 | `packages/hamlib-wasm/hamlib.config.yaml` | The one config: the pinned release (version, archive URL + SHA-256, patches) and the binding surface |
 | `packages/hamlib-wasm/coverage.json` | Generated coverage report: bound vs refused declarations, with reasons |
 | `packages/hamlib-wasm/build` | Native build, package build, audits and the generator wrapper |

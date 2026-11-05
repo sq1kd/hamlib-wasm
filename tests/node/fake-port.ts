@@ -13,7 +13,7 @@ import type {
   SerialLineSettings,
   SerialOutputSignals,
   SerialPortLike,
-} from 'hamlib-wasm/hamlib';
+} from 'hamlib-wasm/raw';
 import { fakeRig } from './rigs.js';
 
 /** What the double records while the package drives it. */

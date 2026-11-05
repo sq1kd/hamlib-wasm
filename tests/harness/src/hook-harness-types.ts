@@ -9,7 +9,7 @@
 export interface HookSnapshot {
   /** The provider finished loading, so its catalogue is known. */
   readonly ready: boolean;
-  /** A rig is owned: `useEasyRig().rig !== undefined`. */
+  /** A rig is owned: `useRig().rig !== undefined`. */
   readonly connected: boolean;
   readonly connecting: boolean;
   readonly error: {

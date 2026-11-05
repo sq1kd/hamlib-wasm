@@ -14,8 +14,8 @@
  * Nothing here writes to a rig.  The frequency round-trip in `write.test.ts` is
  * the only writing call in this project, and only when asked for.
  */
-import { createHamlib } from 'hamlib-wasm/hamlib';
-import type { Hamlib, RigModel } from 'hamlib-wasm/hamlib';
+import { createRawHamlib } from 'hamlib-wasm/raw';
+import type { RawHamlib, RigModel } from 'hamlib-wasm/raw';
 import type { NodeSerialTransport } from 'hamlib-wasm/node';
 
 import { DEVICES } from './devices.js';
@@ -113,7 +113,7 @@ export async function resolveTarget(
   device: HardwareDevice,
   env: Environment = process.env,
 ): Promise<HardwareTarget> {
-  const hamlib = await createHamlib({ transport });
+  const hamlib = await createRawHamlib({ transport });
 
   try {
     const target = await probeForAnswer(hamlib, transport, device, env);
@@ -130,7 +130,7 @@ export async function resolveTarget(
 }
 
 async function probeForAnswer(
-  hamlib: Hamlib,
+  hamlib: RawHamlib,
   transport: NodeSerialTransport,
   device: HardwareDevice,
   env: Environment,

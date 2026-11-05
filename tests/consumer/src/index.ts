@@ -6,33 +6,33 @@
  * exports map - and walks both documented flows, so a mismatch between the
  * generated declarations and the package exports fails `mise run typecheck`.
  *
- * Three entries are exercised: `hamlib-wasm`, the easy surface,
- * `hamlib-wasm/hamlib`, the 1:1 Hamlib surface, and `hamlib-wasm/node`, the Node
+ * Three entries are exercised: `hamlib-wasm`, the default surface,
+ * `hamlib-wasm/raw`, the raw Hamlib surface, and `hamlib-wasm/node`, the Node
  * transport.
  */
-import { HamlibError, createEasy } from 'hamlib-wasm';
+import { HamlibError, createHamlib } from 'hamlib-wasm';
 import type {
-  EasyCapabilities,
-  EasyHamlib,
-  EasyRig,
+  RigCapabilities,
+  Hamlib,
+  Rig,
   HamlibErrorCode,
   HamlibOptions,
   PttState,
   RigState,
 } from 'hamlib-wasm';
-import { createHamlib, webSerialTransport } from 'hamlib-wasm/hamlib';
+import { createRawHamlib, webSerialTransport } from 'hamlib-wasm/raw';
 import type {
-  Hamlib,
-  OpenRigOptions,
-  Rig,
-  RigCapabilities,
+  RawHamlib,
+  OpenRawRigOptions,
+  RawRig,
+  RigModelCapabilities,
   RigConfparam,
   RigMode,
   RigModeState,
   RigModel,
   SerialPortLike,
   SerialTransport,
-} from 'hamlib-wasm/hamlib';
+} from 'hamlib-wasm/raw';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 import type {
   NodeSerialPortListEntry,
@@ -45,14 +45,14 @@ export interface ConsumerSummary {
   frequency: number;
   mode: RigModeState;
   ptt: string;
-  capabilities: RigCapabilities;
+  capabilities: RigModelCapabilities;
 }
 
 export async function runConsumerFlow(
   port: SerialPort,
   locateFile: HamlibOptions['locateFile'],
 ): Promise<ConsumerSummary> {
-  const hamlib: Hamlib = await createHamlib({ locateFile });
+  const hamlib: RawHamlib = await createRawHamlib({ locateFile });
   const version: string = hamlib.version;
   const models: readonly RigModel[] = hamlib.models;
 
@@ -66,13 +66,13 @@ export async function runConsumerFlow(
     throw new Error('the TS-480 model is missing from the catalogue');
   }
 
-  const options: OpenRigOptions = {
+  const options: OpenRawRigOptions = {
     modelId: model.id,
     port,
     baudRate: model.serialRateMax,
   };
 
-  let rig: Rig | undefined;
+  let rig: RawRig | undefined;
   let summary: ConsumerSummary | undefined;
 
   try {
@@ -148,19 +148,19 @@ export async function runConsumerFlow(
   return summary;
 }
 
-export interface EasySummary {
+export interface RigSummary {
   version: string;
   state: RigState;
-  capabilities: EasyCapabilities;
+  capabilities: RigCapabilities;
   ptt: PttState;
 }
 
-/** The easy flow: port request, one snapshot, events, a watch, the raw escape. */
-export async function runEasyFlow(
+/** The default flow: port request, one snapshot, events, a watch, the raw escape. */
+export async function runRigFlow(
   port: SerialPort,
   locateFile: HamlibOptions['locateFile'],
-): Promise<EasySummary> {
-  const hamlib: EasyHamlib = await createEasy({ locateFile, levels: ['STRENGTH'] });
+): Promise<RigSummary> {
+  const hamlib: Hamlib = await createHamlib({ locateFile, levels: ['STRENGTH'] });
   const version: string = hamlib.version;
   const model: RigModel | undefined = hamlib.models.find(
     (candidate: RigModel) => candidate.model === 'TS-480',
@@ -172,7 +172,7 @@ export async function runEasyFlow(
   }
 
   /* A granted port skips requestPort(), so no user gesture is needed here. */
-  const rig: EasyRig = await hamlib.open({
+  const rig: Rig = await hamlib.open({
     modelId: model.id,
     port,
     baudRate: model.serialRateMax,
@@ -197,14 +197,14 @@ export async function runEasyFlow(
   await rig.setPtt(true);
 
   const ptt: PttState = rig.state?.ptt ?? 'off';
-  const capabilities: EasyCapabilities = rig.capabilities;
+  const capabilities: RigCapabilities = rig.capabilities;
   const strength: number | undefined = state.levels?.STRENGTH;
   const advertised: readonly string[] = capabilities.levels;
   void strength;
   void advertised;
 
-  /* Anything the easy surface does not cover is still reachable. */
-  const raw: Rig = rig.raw;
+  /* Anything the default surface does not cover is still reachable. */
+  const raw: RawRig = rig.raw;
   const mode: RigMode | undefined = state.mode;
   const rawMode: RigModeState = await raw.getMode();
 
@@ -227,7 +227,7 @@ export function describeMode(mode: RigMode, passband: number): string {
  * A Web Serial `SerialPort` still fits the package's own `SerialPortLike` as it
  * stands (that is why the browser needs no adapter), and both entries publish
  * the same `SerialTransport` shape, so an application can hold either one in
- * the same variable - and pass it to `createHamlib({ transport })`.
+ * the same variable - and pass it to `createRawHamlib({ transport })`.
  */
 export function describeTransports(port: SerialPort): {
   web: SerialTransport;

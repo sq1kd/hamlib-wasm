@@ -1102,7 +1102,7 @@ export function emitContract(
   lines.push(' * The low-level operation surface of the Wasm module, derived from the');
   lines.push(' * allowlist and the upstream AST rather than from the emitted declaration.');
   lines.push(' *');
-  lines.push(' * `src/hamlib.ts` asserts that the built module satisfies this contract, so a');
+  lines.push(' * `src/raw.ts` asserts that the built module satisfies this contract, so a');
   lines.push(' * binding that drifts from the allowlist fails the typecheck.');
   lines.push(' */');
   lines.push('export interface NativeOperations {');
@@ -1168,7 +1168,7 @@ export function emitContract(
   );
   lines.push('');
   lines.push('/**');
-  lines.push(' * Operations gated on one of those flags, so `src/hamlib.ts` can fold them');
+  lines.push(' * Operations gated on one of those flags, so `src/raw.ts` can fold them');
   lines.push(' * into the capability list it builds for a model.');
   lines.push(' */');
   lines.push('export const FLAG_GATED_OPERATIONS: readonly (readonly [string, RigFlag])[] = [');
@@ -1182,7 +1182,7 @@ export function emitContract(
   lines.push('/**');
   lines.push(' * Every generated operation as a method.  `GeneratedRigMethods`');
   lines.push(' * (`methods/index.ts`) implements it with a real method per operation, and');
-  lines.push(' * `src/hamlib.ts` extends that class, so a new operation is callable without');
+  lines.push(' * `src/raw.ts` extends that class, so a new operation is callable without');
   lines.push(' * any hand-written method and without a string-keyed dispatcher.');
   lines.push(' */');
   lines.push('export interface GeneratedPublicOperations {');
@@ -1384,7 +1384,7 @@ export interface GeneratedCallResult {
 }
 
 /**
- * Shared plumbing for the generated rig methods.  \`src/hamlib.ts\` supplies the
+ * Shared plumbing for the generated rig methods.  \`src/raw.ts\` supplies the
  * implementation: the native module, the current handle, the single call queue,
  * the capability gate and the error conversion.
  */
@@ -1468,7 +1468,7 @@ import { ${className} } from '${path}';
 
 /**
  * Every generated operation as a real, typed method, assembled from the family
- * classes.  \`RigHandle\` extends this; \`tsc\` proves the methods satisfy
+ * classes.  \`RawRigHandle\` extends this; \`tsc\` proves the methods satisfy
  * \`GeneratedPublicOperations\`.
  */
 export abstract class GeneratedRigMethods

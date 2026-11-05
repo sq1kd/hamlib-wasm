@@ -35,7 +35,7 @@ export type Asyncify<T> = T | Promise<T>;
  * The low-level operation surface of the Wasm module, derived from the
  * allowlist and the upstream AST rather than from the emitted declaration.
  *
- * `src/hamlib.ts` asserts that the built module satisfies this contract, so a
+ * `src/raw.ts` asserts that the built module satisfies this contract, so a
  * binding that drifts from the allowlist fails the typecheck.
  */
 export interface NativeOperations {
@@ -285,7 +285,7 @@ type Expect<T extends true> = T;
 export type RigFlag = 'canGetPtt' | 'canSetPtt';
 
 /**
- * Operations gated on one of those flags, so `src/hamlib.ts` can fold them
+ * Operations gated on one of those flags, so `src/raw.ts` can fold them
  * into the capability list it builds for a model.
  */
 export const FLAG_GATED_OPERATIONS: readonly (readonly [string, RigFlag])[] = [
@@ -296,7 +296,7 @@ export const FLAG_GATED_OPERATIONS: readonly (readonly [string, RigFlag])[] = [
 /**
  * Every generated operation as a method.  `GeneratedRigMethods`
  * (`methods/index.ts`) implements it with a real method per operation, and
- * `src/hamlib.ts` extends that class, so a new operation is callable without
+ * `src/raw.ts` extends that class, so a new operation is callable without
  * any hand-written method and without a string-keyed dispatcher.
  */
 export interface GeneratedPublicOperations {

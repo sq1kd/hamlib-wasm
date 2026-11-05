@@ -10,7 +10,7 @@ export interface GeneratedCallResult {
 }
 
 /**
- * Shared plumbing for the generated rig methods.  `src/hamlib.ts` supplies the
+ * Shared plumbing for the generated rig methods.  `src/raw.ts` supplies the
  * implementation: the native module, the current handle, the single call queue,
  * the capability gate and the error conversion.
  */

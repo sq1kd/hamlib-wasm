@@ -1,8 +1,8 @@
 /**
  * The React landing page, driven end to end through the Web Serial double.
  *
- * Two things are proved here: that the easy entry really drives a rig through
- * the React hooks, and that the 1:1 entry produces the same screen from its
+ * Two things are proved here: that the default entry really drives a rig through
+ * the React hooks, and that the raw entry produces the same screen from its
  * own calls - the call log is the visible difference between them.  The PTT
  * commands are proved to stand on their own, without a poll in between.
  *
@@ -49,7 +49,7 @@ async function connect(page: Page): Promise<void> {
   await expect(page.getByTestId('mode-display')).toHaveText(TS480_MODE);
 }
 
-test('drives a rig through the easy backend', async ({ page }) => {
+test('drives a rig through the rig backend', async ({ page }) => {
   await connect(page);
 
   /* The panel reads through the backend poll and its own step buttons. */
@@ -76,7 +76,7 @@ test('drives a rig through the easy backend', async ({ page }) => {
   await runClockUntilElement(page, { testId: 'frequency-display', text: '7,074,000' });
   await expect(page.getByTestId('frequency-display')).toHaveText('7,074,000');
 
-  /* The easy logging: the poll is a declaration, and the mode call carries no
+  /* The rig logging: the poll is a declaration, and the mode call carries no
    * width because the library fills it in from the model. */
   await expect(page.getByTestId('call-log')).toContainText('useRigState(rig, { pollMs: 1000 })');
   await expect(page.getByTestId('call-log')).toContainText("setMode('CW')");
@@ -114,26 +114,26 @@ test('sends both PTT commands without waiting for a poll', async ({ page }) => {
   await expect(page.getByTestId('ptt-state')).toHaveAttribute('data-state', 'off');
 });
 
-test('produces the same screen from the 1:1 calls', async ({ page }) => {
-  await page.getByTestId('backend-native').check();
+test('produces the same screen from the raw calls', async ({ page }) => {
+  await page.getByTestId('backend-raw').check();
   await connect(page);
 
   await page.getByTestId('mode-CW').click();
   await runClockUntilElement(page, { testId: 'mode-display', text: 'CW' });
   await expect(page.getByTestId('mode-display')).toHaveText('CW');
 
-  /* The native logging: the explicit reads the easy surface folds into one,
+  /* The raw logging: the explicit reads the default surface folds into one,
    * and a mode call that writes the passband the app asked Hamlib for. */
   await expect(page.getByTestId('call-log')).toContainText('getFrequency()');
   await expect(page.getByTestId('call-log')).toContainText("setMode('CW',");
   await expect(page.getByTestId('call-log')).not.toContainText('useRigState');
 });
 
-for (const backend of ['easy', 'native'] as const) {
+for (const backend of ['rig', 'raw'] as const) {
   for (const modeFirst of [false, true]) {
     test(`${backend} orders ${modeFirst ? 'mode then passband' : 'passband then mode'} actions`, async ({ page }) => {
-      if (backend === 'native') {
-        await page.getByTestId('backend-native').check();
+      if (backend === 'raw') {
+        await page.getByTestId('backend-raw').check();
       }
 
       await connect(page);

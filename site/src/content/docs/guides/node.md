@@ -3,7 +3,7 @@ title: Node and Electron
 description: Drive a rig from Node, a CLI or an Electron main process through serialport.
 ---
 
-The same package runs outside a browser. `createEasy()` and `createHamlib()`
+The same package runs outside a browser. `createHamlib()` and `createRawHamlib()`
 select the transport the runtime has: Web Serial in a page, the
 [`serialport`](https://serialport.io/) package in Node. Install it next to
 `hamlib-wasm`:
@@ -21,8 +21,8 @@ This is the core of the repository's `examples/node` command line example: list
 ports, or open one, read it once and close it.
 
 ```ts
-import { createEasy, HamlibError } from 'hamlib-wasm';
-import type { EasyRig } from 'hamlib-wasm';
+import { createHamlib, HamlibError } from 'hamlib-wasm';
+import type { Rig } from 'hamlib-wasm';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
 // --list: one line per port.
@@ -30,9 +30,9 @@ for (const port of await nodeSerialTransport().listPorts()) {
   console.log(port.path, port.manufacturer ?? '-', `${port.vendorId ?? '-'}:${port.productId ?? '-'}`);
 }
 
-// --port: no transport passed, so createEasy() picks serialport itself.
-const hamlib = await createEasy();
-let rig: EasyRig | undefined;
+// --port: no transport passed, so createHamlib() picks serialport itself.
+const hamlib = await createHamlib();
+let rig: Rig | undefined;
 
 try {
   const model = hamlib.models.find((entry) => entry.model === 'TS-480')!;
@@ -70,7 +70,7 @@ It only reads: it never writes a frequency, a mode or PTT.
 ## Transport options
 
 `hamlib-wasm/node` exports `nodeSerialTransport()`. Pass it explicitly to
-`createEasy({ transport })` to configure it - an explicit transport always wins
+`createHamlib({ transport })` to configure it - an explicit transport always wins
 over the automatic choice. `nodeSerialTransport({ serialport })` accepts any
 module with a compatible `SerialPort` class, so a different binding or a
 subclass is a one-line change.

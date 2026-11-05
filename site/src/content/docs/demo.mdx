@@ -13,9 +13,9 @@ never sees ports you do not grant.
 The panel can be driven two ways over the **same** rig and the same Hamlib
 module:
 
-- **Easy** - `rig.setMode(mode)`, `rig.setPassband('narrow')` and a
+- **Rig** - `rig.setMode(mode)`, `rig.setPassband('narrow')` and a
   `useRigState` poll that reads one snapshot per tick;
-- **1:1** - `rig.raw`, the underlying `Rig`: `getFrequency()`, `getMode()` and
+- **Raw** - `rig.raw`, the underlying `RawRig`: `getFrequency()`, `getMode()` and
   `getPtt()` polled by hand, and `setMode(mode, width)` with an explicit width
   from `passbandNormal()`.
 

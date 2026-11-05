@@ -9,8 +9,8 @@
  */
 import { afterEach, expect, test } from 'vitest';
 
-import { createHamlib, webSerialTransport } from 'hamlib-wasm/hamlib';
-import type { SerialPortLike, SerialTransport } from 'hamlib-wasm/hamlib';
+import { createRawHamlib, webSerialTransport } from 'hamlib-wasm/raw';
+import type { SerialPortLike, SerialTransport } from 'hamlib-wasm/raw';
 
 import { fakePort } from './fake-port.js';
 import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
@@ -28,7 +28,7 @@ test('drives a rig through a caller-supplied transport and port', async () => {
     },
   };
 
-  const hamlib = await createHamlib({ transport });
+  const hamlib = await createRawHamlib({ transport });
 
   try {
     const port = await hamlib.requestPort();
@@ -76,7 +76,7 @@ test('drives a rig through a caller-supplied transport and port', async () => {
 });
 
 test('refuses a request the Web Serial transport cannot serve', async () => {
-  const hamlib = await createHamlib({ transport: webSerialTransport() });
+  const hamlib = await createRawHamlib({ transport: webSerialTransport() });
 
   try {
     expect(webSerialTransport().isSupported()).toBe(false);
@@ -158,7 +158,7 @@ test('bounds a call that never settles and refuses the instance afterwards', asy
     requestPort: async () => control.port,
   };
 
-  const hamlib = await createHamlib({ transport, callTimeoutMs: 150 });
+  const hamlib = await createRawHamlib({ transport, callTimeoutMs: 150 });
 
   try {
     const ts480 = hamlib.models.find(
@@ -203,7 +203,7 @@ test('close releases the native handle', async () => {
     requestPort: async () => control.port,
   };
 
-  const hamlib = await createHamlib({ transport });
+  const hamlib = await createRawHamlib({ transport });
   const native = (hamlib as unknown as {
     readonly native: { liveHandles(): number | Promise<number> };
   }).native;

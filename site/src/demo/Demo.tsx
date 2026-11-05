@@ -9,7 +9,7 @@ import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
 import { HamlibError } from 'hamlib-wasm';
-import type { EasyOptions, RigModel, SerialPortLike } from 'hamlib-wasm';
+import type { HamlibOptions, RigModel, SerialPortLike } from 'hamlib-wasm';
 import { HamlibProvider, useHamlibContext, useModels } from 'hamlib-wasm/react';
 
 import { useBackend } from './backend';
@@ -18,20 +18,20 @@ import { RigPanel } from './RigPanel';
 import './demo.css';
 
 /* A module constant: the provider reads its options once. */
-const OPTIONS: EasyOptions = { levels: ['STRENGTH', 'SWR'] };
+const OPTIONS: HamlibOptions = { levels: ['STRENGTH', 'SWR'] };
 
 const LOG_LIMIT = 40;
 
 const APIS: readonly { readonly api: Api; readonly code: string; readonly note: string }[] = [
   {
-    api: 'easy',
+    api: 'rig',
     code: 'rig.setMode(mode)',
     note: 'one snapshot, passband filled in, polled by watch()',
   },
   {
-    api: 'native',
+    api: 'raw',
     code: 'rig.raw.setMode(mode, width)',
-    note: 'the 1:1 Rig: one call per Hamlib operation, polled by hand',
+    note: 'the RawRig: one call per Hamlib operation, polled by hand',
   },
 ];
 
@@ -61,7 +61,7 @@ function App(): ReactElement {
   const { hamlib, loading, error: loadError } = useHamlibContext();
   const models = useModels();
 
-  const [api, setApi] = useState<Api>('easy');
+  const [api, setApi] = useState<Api>('rig');
   const [entries, setEntries] = useState<readonly Logged[]>([]);
   const [modelId, setModelId] = useState<number | undefined>(undefined);
   const [baudRate, setBaudRate] = useState('');

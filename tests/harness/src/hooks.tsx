@@ -1,5 +1,5 @@
 /**
- * The hook harness page: it drives `useEasyRig` and `useRigState` exactly the
+ * The hook harness page: it drives `useRig` and `useRigState` exactly the
  * way an application would, and publishes what the hooks published as plain
  * data.
  *
@@ -15,7 +15,7 @@ import { StrictMode, useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { HamlibProvider, useEasyRig, useModels, useRigState } from 'hamlib-wasm/react';
+import { HamlibProvider, useRig, useModels, useRigState } from 'hamlib-wasm/react';
 import type { HamlibOptions } from 'hamlib-wasm';
 
 import type { HookControls, HookSnapshot } from './hook-harness-types';
@@ -48,7 +48,7 @@ const EMPTY_SNAPSHOT: HookSnapshot = {
 let lastPublished: HookSnapshot = EMPTY_SNAPSHOT;
 
 function Probe(): ReactElement {
-  const { rig, connecting, error, connect, disconnect, clearError } = useEasyRig();
+  const { rig, connecting, error, connect, disconnect, clearError } = useRig();
   const models = useModels();
   const state = useRigState(rig, { pollMs: POLL_MS });
   const snapshotsRef = useRef(0);

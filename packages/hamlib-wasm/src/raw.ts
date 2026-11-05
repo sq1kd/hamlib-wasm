@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * hamlib-wasm/hamlib - Hamlib CAT control over a switchable serial transport.
+ * hamlib-wasm/raw - Hamlib CAT control over a switchable serial transport.
  *
  * This is the low-level entry point: a method per upstream Hamlib call, named
  * after the call it binds.  It adds no convenience wrappers of its own.  The
- * package's default entry point is the easier, TypeScript-shaped facade in
+ * package's default entry point is the stateful, TypeScript-shaped facade in
  * `src/index.ts`, which is built on top of this one.
  *
  * The package wraps a WebAssembly build of Hamlib whose serial transport
@@ -20,7 +20,7 @@
  * Every operation is asynchronous and is serialized on one internal promise
  * chain, because the Wasm module runs on the main thread and Emscripten's
  * Asyncify can only have one suspended native call at a time.  Multiple
- * {@link Rig} objects are still supported: their calls are queued in order.
+ * {@link RawRig} objects are still supported: their calls are queued in order.
  *
  * This module never exposes C pointers, Hamlib structures or Wasm memory.
  */
@@ -130,7 +130,7 @@ function normalizeCallTimeout(value: number | undefined): number {
   if (!Number.isFinite(value) || value < 0) {
     throw new HamlibError(
       `callTimeoutMs must be a non-negative number, got ${String(value)}`,
-      { code: 'INVALID_ARGUMENT', operation: 'createHamlib' },
+      { code: 'INVALID_ARGUMENT', operation: 'createRawHamlib' },
     );
   }
 
@@ -138,7 +138,7 @@ function normalizeCallTimeout(value: number | undefined): number {
 }
 
 /** What a rig model can do over a serial transport. */
-export interface RigCapabilities {
+export interface RigModelCapabilities {
   canGetFrequency: boolean;
   canSetFrequency: boolean;
   canGetMode: boolean;
@@ -148,8 +148,8 @@ export interface RigCapabilities {
 }
 
 /** A rig model reachable over a serial transport, sorted by manufacturer then model. */
-export interface RigModel extends RigCapabilities {
-  /** Hamlib model id, pass this to {@link Hamlib.open}. */
+export interface RigModel extends RigModelCapabilities {
+  /** Hamlib model id, pass this to {@link RawHamlib.open}. */
   id: number;
   manufacturer: string;
   model: string;
@@ -180,7 +180,7 @@ export interface RigModel extends RigCapabilities {
   /**
    * Names of the generated operations this model implements, from its
    * `rig_caps` function pointers.  A name that is absent means the matching
-   * generated method on {@link Rig} is refused with `UNSUPPORTED_OPERATION`
+   * generated method on {@link RawRig} is refused with `UNSUPPORTED_OPERATION`
    * before reaching Wasm.
    *
    * A set, not an array: it is built once per model from the native capability
@@ -219,8 +219,8 @@ export interface RigModeState {
   passband: number;
 }
 
-/** Options for {@link createHamlib}. */
-export interface HamlibOptions {
+/** Options for {@link createRawHamlib}. */
+export interface RawHamlibOptions {
   /**
    * Resolve an Emscripten asset name (e.g. `hamlib-wasm.wasm`) to a URL.
    *
@@ -250,11 +250,11 @@ export interface HamlibOptions {
   callTimeoutMs?: number;
 }
 
-/** Options for {@link Hamlib.open}. */
-export interface OpenRigOptions {
+/** Options for {@link RawHamlib.open}. */
+export interface OpenRawRigOptions {
   /** Model id taken from {@link RigModel.id}. */
   modelId: number;
-  /** Port returned by {@link Hamlib.requestPort}. */
+  /** Port returned by {@link RawHamlib.requestPort}. */
   port: SerialPortLike;
   /**
    * Baud rate to open the port at.
@@ -267,17 +267,17 @@ export interface OpenRigOptions {
    * (`get_freq`) has to have sent something back by the time `rig_open()`
    * returns, and an open that received nothing at all is rejected instead of
    * handing back a rig that cannot be read.  Where the rate is unknown, find it
-   * with {@link Hamlib.detectBaudRate} and pass the result here - or keep it
+   * with {@link RawHamlib.detectBaudRate} and pass the result here - or keep it
    * and reuse it on the next connect.
    */
   baudRate?: number;
 }
 
-/** Options for {@link Hamlib.detectBaudRate}. */
+/** Options for {@link RawHamlib.detectBaudRate}. */
 export interface DetectBaudRateOptions {
   /** Model id taken from {@link RigModel.id}. */
   modelId: number;
-  /** Port returned by {@link Hamlib.requestPort}. */
+  /** Port returned by {@link RawHamlib.requestPort}. */
   port: SerialPortLike;
   /**
    * Rates to try, in the order to try them.
@@ -297,27 +297,27 @@ export interface DetectBaudRateOptions {
  * facts the generated surface cannot know: which model was opened, whether it
  * is still open, and how to release it.
  */
-export interface Rig extends GeneratedPublicOperations {
+export interface RawRig extends GeneratedPublicOperations {
   /** The model this rig was opened with. */
   readonly model: RigModel;
   /**
    * The baud rate this rig's port was opened at.
    *
    * The rate that was asked for - the caller's `baudRate`, the rate
-   * {@link Hamlib.detectBaudRate} found, or the model's advertised maximum
+   * {@link RawHamlib.detectBaudRate} found, or the model's advertised maximum
    * when the caller left it out - and, because the open verifies the link, one
    * the rig demonstrably answered at.  Keep it if the connection will be made
    * again: reconnecting with it skips both the guess and the scan.
    */
   readonly baudRate: number;
-  /** `false` once {@link Rig.close} has completed. */
+  /** `false` once {@link RawRig.close} has completed. */
   readonly connected: boolean;
   /** Close the rig.  Idempotent; safe to call after a failure. */
   close(): Promise<void>;
 }
 
 /** A loaded Hamlib instance. */
-export interface Hamlib {
+export interface RawHamlib {
   /** Hamlib version string. */
   readonly version: string;
   /** Every rig model reachable over a serial transport. */
@@ -325,7 +325,7 @@ export interface Hamlib {
   /** Ask the caller-visible source for a serial port.  Requires a user gesture in the browser. */
   requestPort(options?: PortRequest): Promise<SerialPortLike>;
   /** Open a rig on a previously granted port. */
-  open(options: OpenRigOptions): Promise<Rig>;
+  open(options: OpenRawRigOptions): Promise<RawRig>;
   /**
    * Find the baud rate a rig answers at, by trying the rates its model
    * declares.
@@ -333,8 +333,8 @@ export interface Hamlib {
    * Opens the port at each candidate in turn and keeps the first rate the rig
    * replies at, then closes it again - the caller opens the rig for real with
    * the returned number.  Use it when the rate is not known, and keep the
-   * result: {@link Rig.baudRate} reports the rate a rig in use was opened at,
-   * so a reconnect can pass it straight to {@link Hamlib.open}.
+   * result: {@link RawRig.baudRate} reports the rate a rig in use was opened at,
+   * so a reconnect can pass it straight to {@link RawHamlib.open}.
    *
    * ```ts
    * const port = await hamlib.requestPort();
@@ -508,7 +508,7 @@ function hungError(operation: string): HamlibError {
 interface RigContext {
   readonly native: NativeModule;
   readonly queue: Serializer;
-  forget(rig: RigHandle): void;
+  forget(rig: RawRigHandle): void;
 }
 
 /**
@@ -520,7 +520,7 @@ interface RigContext {
  * normally, and only the body's own calls may run directly.  This object is
  * handed to exactly one body and deactivated when that body settles, so a
  * reference that escapes cannot start native work later, while every external
- * call keeps going through {@link RigHandle}.
+ * call keeps going through {@link RawRigHandle}.
  */
 class CompoundScope extends GeneratedRigMethods {
   #active = false;
@@ -583,7 +583,7 @@ class CompoundScope extends GeneratedRigMethods {
   }
 }
 
-class RigHandle extends GeneratedRigMethods implements Rig, CompoundHost {
+class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
   readonly #context: RigContext;
   readonly #path: string;
   readonly #model: RigModel;
@@ -659,10 +659,10 @@ class RigHandle extends GeneratedRigMethods implements Rig, CompoundHost {
   /**
    * Run `body` as one unit on the module's call queue.
    *
-   * The easy surface composes its multi-call operations here: the whole body
+   * The default surface composes its multi-call operations here: the whole body
    * occupies one queue slot, so a raw call, a call on another rig and a later
-   * easy call all wait until it finishes.  Package-internal - not part of the
-   * published `Rig` interface.
+   * `Rig` call all wait until it finishes.  Package-internal - not part of the
+   * published `RawRig` interface.
    */
   runCompound<T>(
     operation: string,
@@ -983,14 +983,14 @@ function collectModels(list: NativeModelList, native: NativeModule): RigModel[] 
   return models;
 }
 
-class HamlibInstance implements Hamlib, RigContext {
+class RawHamlibInstance implements RawHamlib, RigContext {
   readonly #native: NativeModule;
   readonly #registry: SerialRegistry;
   readonly #transport: SerialTransport;
   readonly #models: RigModel[];
   readonly #modelsById: Map<number, RigModel>;
   readonly #version: string;
-  readonly #rigs = new Set<RigHandle>();
+  readonly #rigs = new Set<RawRigHandle>();
   readonly #paths = new Set<string>();
 
   readonly queue: Serializer;
@@ -1016,7 +1016,7 @@ class HamlibInstance implements Hamlib, RigContext {
     this.queue = new Serializer(callTimeoutMs);
   }
 
-  static async create(options: HamlibOptions): Promise<HamlibInstance> {
+  static async create(options: RawHamlibOptions): Promise<RawHamlibInstance> {
     const native = await createNativeModule({
       locateFile: (file: string) => String((options.locateFile ?? locateAsset)(file)),
     });
@@ -1026,7 +1026,7 @@ class HamlibInstance implements Hamlib, RigContext {
     if (typeof registry?.storePort !== 'function') {
       throw new HamlibError(
         'the WebAssembly module did not expose its serial registry',
-        { code: 'TRANSPORT_FAILURE', operation: 'createHamlib' },
+        { code: 'TRANSPORT_FAILURE', operation: 'createRawHamlib' },
       );
     }
 
@@ -1040,7 +1040,7 @@ class HamlibInstance implements Hamlib, RigContext {
 
     const models = collectModels(await native.listModels(), native);
 
-    return new HamlibInstance(
+    return new RawHamlibInstance(
       native,
       registry,
       await selectTransport(options.transport),
@@ -1062,7 +1062,7 @@ class HamlibInstance implements Hamlib, RigContext {
     return this.#models;
   }
 
-  forget(rig: RigHandle): void {
+  forget(rig: RawRigHandle): void {
     this.#rigs.delete(rig);
   }
 
@@ -1073,7 +1073,7 @@ class HamlibInstance implements Hamlib, RigContext {
     return this.#transport.requestPort(options);
   }
 
-  async open(options: OpenRigOptions): Promise<Rig> {
+  async open(options: OpenRawRigOptions): Promise<RawRig> {
     this.#assertLive('open');
     this.#assertTransport('open');
 
@@ -1109,7 +1109,7 @@ class HamlibInstance implements Hamlib, RigContext {
     this.#paths.add(path);
 
     try {
-      const rig = await this.queue.enqueue<RigHandle>('open', async () => {
+      const rig = await this.queue.enqueue<RawRigHandle>('open', async () => {
         const registered = await this.#native.registerPort(path, token);
 
         if (registered.code !== RIG_OK) {
@@ -1124,7 +1124,7 @@ class HamlibInstance implements Hamlib, RigContext {
 
         /* Register inside the queued work: dispose() drains the chain before
          * it snapshots the live rigs, so this rig is always reachable. */
-        const rig = new RigHandle(
+        const rig = new RawRigHandle(
           this,
           path,
           model,
@@ -1344,7 +1344,7 @@ class HamlibInstance implements Hamlib, RigContext {
     if (this.#transport.isSupported()) { return; }
 
     throw new HamlibError(
-      `${this.#transport.name} is not available in this runtime; pass a transport to createHamlib()`,
+      `${this.#transport.name} is not available in this runtime; pass a transport to createRawHamlib()`,
       { code: 'TRANSPORT_UNAVAILABLE', operation },
     );
   }
@@ -1363,11 +1363,11 @@ class HamlibInstance implements Hamlib, RigContext {
  * Load Hamlib and read its rig model catalogue.
  *
  * ```ts
- * const hamlib = await createHamlib();
+ * const hamlib = await createRawHamlib();
  * const port = await hamlib.requestPort();
  * const rig = await hamlib.open({ modelId, port });
  * ```
  */
-export async function createHamlib(options: HamlibOptions = {}): Promise<Hamlib> {
-  return HamlibInstance.create(options);
+export async function createRawHamlib(options: RawHamlibOptions = {}): Promise<RawHamlib> {
+  return RawHamlibInstance.create(options);
 }

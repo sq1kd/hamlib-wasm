@@ -32,29 +32,29 @@ lists the catalogue, and every port operation fails with
 
 | Import | What it is |
 | --- | --- |
-| `hamlib-wasm` | The easy surface: `createEasy({ levels })`, one `EasyRig` per connection (`refresh`, `level`, `setFrequency`, `setMode`, `setPassband`, `setPtt`, `baudRate`, `on`, `watch`), `detectBaudRate`, and `EasyRig.raw` for everything below |
-| `hamlib-wasm/hamlib` | The 1:1 surface: `createHamlib` and one method on `Rig` per bound Hamlib operation, plus `baudRate`, `detectBaudRate`, the catalogue, the error type and the transport contract |
+| `hamlib-wasm` | The default surface: `createHamlib({ levels })`, one `Rig` per connection (`refresh`, `level`, `setFrequency`, `setMode`, `setPassband`, `setPtt`, `baudRate`, `on`, `watch`), `detectBaudRate`, and `Rig.raw` for everything below |
+| `hamlib-wasm/raw` | The raw surface: `createRawHamlib` and one method on `RawRig` per bound Hamlib operation, plus `baudRate`, `detectBaudRate`, the catalogue, the error type and the transport contract |
 | `hamlib-wasm/node` | The node-serialport transport: `nodeSerialTransport()` with `listPorts()` and `requestPort({ path })`, for an Electron main process, a CLI or a test |
-| `hamlib-wasm/react` | React hooks over the easy surface: `HamlibProvider`, `useModels`, `useEasyRig`, `useRigState`, `useRigError`; `react` is an optional peer dependency |
+| `hamlib-wasm/react` | React hooks over the default surface: `HamlibProvider`, `useModels`, `useRig`, `useRigState`, `useRigError`; `react` is an optional peer dependency |
 
 The Emscripten module itself is not an entry point: every native call goes
 through one serialized queue (see [How it works](#how-it-works)), and a direct
 module call would bypass it. Everything the module binds is a method on
-`hamlib-wasm/hamlib`'s `Rig`. `hamlib-wasm/native/hamlib-wasm.wasm` is exported
+`hamlib-wasm/raw`'s `RawRig`. `hamlib-wasm/native/hamlib-wasm.wasm` is exported
 as an asset only, for applications that host the binary themselves (see
 [Loading](#loading)).
 
-## The easy surface
+## The default surface
 
 ```ts
-import { createEasy, HamlibError } from 'hamlib-wasm';
-import type { EasyHamlib, EasyRig, RigState } from 'hamlib-wasm';
+import { createHamlib, HamlibError } from 'hamlib-wasm';
+import type { Hamlib, Rig, RigState } from 'hamlib-wasm';
 
-const hamlib: EasyHamlib = await createEasy({ levels: ['STRENGTH'] });
+const hamlib: Hamlib = await createHamlib({ levels: ['STRENGTH'] });
 hamlib.version;                       // "Hamlib <version> …"
 hamlib.models;                        // RigModel[], sorted by manufacturer then model
 
-const rig: EasyRig = await hamlib.open({ modelId });   // asks for the port: user gesture
+const rig: Rig = await hamlib.open({ modelId });         // asks for the port: user gesture
 rig.baudRate;                                          // the rate the port was opened at
 
 const state: RigState = await rig.refresh();           // every field optional
@@ -77,7 +77,7 @@ await rig.level('STRENGTH');                           // one read, configured +
 
 rig.capabilities.setFrequency;                         // booleans, from rig_caps
 rig.capabilities.levels;                               // configured levels the model has
-rig.raw;                                               // the 1:1 Rig, for anything below
+rig.raw;                                               // the RawRig, for anything below
 
 await rig.close();                                     // idempotent
 await hamlib.dispose();                                // closes rigs, unregisters ports
@@ -92,10 +92,10 @@ What it adds, and what it deliberately does not:
   together or not at all).  A supported read that fails throws and leaves the
   previous successful snapshot in place, and the `state` event only ever
   carries a completed refresh.
-* Every easy method is one *compound* operation on the module queue: the
+* Every method on `Rig` is one *compound* operation on the module queue: the
   passband lookup and the write of `setMode()`, all of `setPassband()` and all
   the reads of `refresh()`, run inside a single queue slot, so a raw call
-  through `rig.raw`, a call on another rig or a later easy call cannot
+  through `rig.raw`, a call on another rig or a later `Rig` call cannot
   interleave with their steps.  This orders the library's own commands; nothing
   can stop someone turning the radio's physical controls between two CAT
   replies.
@@ -133,7 +133,7 @@ What it adds, and what it deliberately does not:
   other listeners, but nothing further is published after the close - field
   events included.  Error listeners follow the same rule, and the failed
   command still rejects to its caller.
-* Levels are opt-in.  `createEasy({ levels })` names the ones the instance may
+* Levels are opt-in.  `createHamlib({ levels })` names the ones the instance may
   read; the close/open gate costs one pure `has_get_level` call per configured
   level, and `refresh()`/`watch()` read only those the model advertises.  A
   level outside the configured set is `INVALID_ARGUMENT`; one the model does not
@@ -146,7 +146,7 @@ What it adds, and what it deliberately does not:
   what a backend declares, and a declared meter that cannot be read would
   otherwise cost the port timeout on every poll.  Reopening the rig re-probes
   it.
-* `hamlib.open()` hands back one owned rig.  An instance tracks its easy
+* `hamlib.open()` hands back one owned rig.  An instance tracks its
   handles, and an open that races with `dispose()` is closed again instead of
   being published, so `dispose()` never leaves a live wrapper or a port behind.
 * The baud rate is either stated or searched, never guessed into a success.
@@ -169,15 +169,15 @@ What it adds, and what it deliberately does not:
   and instant.  A rig whose USB interface ignores the line rate - a CDC-ACM one
   - is unaffected either way.
 
-## The 1:1 surface
+## The raw surface
 
 ```ts
-import { createHamlib, HamlibError } from 'hamlib-wasm/hamlib';
-import type { Hamlib, Rig, RigModel, RigMode, RigModeState } from 'hamlib-wasm/hamlib';
+import { createRawHamlib, HamlibError } from 'hamlib-wasm/raw';
+import type { RawHamlib, RawRig, RigModel, RigMode, RigModeState } from 'hamlib-wasm/raw';
 
-const hamlib: Hamlib = await createHamlib();
+const hamlib: RawHamlib = await createRawHamlib();
 const port = await hamlib.requestPort();          // requires a user gesture
-const rig: Rig = await hamlib.open({ modelId, port, baudRate: 19200 });
+const rig: RawRig = await hamlib.open({ modelId, port, baudRate: 19200 });
 
 rig.baudRate;                                     // 19200: what this port was opened at
 // Unknown rate? Search the range the model declares, then open with the answer:
@@ -231,22 +231,22 @@ Hamlib's error to report.
 ## React
 
 ```tsx
-import { HamlibProvider, useEasyRig, useModels, useRigState, useRigError } from 'hamlib-wasm/react';
+import { HamlibProvider, useRig, useModels, useRigState, useRigError } from 'hamlib-wasm/react';
 
-function Rig() {
+function RigView() {
   const models = useModels();
-  const { rig, connect, disconnect, connecting } = useEasyRig();
+  const { rig, connect, disconnect, connecting } = useRig();
   const state = useRigState(rig, { pollMs: 1000 });
 
   return <button onClick={() => void connect({ modelId: models[0].id })}>{state?.frequency}</button>;
 }
 
 createRoot(document.getElementById('root')).render(
-  <HamlibProvider><Rig /></HamlibProvider>,
+  <HamlibProvider><RigView /></HamlibProvider>,
 );
 ```
 
-`HamlibProvider` loads one instance (and disposes it on unmount); `useEasyRig`
+`HamlibProvider` loads one instance (and disposes it on unmount); `useRig`
 owns one rig and closes it on unmount; `useRigState(rig, { pollMs, fields,
 levels })` subscribes to the state event and optionally polls exactly the
 fields named; `useRigError` reports the last operation failure.
@@ -308,7 +308,7 @@ Three further limitations are worth knowing:
   it. `support` therefore says nothing about it - a "verified" model can still
   be opened at the wrong rate, which is silence rather than an error, and is
   why an open verifies that the rig answered (see the baud rate bullet under
-  the easy surface). A rig whose interface ignores the line rate (a USB
+  the default surface). A rig whose interface ignores the line rate (a USB
   CDC-ACM one, such as the QRP Labs QMX+) is unaffected either way.
 
 ## Errors
@@ -324,7 +324,7 @@ Every failure is a `HamlibError` with:
 
 ## Loading
 
-`createEasy()` / `createHamlib()` load the Emscripten module and resolve the
+`createHamlib()` / `createRawHamlib()` load the Emscripten module and resolve the
 `.wasm` asset next to the installed package with `new URL(..., import.meta.url)`,
 the form bundlers such as Vite rewrite into an emitted asset. Pass `locateFile`
 to override it - for instance to serve `hamlib-wasm/native/hamlib-wasm.wasm`
@@ -339,36 +339,36 @@ to continue.
 
 ## Node and Electron
 
-`hamlib-wasm` and `hamlib-wasm/hamlib` select the transport the runtime has:
-Web Serial in a page, node-serialport in Node.  `createEasy()` therefore works
+`hamlib-wasm` and `hamlib-wasm/raw` select the transport the runtime has:
+Web Serial in a page, node-serialport in Node.  `createHamlib()` therefore works
 unwired, and `hamlib-wasm/node` is imported for `listPorts()` and for transport
 options - or to pass a transport explicitly, which always wins:
 
 ```ts
-import { createEasy } from 'hamlib-wasm';
+import { createHamlib } from 'hamlib-wasm';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
-const easy = await createEasy();               // Node picks node-serialport
+const hamlib = await createHamlib();               // Node picks node-serialport
 
 for (const port of await nodeSerialTransport().listPorts()) {
   console.log(port.path, port.manufacturer, `${port.vendorId}:${port.productId}`);
 }
 
-const modelId = easy.models.find((model) => model.model === 'TS-480')!.id;
-const rig = await easy.open({
+const modelId = hamlib.models.find((model) => model.model === 'TS-480')!.id;
+const rig = await hamlib.open({
   modelId,
-  port: await easy.requestPort({ path: '/dev/tty.usbserial-1410' }),
+  port: await hamlib.requestPort({ path: '/dev/tty.usbserial-1410' }),
   baudRate: 9600,
 });
 ```
 
 * `serialport` is an **optional peer dependency** (`>=12`; this repository pins
   `13.0.0`), imported lazily on the first `requestPort()`/`listPorts()`. A page
-  never loads it, and `hamlib-wasm`/`hamlib-wasm/hamlib` never mention it.
+  never loads it, and `hamlib-wasm`/`hamlib-wasm/raw` never mention it.
 * The port contract is one interface, `SerialPortLike`. A browser `SerialPort`
   satisfies it as it stands, which is why the browser needs no adapter; the Node
   transport is the second implementation, documented with `SerialTransport`,
-  `PortRequest` and the rest in `hamlib-wasm/hamlib`'s type exports.
+  `PortRequest` and the rest in `hamlib-wasm/raw`'s type exports.
 * `nodeSerialTransport({ serialport })` takes any module with a compatible
   `SerialPort` class. That is the whole seam: a different binding, a
   replacement implementation, or a subclass that injects one is a one-line
@@ -414,7 +414,7 @@ graph TD
   With no transport passed, the runtime picks: Web Serial where it exists, the
   Node transport otherwise.
 * **One queue per module** - every native call runs on a single promise chain,
-  because Asyncify can only have one suspended call at a time. Several `Rig`
+  because Asyncify can only have one suspended call at a time. Several `RawRig`
   objects still work; their calls are serialized in order. This is why the
   Emscripten module is not exported.
 * **Single threaded** - the module is built without `-pthread`, with `async`,
@@ -427,7 +427,7 @@ graph TD
 
 ### What is generated
 
-Every operation on `Rig` comes from the pinned upstream Hamlib headers, so the
+Every operation on `RawRig` comes from the pinned upstream Hamlib headers, so the
 generator classifies each declaration into a shape whose types all map, and
 *refuses* the rest with a reason in `coverage.json` rather than binding a guess.
 
@@ -435,7 +435,7 @@ The surface is the one the reference client needs: a declaration is bound
 because the upstream `rigctl`/`rigctld` sources call it, and one they never call
 is refused with that reason. Today that is 89 generated operations plus 11 whose
 C++ body is hand-written (the caller-buffer, table-walker, extended-setting and
-PTT shapes): 100 methods on `Rig`, against 87 refusals.
+PTT shapes): 100 methods on `RawRig`, against 87 refusals.
 
 `hamlib.config.yaml` declares the value objects and the operations whose C++
 body a signature cannot describe (the module lifecycle, port registration and

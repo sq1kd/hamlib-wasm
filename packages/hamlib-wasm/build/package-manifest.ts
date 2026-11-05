@@ -73,8 +73,8 @@ export const PACKAGE_JSON_FILES: readonly PackageManifestEntry[] = readPackageFi
 export const GENERATED_OUTPUTS: readonly string[] = [
   'dist/index.js',
   'dist/index.d.ts',
-  'dist/hamlib.js',
-  'dist/hamlib.d.ts',
+  'dist/raw.js',
+  'dist/raw.d.ts',
   'dist/node.js',
   'dist/node.d.ts',
   packageRelative(DIST_MODULE_JS),

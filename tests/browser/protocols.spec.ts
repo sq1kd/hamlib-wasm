@@ -55,7 +55,7 @@ test('drives an Icom CI-V radio, a different protocol family', async ({ page }) 
   await useRig(page, 'icom-ic703');
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ic703 = hamlib.models.find(
       (model) => model.manufacturer === 'Icom' && model.model === 'IC-703',
@@ -129,7 +129,7 @@ test('reports the upstream open failure that keeps serial DTR PTT unreachable', 
   await useRig(page, 'yaesu-ft757gx2');
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
-    const hamlib = await window.__hamlibHarness.createHamlib();
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ft757 = hamlib.models.find(
       (model) => model.manufacturer === 'Yaesu' && model.model === 'FT-757GXII',

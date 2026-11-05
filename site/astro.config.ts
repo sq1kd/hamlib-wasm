@@ -43,7 +43,7 @@ export default defineConfig({
         starlightTypeDoc({
           entryPoints: [
             '../packages/hamlib-wasm/src/index.ts',
-            '../packages/hamlib-wasm/src/hamlib.ts',
+            '../packages/hamlib-wasm/src/raw.ts',
             '../packages/hamlib-wasm/src/react.ts',
             '../packages/hamlib-wasm/src/node.ts',
           ],
@@ -75,8 +75,8 @@ export default defineConfig({
         {
           label: 'Guides',
           items: [
-            { label: 'Easy API', slug: 'guides/easy' },
-            { label: '1:1 Hamlib API', slug: 'guides/hamlib' },
+            { label: 'Rig API', slug: 'guides/rig-api' },
+            { label: 'Raw API', slug: 'guides/raw-api' },
             { label: 'React hooks', slug: 'guides/react' },
             { label: 'Node and Electron', slug: 'guides/node' },
             { label: 'Supported rigs', slug: 'guides/rigs' },
