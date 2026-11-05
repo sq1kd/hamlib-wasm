@@ -49,15 +49,6 @@
   align-items: start;
 }
 
-.hamlib-demo .panel .status,
-.hamlib-demo .panel .actions,
-.hamlib-demo .panel [data-testid='connection-state'],
-.hamlib-demo .panel .error,
-.hamlib-demo .panel .limitation {
-  grid-column: 1 / -1;
-  margin: 0;
-}
-
 .hamlib-demo .status {
   color: var(--muted);
 }
@@ -67,21 +58,6 @@
   gap: 0.3rem;
   font-size: 0.85rem;
   color: var(--muted);
-}
-
-/* The detect control keeps its checkbox beside its own label, with the range
- * hint underneath both. */
-.hamlib-demo .field.checkbox {
-  grid-template-columns: auto 1fr;
-  gap: 0.3rem 0.5rem;
-  align-items: center;
-}
-
-.hamlib-demo .field.checkbox small {
-  grid-column: 2;
-  color: var(--muted);
-  font-size: 0.78rem;
-  opacity: 0.85;
 }
 
 .hamlib-demo select,
@@ -153,6 +129,32 @@
 .hamlib-demo .limitation {
   color: var(--meter);
   font-size: 0.85rem;
+}
+
+/* Panel-scoped rules come after the general ones they refine. */
+
+.hamlib-demo .panel .status,
+.hamlib-demo .panel .actions,
+.hamlib-demo .panel [data-testid='connection-state'],
+.hamlib-demo .panel .error,
+.hamlib-demo .panel .limitation {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* The detect control keeps its checkbox beside its own label, with the range
+ * hint underneath both. */
+.hamlib-demo .field.checkbox {
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.5rem;
+  align-items: center;
+}
+
+.hamlib-demo .field.checkbox small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.78rem;
+  opacity: 0.85;
 }
 
 /* --- the rig front panel ------------------------------------------------ */

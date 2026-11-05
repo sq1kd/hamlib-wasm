@@ -12,16 +12,18 @@ import { measureDemoDownload } from './integrations/demo-size';
  * GitHub Pages serves a project site at https://<owner>.github.io/<repo>/, and
  * the Actions runner exports GITHUB_REPOSITORY=<owner>/<repo>, so a Pages build
  * needs no configuration.  SITE_URL / SITE_BASE override either half; a local
- * build without them is served from the root.
+ * build without them is served from the root of the preview server, which is
+ * also the origin the sitemap then names.
  */
 const repository = process.env.SITE_REPOSITORY ?? process.env.GITHUB_REPOSITORY;
 const [owner, repo] = repository?.split('/') ?? [];
-const site = process.env.SITE_URL ?? (owner === undefined ? undefined : `https://${owner}.github.io`);
+const site = process.env.SITE_URL
+  ?? (owner === undefined ? 'http://127.0.0.1:4176' : `https://${owner}.github.io`);
 const base = process.env.SITE_BASE ?? (repo === undefined ? '/' : `/${repo}/`);
 const repositoryUrl = repository === undefined ? undefined : `https://github.com/${repository}`;
 
 export default defineConfig({
-  ...(site === undefined ? {} : { site }),
+  site,
   base,
   trailingSlash: 'ignore',
   integrations: [
@@ -36,6 +38,7 @@ export default defineConfig({
           editLink: { baseUrl: `${repositoryUrl}/edit/main/site/` },
         }),
       customCss: ['./src/styles/site.css'],
+      disable404Route: true,
       plugins: [
         starlightTypeDoc({
           entryPoints: [

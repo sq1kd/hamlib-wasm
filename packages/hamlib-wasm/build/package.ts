@@ -45,6 +45,33 @@ function prependBanner(file: string, banner: string): void {
   writeFileSync(file, `${banner}\n${content}`);
 }
 
+/**
+ * Emscripten's `ENVIRONMENT=web,node` loader reaches `node:module` through a
+ * dynamic import that only runs under Node.  A browser bundler still resolves
+ * the literal specifier and warns about externalizing a Node builtin in every
+ * application that bundles the package, so the specifier is made opaque to
+ * static analysis.  Under Node the import is unchanged at run time.
+ */
+const NODE_MODULE_IMPORT = 'await import("node:module")';
+const OPAQUE_NODE_MODULE_IMPORT =
+  'await import(/* @vite-ignore */ /* webpackIgnore: true */ String("node:module"))';
+
+function hideNodeImportFromBundlers(file: string): void {
+  const content = readFileSync(file, 'utf8');
+
+  if (content.includes(OPAQUE_NODE_MODULE_IMPORT)) {
+    return;
+  }
+
+  const occurrences = content.split(NODE_MODULE_IMPORT).length - 1;
+
+  assert(
+    occurrences === 1,
+    `expected one \`${NODE_MODULE_IMPORT}\` in the Emscripten loader, found ${occurrences}`,
+  );
+  writeFileSync(file, content.replace(NODE_MODULE_IMPORT, OPAQUE_NODE_MODULE_IMPORT));
+}
+
 function main(): void {
   assert(
     existsSync(GENERATED_DECLARATION),
@@ -57,6 +84,8 @@ function main(): void {
   for (const output of generatedPackageOutputs()) {
     assert(existsSync(output), `expected build output is missing: ${path.relative(PACKAGE_DIR, output)}`);
   }
+
+  hideNodeImportFromBundlers(DIST_MODULE_JS);
 
   log(SCOPE, 'rendering license notices and relink kit');
 
