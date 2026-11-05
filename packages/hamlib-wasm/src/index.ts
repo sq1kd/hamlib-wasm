@@ -46,16 +46,13 @@
 
 import { HamlibError, createRawHamlib } from './raw.js';
 import type {
-  DetectBaudRateOptions,
   RawHamlib,
   RawHamlibOptions,
   PortRequest,
   RawRig,
-  RigMode,
-  RigModeState,
-  RigModel,
   SerialPortLike,
 } from './raw.js';
+import type { DetectBaudRateOptions, RigMode, RigModeState, RigModel } from './catalogue.js';
 import type { CompoundHost } from './native/seam.js';
 
 export {
@@ -66,21 +63,23 @@ export {
   webSerialTransport,
 } from './raw.js';
 export type {
-  BrowserSupport,
   DetectBaudRateOptions,
-  HamlibErrorCode,
-  PortFilter,
-  PortRequest,
-  RigModelCapabilities,
-  RigConfparam,
   RigMode,
   RigModeState,
   RigModel,
+  RigModelCapabilities,
   SerialHandshake,
+  SerialParity,
+} from './catalogue.js';
+export type {
+  BrowserSupport,
+  HamlibErrorCode,
+  PortFilter,
+  PortRequest,
+  RigConfparam,
   SerialInputSignals,
   SerialLineSettings,
   SerialOutputSignals,
-  SerialParity,
   SerialPortInfo,
   SerialPortLike,
   SerialTransport,
