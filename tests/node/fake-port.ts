@@ -85,20 +85,18 @@ class FakeSerialPort implements SerialPortLike {
     state.rig.reset();
     state.rig.commands.length = 0;
 
-    const port = this;
-
     this.#readable = new ReadableStream<Uint8Array>({
       start: (controller) => {
-        port.#controller = controller;
+        this.#controller = controller;
       },
       cancel: () => {
-        port.#controller = null;
+        this.#controller = null;
       },
     });
 
     this.#writable = new WritableStream<Uint8Array>({
       write: (chunk) => {
-        port.#receive(chunk);
+        this.#receive(chunk);
       },
     });
 

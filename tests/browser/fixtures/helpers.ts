@@ -12,23 +12,23 @@
   function describeError(error: unknown): HamlibErrorView {
     var harness = window.__hamlibHarness;
     var value = error as { [key: string]: unknown } | null;
-    var cause = value ? value['cause'] : null;
+    var cause = value ? value.cause : null;
     /* `cause` is only read through `.name` and `.message`, and only when it is
      * truthy, which is why a failed cast on a primitive cause is harmless. */
     var named = cause as { name?: unknown; message?: unknown } | null;
-    var hamlibCode = value ? value['hamlibCode'] : null;
+    var hamlibCode = value ? value.hamlibCode : null;
 
     return {
-      name: value && value['name'] ? String(value['name']) : null,
-      message: value && value['message'] ? String(value['message']) : String(error),
-      code: value && value['code'] ? String(value['code']) : null,
-      operation: value && value['operation'] ? String(value['operation']) : null,
+      name: value?.name ? String(value.name) : null,
+      message: value?.message ? String(value.message) : String(error),
+      code: value?.code ? String(value.code) : null,
+      operation: value?.operation ? String(value.operation) : null,
       hamlibCode: typeof hamlibCode === 'number' ? hamlibCode : null,
-      hamlibMessage: value && value['hamlibMessage'] ? String(value['hamlibMessage']) : null,
-      cause: cause && named && named.name
+      hamlibMessage: value?.hamlibMessage ? String(value.hamlibMessage) : null,
+      cause: cause && named?.name
         ? String(named.name) + ': ' + String(named.message)
         : (cause === null ? null : String(cause)),
-      isHamlibError: Boolean(harness && harness.isHamlibError(error)),
+      isHamlibError: Boolean(harness?.isHamlibError(error)),
     };
   }
 

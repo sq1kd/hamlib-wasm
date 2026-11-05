@@ -59,5 +59,3 @@ declare global {
     __pendingHookCall: Promise<string> | undefined;
   }
 }
-
-export {};

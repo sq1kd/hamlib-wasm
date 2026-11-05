@@ -9,6 +9,7 @@
 // version and is reported by the notes script from build provenance.
 module.exports = {
   branches: ['main', { name: 'next', prerelease: true }],
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: semantic-release expands this lodash template.
   tagFormat: 'v${version}',
   plugins: [
     '@semantic-release/commit-analyzer',

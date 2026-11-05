@@ -201,7 +201,7 @@ addToLibrary({
 
           if (state.reader) {
             try {
-              void state.reader.cancel().catch(function () {
+              void state.reader.cancel().catch(() => {
                 /* Already closed or errored. */
               });
             } catch {
@@ -211,7 +211,7 @@ addToLibrary({
         }
 
         try {
-          void Promise.resolve(record.port.close()).catch(function () {
+          void Promise.resolve(record.port.close()).catch(() => {
             /* Best effort. */
           });
         } catch {
@@ -283,10 +283,9 @@ addToLibrary({
     /* --- RX pump -------------------------------------------------------- */
 
     startPump(state: PortState): Promise<void> {
-      const self = this;
       const reader = state.reader as ReadableStreamDefaultReader<Uint8Array>;
 
-      return (async function () {
+      return (async () => {
         try {
           for (;;) {
             const result = await reader.read();
@@ -297,15 +296,15 @@ addToLibrary({
 
             if (result.value && result.value.length > 0) {
               state.rxBytes += result.value.length;
-              self.queuePush(state.queue, result.value);
-              self.wake(state, 'data');
+              this.queuePush(state.queue, result.value);
+              this.wake(state, 'data');
 
-              if (state.queue.length > self.RX_QUEUE_LIMIT) {
+              if (state.queue.length > this.RX_QUEUE_LIMIT) {
                 /* Nothing is draining the port: stop reading and report it,
                  * rather than growing a buffer no CAT exchange will consume. */
-                const message = `serial receive buffer exceeded ${self.RX_QUEUE_LIMIT} bytes`;
+                const message = `serial receive buffer exceeded ${this.RX_QUEUE_LIMIT} bytes`;
                 state.failure = { name: 'Error', message };
-                self.recordError('Error', message, 'read');
+                this.recordError('Error', message, 'read');
 
                 try {
                   await reader.cancel();
@@ -322,10 +321,10 @@ addToLibrary({
             const name = (error as { name?: string } | null)?.name ?? 'Error';
             const message = (error as { message?: string } | null)?.message ?? String(error);
             state.failure = { name, message };
-            self.recordError(name, message, 'read');
+            this.recordError(name, message, 'read');
           }
         } finally {
-          self.wake(state, 'error');
+          this.wake(state, 'error');
         }
       })();
     },
@@ -570,7 +569,6 @@ addToLibrary({
     },
 
     write(handle: number, ptr: number, len: number): Promise<number> {
-      const self = this;
       const entry = this.handles.get(handle);
 
       if (!entry) {
@@ -585,21 +583,21 @@ addToLibrary({
       /* Copy the outgoing range once, before awaiting the writer. */
       const chunk = HEAPU8.slice(ptr, ptr + len);
 
-      const perform = async function (): Promise<number> {
+      const perform = async (): Promise<number> => {
         try {
           if (!state.writer) {
             state.writer = entry.record.port.writable?.getWriter() ?? null;
           }
 
           if (!state.writer) {
-            self.recordError('InvalidStateError', 'serial port has no writable stream', 'write');
-            return self.WS_ERR_IO;
+            this.recordError('InvalidStateError', 'serial port has no writable stream', 'write');
+            return this.WS_ERR_IO;
           }
 
           await state.writer.write(chunk);
           return len;
         } catch (error) {
-          return self.fail(error, 'write');
+          return this.fail(error, 'write');
         }
       };
 
@@ -612,7 +610,6 @@ addToLibrary({
     },
 
     waitReadable(handle: number, timeoutMs: number): Promise<number> {
-      const self = this;
       const entry = this.handles.get(handle);
 
       if (!entry) {
@@ -635,11 +632,11 @@ addToLibrary({
         return Promise.resolve(this.WS_ERR_IO);
       }
 
-      return new Promise<WakeReason>(function (resolve) {
+      return new Promise<WakeReason>((resolve) => {
         let settled = false;
         let timer: number | undefined;
 
-        const waiter = function (why: WakeReason): void {
+        const waiter = (why: WakeReason): void => {
           if (settled) {
             return;
           }
@@ -652,11 +649,11 @@ addToLibrary({
         state.waiters.push(waiter);
 
         if (timeoutMs >= 0) {
-          timer = setTimeout(function () {
+          timer = setTimeout(() => {
             waiter('timeout');
           }, timeoutMs);
         }
-      }).then(function (reason) {
+      }).then((reason) => {
         if (reason === 'data') {
           return 1;
         }
@@ -671,12 +668,12 @@ addToLibrary({
         const failure = state.failure as TransportFailure | null;
 
         if (failure) {
-          self.recordError(failure.name, failure.message, 'read');
+          this.recordError(failure.name, failure.message, 'read');
         } else if (state.closed) {
-          self.recordError('InvalidStateError', 'serial port is closed', 'read');
+          this.recordError('InvalidStateError', 'serial port is closed', 'read');
         }
 
-        return self.WS_ERR_IO;
+        return this.WS_ERR_IO;
       });
     },
 
@@ -800,107 +797,75 @@ addToLibrary({
   } satisfies HamlibWsApi,
 
   hamlibWsRegisterPort__deps: ['$HamlibWs'],
-  hamlibWsRegisterPort: function (path: number, token: number): number {
-    return HamlibWs.registerPort(UTF8ToString(path), token);
-  },
+  hamlibWsRegisterPort: (path: number, token: number): number => HamlibWs.registerPort(UTF8ToString(path), token),
 
   hamlibWsUnregisterPort__deps: ['$HamlibWs'],
-  hamlibWsUnregisterPort: function (path: number): number {
-    return HamlibWs.unregisterPort(UTF8ToString(path));
-  },
+  hamlibWsUnregisterPort: (path: number): number => HamlibWs.unregisterPort(UTF8ToString(path)),
 
   hamlibWsOpenPort__deps: ['$HamlibWs'],
   hamlibWsOpenPort__async: 'auto',
-  hamlibWsOpenPort: function (
+  hamlibWsOpenPort: (
     path: number,
     rate: number,
     dataBits: number,
     stopBits: number,
     parity: number,
     flowControl: number,
-  ): Promise<number> {
-    return HamlibWs.openPort(UTF8ToString(path), rate, dataBits, stopBits, parity, flowControl);
-  },
+  ): Promise<number> => HamlibWs.openPort(UTF8ToString(path), rate, dataBits, stopBits, parity, flowControl),
 
   hamlibWsClosePort__deps: ['$HamlibWs'],
   hamlibWsClosePort__async: 'auto',
-  hamlibWsClosePort: function (handle: number): Promise<number> {
-    return HamlibWs.closePort(handle);
-  },
+  hamlibWsClosePort: (handle: number): Promise<number> => HamlibWs.closePort(handle),
 
   hamlibWsMatchesOpenOptions__deps: ['$HamlibWs'],
-  hamlibWsMatchesOpenOptions: function (
+  hamlibWsMatchesOpenOptions: (
     handle: number,
     rate: number,
     dataBits: number,
     stopBits: number,
     parity: number,
     flowControl: number,
-  ): number {
-    return HamlibWs.matchesOpenOptions(handle, rate, dataBits, stopBits, parity, flowControl);
-  },
+  ): number => HamlibWs.matchesOpenOptions(handle, rate, dataBits, stopBits, parity, flowControl),
 
   hamlibWsRead__deps: ['$HamlibWs'],
-  hamlibWsRead: function (handle: number, ptr: number, len: number): number {
-    return HamlibWs.read(handle, ptr, len);
-  },
+  hamlibWsRead: (handle: number, ptr: number, len: number): number => HamlibWs.read(handle, ptr, len),
 
   hamlibWsBytesReceived__deps: ['$HamlibWs'],
-  hamlibWsBytesReceived: function (handle: number): number {
-    return HamlibWs.bytesReceived(handle);
-  },
+  hamlibWsBytesReceived: (handle: number): number => HamlibWs.bytesReceived(handle),
 
   hamlibWsWrite__deps: ['$HamlibWs'],
   hamlibWsWrite__async: 'auto',
-  hamlibWsWrite: function (handle: number, ptr: number, len: number): Promise<number> {
-    return HamlibWs.write(handle, ptr, len);
-  },
+  hamlibWsWrite: (handle: number, ptr: number, len: number): Promise<number> => HamlibWs.write(handle, ptr, len),
 
   hamlibWsWaitReadable__deps: ['$HamlibWs'],
   hamlibWsWaitReadable__async: 'auto',
-  hamlibWsWaitReadable: function (handle: number, timeoutMs: number): Promise<number> {
-    return HamlibWs.waitReadable(handle, timeoutMs);
-  },
+  hamlibWsWaitReadable: (handle: number, timeoutMs: number): Promise<number> => HamlibWs.waitReadable(handle, timeoutMs),
 
   hamlibWsFlush__deps: ['$HamlibWs'],
-  hamlibWsFlush: function (handle: number): number {
-    return HamlibWs.flush(handle);
-  },
+  hamlibWsFlush: (handle: number): number => HamlibWs.flush(handle),
 
   hamlibWsSetSignals__deps: ['$HamlibWs'],
   hamlibWsSetSignals__async: 'auto',
-  hamlibWsSetSignals: function (handle: number, rts: number, dtr: number, brk: number): Promise<number> {
-    return HamlibWs.setSignals(handle, rts, dtr, brk);
-  },
+  hamlibWsSetSignals: (handle: number, rts: number, dtr: number, brk: number): Promise<number> => HamlibWs.setSignals(handle, rts, dtr, brk),
 
   hamlibWsGetSignals__deps: ['$HamlibWs'],
   hamlibWsGetSignals__async: 'auto',
-  hamlibWsGetSignals: function (handle: number): Promise<number> {
-    return HamlibWs.getSignals(handle);
-  },
+  hamlibWsGetSignals: (handle: number): Promise<number> => HamlibWs.getSignals(handle),
 
   hamlibWsLastRts__deps: ['$HamlibWs'],
-  hamlibWsLastRts: function (handle: number): number {
-    return HamlibWs.lastRts(handle);
-  },
+  hamlibWsLastRts: (handle: number): number => HamlibWs.lastRts(handle),
 
   hamlibWsLastDtr__deps: ['$HamlibWs'],
-  hamlibWsLastDtr: function (handle: number): number {
-    return HamlibWs.lastDtr(handle);
-  },
+  hamlibWsLastDtr: (handle: number): number => HamlibWs.lastDtr(handle),
 
   hamlibWsWriteLastError__deps: ['$HamlibWs'],
-  hamlibWsWriteLastError: function (ptr: number, len: number): number {
-    return HamlibWs.writeLastError(ptr, len);
-  },
+  hamlibWsWriteLastError: (ptr: number, len: number): number => HamlibWs.writeLastError(ptr, len),
 
   hamlibWsClearLastError__deps: ['$HamlibWs'],
-  hamlibWsClearLastError: function (): number {
-    return HamlibWs.clearLastError();
-  },
+  hamlibWsClearLastError: (): number => HamlibWs.clearLastError(),
 
   hamlibWsForceCloseAll__deps: ['$HamlibWs'],
-  hamlibWsForceCloseAll: function (): number {
+  hamlibWsForceCloseAll: (): number => {
     HamlibWs.forceCloseAll();
     return 0;
   },

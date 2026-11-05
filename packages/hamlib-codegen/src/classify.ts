@@ -264,7 +264,7 @@ const INT_VALUE_BINDING: TypeBinding = {
 
 /** Force an enum binding to cross as its underlying number, for the codec. */
 function asToken(binding: TypeBinding | null): TypeBinding | null {
-  if (!binding || binding.category !== 'enum') {
+  if (binding?.category !== 'enum') {
     return binding;
   }
 

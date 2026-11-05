@@ -106,6 +106,7 @@ const WASM_ASSET = new URL('./native/hamlib-wasm.wasm', import.meta.url);
 function locateAsset(file: string): string | URL {
   return file === WASM_ASSET_NAME
     ? WASM_ASSET
+    // biome-ignore lint/style/useTemplate: a template literal here becomes a Vite directory glob.
     : new URL('./native/' + file, import.meta.url);
 }
 
