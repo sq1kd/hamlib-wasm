@@ -20,9 +20,9 @@
  *
  * Hamlib never reaches the failing paths in this build: the facade sets
  * async=0 and poll_interval=0 through Hamlib's public configuration before
- * rig_open(), and the pinned patch skips only the Morse worker start.  A
- * backend that would still need a second thread (AnyTone D578A, for example)
- * therefore fails its open loudly instead of degrading quietly.
+ * rig_open(), and the only thread the pinned patch removes is the Morse
+ * worker.  A backend that would still need a second thread (AnyTone D578A,
+ * for example) therefore fails its open loudly instead of degrading quietly.
  *
  * This header must be passed first on the include path so it wins over the
  * platform pthread.h for every Hamlib translation unit.

@@ -26,3 +26,94 @@
  
      if (rs->auto_disable_screensaver)
      {
+--- a/rigs/barrett/barrett.c
++++ b/rigs/barrett/barrett.c
+@@ -48,7 +48,12 @@
+     rig_register(&barrett_caps);
+     rig_register(&barrett950_caps);
+     rig_register(&barrett4050_caps);
++    /* Modified by hamlib-wasm on 2026-11-05: on Emscripten, register only
++     * models that use a serial port.  See hamlib-4.7.2-web.patch in the
++     * source kit. */
++#ifndef __EMSCRIPTEN__
+     rig_register(&barrett4100_caps);
++#endif
+     rig_debug(RIG_DEBUG_VERBOSE, "%s: _init back from rig_register\n", __func__);
+ 
+     return RIG_OK;
+--- a/rigs/dummy/dummy.c
++++ b/rigs/dummy/dummy.c
+@@ -2868,6 +2868,10 @@
+ {
+     rig_debug(RIG_DEBUG_VERBOSE, "%s: _init called\n", __func__);
+ 
++    /* Modified by hamlib-wasm on 2026-11-05: on Emscripten, register only
++     * models that use a serial port.  See hamlib-4.7.2-web.patch in the
++     * source kit. */
++#ifndef __EMSCRIPTEN__
+     rig_register(&dummy_caps);
+     rig_register(&netrigctl_caps);
+     rig_register(&flrig_caps);
+@@ -2877,6 +2881,7 @@
+     rig_register(&sdrsharp_caps);
+     rig_register(&quisk_caps);
+     rig_register(&gqrx_caps);
++#endif
+ //    rig_register(&tci1x_caps);
+     return RIG_OK;
+ }
+--- a/rigs/flexradio/flexradio.c
++++ b/rigs/flexradio/flexradio.c
+@@ -44,6 +44,10 @@
+ {
+     rig_debug(RIG_DEBUG_TRACE, "%s called\n", __func__);
+ 
++    /* Modified by hamlib-wasm on 2026-11-05: on Emscripten, register only
++     * models that use a serial port.  See hamlib-4.7.2-web.patch in the
++     * source kit. */
++#ifndef __EMSCRIPTEN__
+     rig_register(&sdr1k_rig_caps);
+     //rig_register(&sdr1krfe_rig_caps);
+     rig_register(&dttsp_rig_caps);
+@@ -56,6 +60,7 @@
+     rig_register(&smartsdr_f_rig_caps);
+     rig_register(&smartsdr_g_rig_caps);
+     rig_register(&smartsdr_h_rig_caps);
++#endif
+ 
+     return RIG_OK;
+ }
+--- a/rigs/kenwood/kenwood.c
++++ b/rigs/kenwood/kenwood.c
+@@ -6547,7 +6547,12 @@
+ 
+     rig_register(&transfox_caps);
+ 
++    /* Modified by hamlib-wasm on 2026-11-05: on Emscripten, register only
++     * models that use a serial port.  See hamlib-4.7.2-web.patch in the
++     * source kit. */
++#ifndef __EMSCRIPTEN__
+     rig_register(&f6k_caps);
++#endif
+     rig_register(&powersdr_caps);
+     rig_register(&pihpsdr_caps);
+     rig_register(&ts890s_caps);
+--- a/rigs/kit/kit.c
++++ b/rigs/kit/kit.c
+@@ -35,9 +35,16 @@
+ 
+     rig_register(&elektor304_caps);
+     rig_register(&drt1_caps);
++    /* Modified by hamlib-wasm on 2026-11-05: on Emscripten, register only
++     * models that use a serial port.  See hamlib-4.7.2-web.patch in the
++     * source kit. */
++#ifndef __EMSCRIPTEN__
+     rig_register(&dds60_caps);
++#endif
+     rig_register(&miniVNA_caps);
++#ifndef __EMSCRIPTEN__
+     rig_register(&hiqsdr_caps);
++#endif
+     rig_register(&rshfiq_caps);
+ 
+ #if defined(HAVE_LIBUSB)

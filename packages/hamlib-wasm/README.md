@@ -399,8 +399,11 @@ graph TD
   `read()`/`write()`/`select()`/`nanosleep()` calls the common port layer makes
   for a serial port to it. Upstream's own read loop, 7 data bit masking, retry
   accounting and timeout handling stay in charge.
-* **One upstream patch hunk** - the pinned patch skips only the Morse worker
-  start in `rig_open()`, which the single threaded build cannot support.
+* **One small upstream patch** - the pinned patch skips the Morse worker
+  start in `rig_open()`, which the single threaded build cannot support, and
+  leaves the network, parallel, device and dummy rig models unregistered so
+  the linker drops their code. Those models could never be opened over a
+  serial port; the catalogue lists exactly the same models either way.
   Everything else `rig_open()` does still runs.
 * **Public API only** - the facade reaches Hamlib through
   `rig_init()`/`rig_open()`/`rig_close()` and `rig_token_lookup()` +

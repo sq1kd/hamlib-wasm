@@ -23,7 +23,7 @@ release:
   license: LGPL-2.1-or-later
   patches:
     - file: hamlib-4.7.2-web.patch
-      purpose: "Skip the Morse worker start in rig_open(): the browser build has no pthreads, and without this the worker's thread creation would fail the whole open. One hunk, no other upstream source change."
+      purpose: "Skip the Morse worker start in rig_open(): the browser build has no pthreads, and without this the worker's thread creation would fail the whole open. Register only serial-port rig models on Emscripten: the network, parallel, device and dummy models cannot be opened here, the facade already hides them, and leaving them unregistered lets the linker drop their code. No other upstream source change."
 
 # Value objects the Embind boundary returns whose C++ structs are declared in
 # native/facade.cpp.  The generator registers them; it never defines them.
