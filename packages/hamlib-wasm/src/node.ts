@@ -13,22 +13,30 @@
  * first {@link NodeSerialTransport.requestPort} or
  * {@link NodeSerialTransport.listPorts} call, never at module load, so a
  * browser bundler never sees it and an application that only runs in a page
- * installs nothing.  Nothing in the emitted declarations mentions the package
- * either - the adapter's shapes are this file's own.
+ * installs nothing.  Its types do not leak into this package's either.
+ *
+ * Under Node, `createHamlib()` picks this transport on its own; import this
+ * entry to list ports or to pass options.  Node 24 or later is required.
  *
  * ```ts
- * import { createRawHamlib } from 'hamlib-wasm/raw';
+ * import { createHamlib } from 'hamlib-wasm';
  * import { nodeSerialTransport } from 'hamlib-wasm/node';
  *
  * const transport = nodeSerialTransport();
- * const hamlib = await createRawHamlib({ transport });
- * const port = await transport.requestPort({ path: '/dev/tty.usbserial-1410' });
- * const rig = await hamlib.open({ modelId, port, baudRate: 9600 });
+ * console.log(await transport.listPorts());   // pick the radio's path
+ *
+ * const hamlib = await createHamlib({ transport });
+ * const model = hamlib.models.find((entry) => entry.model === 'TS-480')!;
+ * const port = await hamlib.requestPort({ path: '/dev/tty.usbserial-1410' });
+ * const rig = await hamlib.open({ modelId: model.id, port, baudRate: 9600 });
  * ```
  *
- * The default `serialport` version is `13`; `nodeSerialTransport({ serialport })`
- * takes any module with a compatible `SerialPort` class, which is the seam for
- * a different binding or a replacement implementation.
+ * Tested with `serialport` 13; any version from 12 works.
+ * `nodeSerialTransport({ serialport })` takes any module with a compatible
+ * `SerialPort` class, which is the seam for a different binding or a
+ * replacement implementation.
+ *
+ * @packageDocumentation
  */
 
 import { HamlibError } from './errors.js';

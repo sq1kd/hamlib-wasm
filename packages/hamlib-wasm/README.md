@@ -54,17 +54,19 @@ const hamlib: Hamlib = await createHamlib({ levels: ['STRENGTH'] });
 hamlib.version;                       // "Hamlib <version> …"
 hamlib.models;                        // RigModel[], sorted by manufacturer then model
 
+const modelId = hamlib.models.find((entry) => entry.model === 'TS-480')!.id;
 const rig: Rig = await hamlib.open({ modelId });         // asks for the port: user gesture
 rig.baudRate;                                          // the rate the port was opened at
 
 const state: RigState = await rig.refresh();           // every field optional
 state.frequency;                                       // Hz, or undefined when unreadable
-rig.state;                                             // the last completed refresh, if any
+rig.state;                                             // merged snapshot of every completed read
 
 await rig.setFrequency(14_074_000);
 await rig.setMode('USB');                              // passband filled in from the model
 await rig.setPassband('narrow');                       // current mode + width, in one compound
-await rig.setPtt(true);
+await rig.setPtt(true);                                // transmits: dummy load or antenna
+await rig.setPtt(false);
 
 const stop = rig.watch({ intervalMs: 1000, fields: ['frequency', 'mode'] });
 const stopMeter = rig.watch({ intervalMs: 500, levels: ['STRENGTH'] });  // one SM0 per tick
@@ -80,8 +82,12 @@ rig.capabilities.levels;                               // configured levels the 
 rig.raw;                                               // the RawRig, for anything below
 
 await rig.close();                                     // idempotent
-await hamlib.dispose();                                // closes rigs, unregisters ports
+await hamlib.dispose();                                // closes every rig and port
 ```
+
+In Node, pass the port explicitly: `open({ modelId, port: await
+hamlib.requestPort({ path }) })`. Every method acts on the rig's current VFO;
+VFO selection and split are on `rig.raw`.
 
 What it adds, and what it deliberately does not:
 
@@ -90,8 +96,9 @@ What it adds, and what it deliberately does not:
   model cannot read is omitted, never invented, so a frequency-only receiver
   yields a snapshot with `frequency` alone (`mode` and `passband` always appear
   together or not at all).  A supported read that fails throws and leaves the
-  previous successful snapshot in place, and the `state` event only ever
-  carries a completed refresh.
+  previous successful snapshot in place.  `rig.state` and the `state` event
+  carry the merged snapshot of every completed read - `refresh()` or a
+  `watch()` tick.
 * Every method on `Rig` is one *compound* operation on the module queue: the
   passband lookup and the write of `setMode()`, all of `setPassband()` and all
   the reads of `refresh()`, run inside a single queue slot, so a raw call
@@ -99,11 +106,6 @@ What it adds, and what it deliberately does not:
   interleave with their steps.  This orders the library's own commands; nothing
   can stop someone turning the radio's physical controls between two CAT
   replies.
-* Every generated method takes that queue, including the `pure` helpers that
-  read only `rig_caps` (`passband*`, the token codecs, the `has_*` masks, the
-  `ext*` lookups).  They make no CAT traffic, but they still enter the Wasm
-  module, which must not be re-entered while a native call is suspended under
-  Asyncify.
 * `setMode(mode)` fills in the passband through Hamlib's own
   `passband_normal`; pass one explicitly to override it.
 * `setPassband('normal' | 'narrow' | 'wide')` reads the current mode, applies
@@ -154,8 +156,8 @@ What it adds, and what it deliberately does not:
   the model advertises - and a rig behind a real UART answers at one rate only,
   the one its own menu is set to, producing silence rather than an error at any
   other.  Such an open is rejected with the rate it tried and the range the
-  model declares, so a wrong rate reads as a wrong rate instead of as a
-  connected rig whose every read fails.  When the rate is unknown, ask for one:
+  model declares (`HAMLIB_ERROR`), so a wrong rate reads as a wrong rate
+  instead of as a connected rig whose every read fails.  When the rate is unknown, ask for one:
 
   ```ts
   const port = await hamlib.requestPort();
@@ -191,14 +193,14 @@ await rig.setPtt('on');
 const ptt: string = await rig.getPtt();           // the rig's own state name
 
 await rig.close();                                // idempotent
-await hamlib.dispose();                           // closes rigs, unregisters ports
+await hamlib.dispose();                           // closes every rig and port
 ```
 
 Every operation is a real typed method named after the upstream call it binds,
 and none of them is a hand-written wrapper:
 
 ```ts
-rig.model.capabilities;                               // string[]: methods this model implements
+rig.model.capabilities;                               // ReadonlySet<string>: methods this model implements
 await rig.setRit(500);                                // throws HamlibError on failure
 await rig.setLevel('RF', 0.5);                        // level name + float/int value
 const split = await rig.getSplitFreqMode();           // { txFreq, txMode, txWidth }
@@ -216,6 +218,12 @@ implemented comes back zero). Every walker returns plain
 `RigConfparam` objects - one projected entry per parameter, with the native
 vector freed - never an Embind-owned value.
 
+Every generated method takes the module queue, including the `pure` helpers
+that read only `rig_caps` (`passband*`, the token codecs, the `has_*` masks,
+the `ext*` lookups).  They make no CAT traffic, but they still enter the Wasm
+module, which must not be re-entered while a native call is suspended under
+Asyncify.
+
 Each method is gated by `rig.model.capabilities`, derived from the backend's
 `rig_caps`: calling one the model does not implement throws
 `UNSUPPORTED_OPERATION` before the rig is touched. The two PTT operations are
@@ -231,17 +239,29 @@ Hamlib's error to report.
 ## React
 
 ```tsx
-import { HamlibProvider, useRig, useModels, useRigState, useRigError } from 'hamlib-wasm/react';
+import { createRoot } from 'react-dom/client';
+import { HamlibProvider, useRig, useModels, useRigState } from 'hamlib-wasm/react';
 
 function RigView() {
   const models = useModels();
-  const { rig, connect, disconnect, connecting } = useRig();
+  const { rig, connect, error } = useRig();
   const state = useRigState(rig, { pollMs: 1000 });
+  const model = models.find((entry) => entry.model === 'TS-480');
 
-  return <button onClick={() => void connect({ modelId: models[0].id })}>{state?.frequency}</button>;
+  if (rig === undefined) {
+    // connect() publishes its failure as `error` and also rejects.
+    return (
+      <button disabled={model === undefined}
+              onClick={() => connect({ modelId: model!.id }).catch(() => {})}>
+        Connect {error?.message}
+      </button>
+    );
+  }
+
+  return <p>{state?.frequency} Hz</p>;
 }
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root')!).render(
   <HamlibProvider><RigView /></HamlibProvider>,
 );
 ```
@@ -249,7 +269,8 @@ createRoot(document.getElementById('root')).render(
 `HamlibProvider` loads one instance (and disposes it on unmount); `useRig`
 owns one rig and closes it on unmount; `useRigState(rig, { pollMs, fields,
 levels })` subscribes to the state event and optionally polls exactly the
-fields named; `useRigError` reports the last operation failure.
+fields named; `useRigError` reports the last operation failure.  `useHamlib()`
+throws until the module has loaded; `useHamlibContext()` reports `loading`.
 StrictMode double-invocation is handled: an effect that unmounts before its
 module or rig finished opening disposes what it created.
 

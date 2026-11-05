@@ -17,14 +17,31 @@
  *    `passband_normal`, so a caller does not have to know its width.
  *  - `setPtt(true)` and {@link PttState} replace the string vocabulary.
  *  - `on()`/`watch()` give a UI an event stream without polling by hand; the
- *    calls still serialize on the module's single queue.  A `watch()` declares
- *    which fields it needs, so a meter poll never drags the frequency along.
+ *    calls still run one at a time, in order.  A `watch()` declares which
+ *    fields it needs, so a meter poll never drags the frequency along.
  *  - {@link Rig.capabilities} answers "can this model do X" as booleans,
- *    derived from the same `rig_caps` matrix the catalogue exposes.
+ *    derived from what the model's Hamlib backend implements.
  *
  * It composes; it never fakes.  A write does not invent state (Hamlib's own
  * cache decides what a following read reports), and a read the model cannot
- * perform still fails with the native `UNSUPPORTED_OPERATION` error.
+ * perform still fails with `UNSUPPORTED_OPERATION`.
+ *
+ * Every method acts on the rig's current VFO.  VFO selection, split, memories
+ * and the rest of Hamlib are on {@link Rig.raw}.
+ *
+ * ```ts
+ * import { createHamlib } from 'hamlib-wasm';
+ *
+ * const hamlib = await createHamlib();
+ * const model = hamlib.models.find((entry) => entry.model === 'TS-480')!;
+ * const rig = await hamlib.open({ modelId: model.id, baudRate: 9600 });
+ *
+ * await rig.setFrequency(14_074_000);
+ * await rig.setMode('USB');
+ * console.log(await rig.refresh());   // { frequency: 14074000, mode: 'USB', passband: … }
+ * ```
+ *
+ * @packageDocumentation
  */
 
 import { HamlibError, createRawHamlib } from './raw.js';
@@ -71,7 +88,14 @@ export type {
   VerifiedModel,
 } from './raw.js';
 
-/** Push-to-talk states Hamlib reports and accepts. */
+/**
+ * Push-to-talk states Hamlib reports.
+ *
+ * `'on'` is plain transmit, and what {@link Rig.setPtt} with `true` sends.
+ * `'on-mic'` and `'on-data'` are transmit with the audio taken from the
+ * microphone or from the data (rear/USB audio) input, on radios that tell the
+ * two apart.  Anything other than `'off'` means the rig is transmitting.
+ */
 export type PttState = 'off' | 'on' | 'on-mic' | 'on-data';
 
 const PTT_STATES: readonly PttState[] = ['off', 'on', 'on-mic', 'on-data'];
@@ -82,9 +106,15 @@ export type PassbandSelector = 'normal' | 'narrow' | 'wide';
 /**
  * The rig levels this entry can read.
  *
- * These are Hamlib's own level names, not a translation of them: a read is
- * `rig_get_level` after `rig_parse_level`.  `RFPOWER` is the setpoint,
- * `RFPOWER_METER` the measured forward power.
+ * These are Hamlib's own level names, and the values are on Hamlib's scales:
+ *
+ * | Level | Value |
+ * | --- | --- |
+ * | `STRENGTH` | Signal strength in dB relative to S9, an integer: S0 is -54, S9 is 0, S9+20 is 20 |
+ * | `SWR` | Standing wave ratio, 1 and up |
+ * | `ALC` | ALC meter, as the backend scales it (usually 0 to 1) |
+ * | `RFPOWER` | The output power setting, 0 to 1 of the rig's maximum |
+ * | `RFPOWER_METER` | Measured forward power, 0 to 1 of the rig's maximum |
  *
  * A level is only ever read when the instance was configured for it (see
  * {@link HamlibOptions.levels}) and the model advertises it, so a page that
@@ -145,11 +175,17 @@ export interface RigState {
 
 /** What a model can do, as booleans a UI can test. */
 export interface RigOperationCapabilities {
+  /** The rig can report its frequency ({@link Rig.refresh} includes `frequency`). */
   getFrequency: boolean;
+  /** {@link Rig.setFrequency} is available. */
   setFrequency: boolean;
+  /** The rig can report its mode and passband. */
   getMode: boolean;
+  /** {@link Rig.setMode} and {@link Rig.setPassband} are available. */
   setMode: boolean;
+  /** The rig can report push-to-talk ({@link Rig.refresh} includes `ptt`). */
   getPtt: boolean;
+  /** {@link Rig.setPtt} is available. */
   setPtt: boolean;
 }
 
@@ -164,12 +200,19 @@ export interface RigCapabilities extends RigOperationCapabilities {
   levels: readonly LevelName[];
 }
 
-/** The events an {@link Rig} emits. */
+/**
+ * The events a {@link Rig} emits.  Every read - {@link Rig.refresh}, a
+ * {@link Rig.watch} tick, {@link Rig.level} - publishes what it read; a write
+ * publishes nothing until the next read reports it.
+ */
 export interface RigEvents {
-  /** A completed read, merged into the remembered snapshot. */
+  /** The remembered snapshot, after a completed read was merged into it. */
   state: RigState;
+  /** A frequency read, in Hz. */
   frequency: number;
+  /** A mode read, with its passband in Hz. */
   mode: RigModeState;
+  /** A push-to-talk read. */
   ptt: PttState;
   /** The levels one read produced; only the levels it actually read. */
   levels: Partial<Record<LevelName, number>>;
@@ -227,15 +270,20 @@ export interface OpenRigOptions {
   /** Model id taken from {@link Hamlib.models}. */
   modelId: number;
   /**
-   * Baud rate.  When omitted, the model's advertised default (the highest rate
-   * Hamlib supports for it) is used, and the open verifies that the rig answers
-   * at it; see {@link RawRig.baudRate} and {@link Hamlib.detectBaudRate} for a
-   * rig whose rate is not known.
+   * Baud rate: the CAT rate set in the radio's own menu.  When omitted, the
+   * highest rate the model supports is tried, and the open verifies that the
+   * rig answers at it.  A rig that stays silent at the rate tried - usually a
+   * mismatch with its menu - rejects the open with `HAMLIB_ERROR`; use
+   * {@link Hamlib.detectBaudRate} when the rate is not known.
    */
   baudRate?: number;
   /**
-   * An already granted port.  When omitted, {@link Hamlib.requestPort} runs
-   * first, so this must be called from a user gesture.
+   * An already granted port.
+   *
+   * In a browser it may be omitted: {@link Hamlib.requestPort} then runs
+   * first, so the open must be called from a user gesture.  In Node it is
+   * required - pass `await hamlib.requestPort({ path })`, a path from
+   * `listPorts()`; without it the open rejects with `INVALID_ARGUMENT`.
    */
   port?: SerialPortLike;
 }
@@ -263,10 +311,13 @@ export interface WatchOptions {
 /**
  * A connected rig, with a state snapshot and events.
  *
- * Every method is one compound operation on the module's single call queue: a
- * multi-call method like `setMode()` or `refresh()` occupies one queue slot, so
- * nothing - a poll, a raw call, a call on another rig - can run between its
- * steps.  Order is preserved, not raced.
+ * Calls run one at a time, in the order they were made, across every rig of
+ * the instance.  A method that takes several CAT commands (`setMode()`,
+ * `refresh()`) runs them back to back: nothing - a poll, a raw call, a call on
+ * another rig - can run between its steps.
+ *
+ * Every method acts on the rig's current VFO; select another one, or use
+ * split, through {@link Rig.raw}.
  */
 export interface Rig {
   /** The model this rig was opened with. */
@@ -297,8 +348,12 @@ export interface Rig {
   /** Set the frequency in Hz. */
   setFrequency(hz: number): Promise<void>;
   /**
-   * Set the mode, filling in the model's normal passband when `passband` is
-   * omitted.  At that point `passband` is the value the call actually used.
+   * Set the mode, and the passband width in Hz.
+   *
+   * `mode` is a Hamlib mode name such as `'USB'`, `'LSB'`, `'CW'`, `'CWR'`,
+   * `'AM'`, `'FM'`, `'RTTY'`, `'PKTUSB'` or `'PKTLSB'`; the model decides
+   * which ones it accepts.  When `passband` is omitted, the model's normal
+   * width for that mode is used.
    */
   setMode(mode: RigMode, passband?: number): Promise<void>;
   /**
@@ -307,7 +362,11 @@ export interface Rig {
    * change issued afterwards cannot be undone by the older passband action.
    */
   setPassband(kind: PassbandSelector): Promise<void>;
-  /** Set push-to-talk to on (`true`) or off (`false`). */
+  /**
+   * Key (`true`) or unkey (`false`) the transmitter.  `true` sends `'on'`.
+   *
+   * This transmits for real: have a dummy load or an antenna connected.
+   */
   setPtt(on: boolean): Promise<void>;
   /**
    * Read one level as configured for this instance.
@@ -326,7 +385,7 @@ export interface Rig {
    */
   refresh(): Promise<RigState>;
   /** Subscribe to one event; the returned function unsubscribes. */
-  on<K extends keyof RigEvents>(event: K, listener: Listener<RigEvents[K]>): () => void;
+  on<K extends keyof RigEvents>(event: K, listener: (value: RigEvents[K]) => void): () => void;
   /**
    * Poll the fields named in `options` while the returned function has not
    * been called.  Registrations compose: each interval runs its own timer,
@@ -334,9 +393,14 @@ export interface Rig {
    * scheduler.  A tick that arrives while that interval's previous poll is
    * still in flight is skipped, so a slow rig cannot build a queue of reads.
    *
-   * A watch tick is best effort: a field that fails reports an `error` event
-   * and leaves the rest of the snapshot untouched.  Use {@link refresh} when
+   * Every tick publishes what it read as `state` and the field events.  A
+   * tick is best effort: a field that fails reports an `error` event and
+   * leaves the rest of the snapshot untouched.  Use {@link refresh} when
    * all-or-nothing matters.
+   *
+   * Throws synchronously - it returns no promise - with `RIG_CLOSED` on a
+   * closed rig and `INVALID_ARGUMENT` for a bad interval, an unknown field or
+   * a level this rig will not read.
    */
   watch(options: WatchOptions): () => void;
   /**
@@ -352,9 +416,24 @@ export interface Hamlib {
   readonly version: string;
   /** Every rig model reachable over a serial transport, sorted by manufacturer then model. */
   readonly models: readonly RigModel[];
-  /** Ask the caller-visible source for a serial port.  Requires a user gesture in the browser. */
+  /**
+   * Get a serial port: the browser's port chooser, or the `path` given in
+   * Node.
+   *
+   * In a browser it must run from a user gesture, such as a click, and
+   * rejects with `PORT_PERMISSION_DENIED` when the user dismisses the
+   * chooser.  `TRANSPORT_UNAVAILABLE` means the browser has no Web Serial.
+   */
   requestPort(options?: PortRequest): Promise<SerialPortLike>;
-  /** Open a rig, optionally on an already granted port. */
+  /**
+   * Open a rig, on `options.port` or on a port {@link Hamlib.requestPort}
+   * asks for first.
+   *
+   * The rig is only returned once it has answered.  Rejects with the
+   * {@link Hamlib.requestPort} errors when it asks for the port, and with
+   * `HAMLIB_ERROR` when the rig does not answer - most often a baud rate that
+   * does not match the radio's menu.
+   */
   open(options: OpenRigOptions): Promise<Rig>;
   /**
    * Find the baud rate a rig answers at, before opening it.
@@ -1117,18 +1196,21 @@ async function advertisedLevels(
  *
  * ```ts
  * const hamlib = await createHamlib({ levels: ['STRENGTH', 'SWR'] });
- * const model = hamlib.models.find((entry) => entry.model === 'TS-480');
+ * const model = hamlib.models.find((entry) => entry.model === 'TS-480')!;
  * const rig = await hamlib.open({ modelId: model.id });   // asks for the port
- * console.log(await rig.refresh());                        // 14074000 USB 2400
- * rig.watch({ intervalMs: 500, fields: ['levels'], levels: ['STRENGTH'] });
+ * console.log(await rig.refresh());   // { frequency: 14074000, mode: 'USB', passband: 2400, … }
+ * const stop = rig.watch({ intervalMs: 500, levels: ['STRENGTH'] });
  * await rig.setFrequency(7_074_000);
- * await rig.setPtt(true);
+ * stop();
  * await rig.close();
  * await hamlib.dispose();
  * ```
  *
  * One instance owns one Wasm module and one call queue; a second instance is a
  * second module with its own memory.
+ *
+ * In a browser without Web Serial the instance still loads and lists the
+ * catalogue; its port operations then reject with `TRANSPORT_UNAVAILABLE`.
  */
 export async function createHamlib(options: HamlibOptions = {}): Promise<Hamlib> {
   return HamlibInstance.create(options);

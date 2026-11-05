@@ -20,7 +20,7 @@ it is supported:
 
 :::caution
 "Verified" means covered by an emulator-backed test in this repository - the
-Kenwood TS-480 and Icom IC-703 protocols among them. It never means tested
+Kenwood TS-480, the Icom IC-703 over CI-V and the Yaesu FT-710 over newcat. It never means tested
 against hardware. Every other model is a candidate: worth trying, not promised.
 :::
 
@@ -52,4 +52,5 @@ tried; `detectBaudRate()` searches the declared range. See
 - **No cancellation of a stuck call.** A call that overruns `callTimeoutMs`
   leaves the module unusable (`RIG_HUNG`); dispose it and create a new one.
 - **Browser support.** Web Serial exists only in desktop Chromium-based
-  browsers and Firefox 151+, in a secure context.
+  browsers and Firefox 151+, in a secure context; see
+  [Where it runs](../../getting-started/#where-it-runs).

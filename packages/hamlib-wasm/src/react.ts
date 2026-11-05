@@ -20,6 +20,8 @@
  *
  * No JSX is required: the provider builds its element with `createElement`, so
  * this entry compiles as ordinary TypeScript.
+ *
+ * @packageDocumentation
  */
 
 import {
@@ -47,6 +49,7 @@ import type {
 
 export type {
   Hamlib,
+  HamlibErrorCode,
   HamlibOptions,
   LevelName,
   OpenRigOptions,
@@ -58,6 +61,7 @@ export type {
   RigCapabilities,
   RigEvents,
   RigField,
+  RigMode,
   RigModel,
   RigState,
   RigOperationCapabilities,
@@ -156,7 +160,10 @@ export function HamlibProvider({ children, options }: HamlibProviderProps): Reac
   return createElement(HamlibContext.Provider, { value }, children);
 }
 
-/** The provider's value.  Throws when there is no provider above. */
+/**
+ * The provider's value: the module once loaded, `loading` until then, and the
+ * load `error` if it failed.  Throws when there is no provider above.
+ */
 export function useHamlibContext(): HamlibContextValue {
   const value = useContext(HamlibContext);
 
@@ -167,7 +174,12 @@ export function useHamlibContext(): HamlibContextValue {
   return value;
 }
 
-/** The loaded module.  Throws while it is still loading. */
+/**
+ * The loaded module.
+ *
+ * Throws while it is still loading - including on the first render - so call
+ * it only below a component that has checked `useHamlibContext().loading`.
+ */
 export function useHamlib(): Hamlib {
   const { hamlib } = useHamlibContext();
 
@@ -194,10 +206,16 @@ export interface UseRigResult {
   /**
    * Open a rig.  Without `port`, this runs `requestPort()`, so it must be
    * called from a user gesture.
+   *
+   * A failure is published as `error` and also rejects, so handle the promise:
+   * `connect(options).catch(() => {})` when `error` is all the UI needs.
+   * Dismissing the browser's port chooser is such a failure
+   * (`PORT_PERMISSION_DENIED`).
    */
   connect(options: OpenRigOptions): Promise<void>;
   /** Close the current rig.  Safe to call when there is none. */
   disconnect(): Promise<void>;
+  /** Forget the last `connect()` failure. */
   clearError(): void;
 }
 
@@ -377,7 +395,10 @@ export function useRigState(
   return state;
 }
 
-/** The most recent operation failure the rig reported, if any. */
+/**
+ * The most recent operation failure the rig reported, if any.  It is reset
+ * when `rig` changes; it is not cleared by a later success.
+ */
 export function useRigError(rig: Rig | undefined): HamlibError | undefined {
   const [error, setError] = useState<HamlibError | undefined>(undefined);
 

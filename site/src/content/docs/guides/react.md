@@ -15,11 +15,13 @@ function RigView() {
   const { rig, connect, disconnect, connecting, error } = useRig();
   const state = useRigState(rig, { pollMs: 1000 });
   const failure = useRigError(rig);
+  const model = models.find((entry) => entry.model === 'TS-480');
 
   if (rig === undefined) {
     return (
-      <button disabled={connecting || models.length === 0}
-              onClick={() => void connect({ modelId: models[0].id })}>
+      <button disabled={connecting || model === undefined}
+              // connect() publishes its failure as `error` and also rejects.
+              onClick={() => connect({ modelId: model!.id, baudRate: 9600 }).catch(() => {})}>
         Connect
       </button>
     );
@@ -47,11 +49,12 @@ createRoot(document.getElementById('root')!).render(
 | Hook | What it does |
 | --- | --- |
 | `HamlibProvider` | Loads one module with `createHamlib(options)` and disposes it on unmount. `options` is read once - keep it stable. |
-| `useHamlibContext()` / `useHamlib()` | The loaded `Hamlib`, plus `loading` and the load `error`. |
+| `useHamlibContext()` | `{ hamlib, loading, error }`: the module once loaded, and the load error if it failed. |
+| `useHamlib()` | The loaded `Hamlib`. Throws while it is still loading, so use it only below a check of `loading`. |
 | `useModels()` | The model catalogue; empty until the module has loaded. |
-| `useRig()` | Owns one rig: `connect(options)`, `disconnect()`, `rig`, `connecting`, `error`. Closes the rig on unmount. |
+| `useRig()` | Owns one rig: `connect(options)`, `disconnect()`, `rig`, `connecting`, `error`, `clearError()`. Closes the rig on unmount. `connect()` both sets `error` and rejects. |
 | `useRigState(rig, { pollMs, fields, levels })` | Subscribes to the `state` event and, with `pollMs`, registers the rig's own `watch()` for exactly the fields named. |
-| `useRigError(rig)` | The last operation failure the rig reported. |
+| `useRigError(rig)` | The last operation failure the rig reported. Reset when `rig` changes, not by a later success. |
 
 ## Guarantees
 
@@ -70,7 +73,9 @@ createRoot(document.getElementById('root')!).render(
   and `error` reports it, so Disconnect stays available.
 
 `connect()` without a `port` runs `requestPort()`, so call it from a click
-handler in a browser.
+handler in a browser. Dismissing the chooser rejects it with
+`PORT_PERMISSION_DENIED`; handle the promise (`.catch(() => {})` is enough
+when the UI shows `error`), or the browser reports an unhandled rejection.
 
 The [live demo](../../demo/) is built on these hooks. See the
 [API reference](../../api/hamlib-wasm/react/readme/) for every option.

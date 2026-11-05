@@ -12,8 +12,9 @@ select the transport the runtime has: Web Serial in a page, the
 npm install hamlib-wasm serialport
 ```
 
-`serialport` is an optional peer dependency (12 or later), imported lazily on
-the first `requestPort()` or `listPorts()`. A web page never loads it.
+`serialport` is an optional peer dependency (12 or later; tested with 13),
+imported lazily on the first `requestPort()` or `listPorts()`. A web page never
+loads it. Node 24 or later is required.
 
 ## Read a rig
 
@@ -55,7 +56,8 @@ try {
 ```
 
 In Node, `requestPort({ path })` names the device - there is no chooser. On
-Windows a port is a name like `COM3`.
+Windows a port is a name like `COM3`. Pass the port to `open()`: unlike in a
+browser, `open({ modelId })` without one rejects with `INVALID_ARGUMENT`.
 
 From a checkout of the repository the example runs with plain Node's type
 stripping:

@@ -78,14 +78,14 @@ export interface PortRequest {
   path?: string;
 }
 
-/** Acquires ports.  Implementations: `webSerialTransport()` and `nodeSerialTransport()`; `createRawHamlib` selects between them by runtime. */
+/** Acquires ports.  Implementations: `webSerialTransport()` and `nodeSerialTransport()`; `createHamlib` and `createRawHamlib` pick one by runtime. */
 export interface SerialTransport {
   /** Human readable name used in error messages, e.g. `"Web Serial"`. */
   readonly name: string;
   /** True when this runtime can drive the transport. */
   isSupported(): boolean;
   /**
-   * Ask the caller-visible source for a port.  Rejects with
+   * Get a port: the browser's chooser, or the `path` given in Node.  Rejects with
    * `INVALID_ARGUMENT` for a request this transport cannot serve, and with
    * `TRANSPORT_UNAVAILABLE` when it cannot run here at all.
    */

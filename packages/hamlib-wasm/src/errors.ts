@@ -3,10 +3,10 @@
 /**
  * The one error type this package throws, and the codes it reports.
  *
- * Kept in its own module because two layers produce these values: the facade
- * (`src/raw.ts`) for everything it can reject before Wasm, and the
- * transports (`src/web-serial.ts`, `src/node.ts`) for what the device layer
- * underneath them raises.
+ * Kept in its own module because several layers produce these values: both
+ * API layers (`src/index.ts`, `src/raw.ts`) for everything they can reject
+ * before Wasm, and the transports (`src/web-serial.ts`, `src/node.ts`) for
+ * what the device layer underneath them raises.
  */
 
 /** Human readable text for Hamlib's `enum rig_errcode_e`. */
@@ -36,42 +36,34 @@ export const HAMLIB_ERROR_MESSAGES: Readonly<Record<number, string>> = {
   22: 'access denied',
 };
 
-/** Stable error codes reported by {@link HamlibError}. */
+/**
+ * Stable error codes reported by {@link HamlibError}.
+ *
+ * | Code | Meaning |
+ * | --- | --- |
+ * | `TRANSPORT_UNAVAILABLE` | No transport can run here: a browser without Web Serial, or Node without `serialport` installed |
+ * | `PORT_PERMISSION_DENIED` | The user dismissed the port chooser or blocked the port |
+ * | `TRANSPORT_FAILURE` | The serial port itself failed, e.g. it was unplugged or refused the line settings |
+ * | `HAMLIB_ERROR` | Hamlib reported an error; `hamlibCode`/`hamlibMessage` say which.  An `open` that gets no answer from the rig - usually a baud rate that does not match the radio's menu - fails this way |
+ * | `RIG_UNRESPONSIVE` | `detectBaudRate` tried every rate the model declares and the rig answered at none |
+ * | `INVALID_ARGUMENT` | An argument was rejected before anything was sent to the rig |
+ * | `UNSUPPORTED_OPERATION` | The model cannot perform the operation; nothing was sent |
+ * | `RIG_CLOSED` | The rig has been closed |
+ * | `RIG_TIMEOUT` | A call did not settle within `callTimeoutMs`; the instance is unusable from then on |
+ * | `RIG_HUNG` | An earlier call timed out and never returned; dispose the instance and create a new one |
+ * | `DISPOSED` | The Hamlib instance has been disposed |
+ */
 export type HamlibErrorCode =
-  /** No transport can run here (e.g. no Web Serial, or a missing serialport). */
   | 'TRANSPORT_UNAVAILABLE'
-  /** The user dismissed the port chooser or blocked the port. */
   | 'PORT_PERMISSION_DENIED'
-  /** The transport raised an error of its own. */
   | 'TRANSPORT_FAILURE'
-  /** Hamlib returned a negative error code. */
   | 'HAMLIB_ERROR'
-  /**
-   * No baud rate answered, so there was nothing to open.
-   *
-   * Reported by {@link RawHamlib.detectBaudRate}: every candidate rate in the
-   * model's declared range was tried and the rig replied at none of them.
-   */
   | 'RIG_UNRESPONSIVE'
-  /** A bound was violated before reaching Wasm. */
   | 'INVALID_ARGUMENT'
-  /** The selected model cannot perform the requested operation. */
   | 'UNSUPPORTED_OPERATION'
-  /** The rig has been closed. */
   | 'RIG_CLOSED'
-  /**
-   * A native call did not settle within the configured `callTimeoutMs`.
-   *
-   * The call is abandoned and the instance becomes unusable; see
-   * {@link RawHamlibOptions.callTimeoutMs}.
-   */
   | 'RIG_TIMEOUT'
-  /**
-   * The instance is hung: an earlier call overran and never returned, so the
-   * native stack cannot be re-entered.  Dispose it and create a new one.
-   */
   | 'RIG_HUNG'
-  /** The Hamlib instance has been disposed. */
   | 'DISPOSED';
 
 export interface HamlibErrorOptions {
@@ -90,14 +82,28 @@ export interface HamlibErrorOptions {
 /**
  * Every failure reported by this package is a `HamlibError`.
  *
+ * ```ts
+ * try {
+ *   await rig.setFrequency(14_074_000);
+ * } catch (error) {
+ *   if (error instanceof HamlibError && error.code === 'UNSUPPORTED_OPERATION') {
+ *     // this model cannot set the frequency
+ *   }
+ * }
+ * ```
+ *
  * Transport context is preserved: a transport failure keeps the error the
  * device layer raised as `cause`, and Hamlib failures carry
  * `hamlibCode`/`hamlibMessage`.
  */
 export class HamlibError extends Error {
+  /** What went wrong, as a stable code to branch on; see {@link HamlibErrorCode}. */
   readonly code: HamlibErrorCode;
+  /** The operation that failed, e.g. `"open"` or `"getFrequency"`. */
   readonly operation: string;
+  /** Hamlib's negative error code, when `code` is `"HAMLIB_ERROR"`. */
   readonly hamlibCode?: number;
+  /** Hamlib's text for `hamlibCode`, e.g. `"communication timed out"`. */
   readonly hamlibMessage?: string;
 
   constructor(message: string, options: HamlibErrorOptions) {

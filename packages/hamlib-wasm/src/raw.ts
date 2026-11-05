@@ -23,6 +23,8 @@
  * {@link RawRig} objects are still supported: their calls are queued in order.
  *
  * This module never exposes C pointers, Hamlib structures or Wasm memory.
+ *
+ * @packageDocumentation
  */
 
 import createNativeModule from './native/hamlib-wasm.mjs';
