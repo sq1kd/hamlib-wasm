@@ -164,7 +164,7 @@ What it adds, and what it deliberately does not:
   rig.baudRate;                                                     // 38400, say - keep it
   ```
 
-  `easyRig.baudRate` reports the rate a live rig was opened at, so storing it
+  `rig.baudRate` reports the rate a live rig was opened at, so storing it
   (a cookie, a settings row, your own default) makes the next connect explicit
   and instant.  A rig whose USB interface ignores the line rate - a CDC-ACM one
   - is unaffected either way.

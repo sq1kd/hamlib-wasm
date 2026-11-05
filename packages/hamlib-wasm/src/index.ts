@@ -362,7 +362,7 @@ export interface Hamlib {
    * The same search as {@link RawHamlib.detectBaudRate}: the rates the model
    * declares are tried in turn and the first one the rig replies at is
    * returned, port closed.  Hand the result to {@link Hamlib.open}, or keep
-   * it - `easyRig.baudRate` reports the rate a live rig was opened at, and
+   * it - `rig.baudRate` reports the rate a live rig was opened at, and
    * reconnecting with a known rate skips the scan.
    *
    * ```ts

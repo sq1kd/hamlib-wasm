@@ -10,7 +10,7 @@ import type { Application } from 'typedoc';
 
 const NAMES: Readonly<Record<string, string>> = {
   index: 'hamlib-wasm',
-  hamlib: 'hamlib-wasm/raw',
+  raw: 'hamlib-wasm/raw',
   react: 'hamlib-wasm/react',
   node: 'hamlib-wasm/node',
 };
