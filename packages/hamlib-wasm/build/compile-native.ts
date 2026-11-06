@@ -194,6 +194,11 @@ function linkModule(): void {
   mkdirSync(DIST_NATIVE_DIR, { recursive: true });
   const jsLibrary = compileJsLibrary();
 
+  /* Compiled on its own: handed to em++ with the facade, a .c file is compiled
+   * as C++, which clang has deprecated. */
+  const monotonicTime = path.join(BUILD_DIR, 'monotonic_time.o');
+  run(SCOPE, 'emcc', ['-c', '-O3', path.join(NATIVE_DIR, 'monotonic_time.c'), '-o', monotonicTime]);
+
   log(SCOPE, 'linking the Embind facade and generating TypeScript declarations');
   run(
     SCOPE,
@@ -201,7 +206,7 @@ function linkModule(): void {
     [
       path.join(NATIVE_DIR, 'facade.cpp'),
       path.join(NATIVE_DIR, 'wrapped_io.cpp'),
-      path.join(NATIVE_DIR, 'monotonic_time.c'),
+      monotonicTime,
       `-I${path.join(BUILD_DIR, 'include')}`,
       `-I${path.join(SOURCE_DIR, 'include')}`,
       `-I${NATIVE_DIR}`,

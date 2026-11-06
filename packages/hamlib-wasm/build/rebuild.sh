@@ -115,6 +115,7 @@ require() {
 require tar
 require patch
 require emconfigure
+require emcc
 require em++
 require make
 require awk
@@ -198,10 +199,13 @@ echo "building libhamlib.a and built-in backends"
 make -j "$JOBS" -C "$BUILD_DIR/src"
 
 echo "linking hamlib-wasm"
+# Compiled on its own: handed to em++ with the facade, a .c file is compiled
+# as C++, which clang has deprecated.
+emcc -c -O3 "$KIT_DIR/native/monotonic_time.c" -o "$BUILD_DIR/monotonic_time.o"
 set -- \
     "$KIT_DIR/native/facade.cpp" \
     "$KIT_DIR/native/wrapped_io.cpp" \
-    "$KIT_DIR/native/monotonic_time.c" \
+    "$BUILD_DIR/monotonic_time.o" \
     "-I$BUILD_DIR/include" \
     "-I$SOURCE_DIR/include" \
     "-I$KIT_DIR/native" \
