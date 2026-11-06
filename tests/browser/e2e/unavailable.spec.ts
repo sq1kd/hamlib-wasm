@@ -17,7 +17,6 @@ test('reports that Web Serial is unavailable and keeps connect disabled', async 
   });
 
   await page.goto(REACT_URL);
-  await page.getByTestId('load-demo').click();
 
   const status = page.getByTestId('web-serial-status');
 
@@ -29,6 +28,6 @@ test('reports that Web Serial is unavailable and keeps connect disabled', async 
 
   await expect(page.getByTestId('model-select')).toBeEnabled();
   await expect(page.getByTestId('connect-button')).toBeDisabled();
-  await expect(page.getByTestId('disconnect-button')).toBeDisabled();
+  await expect(page.getByTestId('disconnect-button')).toHaveCount(0);
   await expect(page.getByTestId('error-message')).toHaveCount(0);
 });

@@ -8,10 +8,12 @@ import LiveDemo from '../../components/LiveDemo';
 
 Connect a radio over USB (or through a USB-to-serial adapter), pick its model
 and press **Grant port & connect**. The browser asks which port to use; the page
-never sees ports you do not grant.
+never sees ports you do not grant. Once connected, the setup gives way to the
+radio's front panel; **Disconnect** brings it back.
 
-The panel can be driven two ways over the **same** rig and the same Hamlib
-module:
+Tick **Show library calls** to see what the panel does under the hood. The log
+also lets you choose, before connecting, which of two ways drives the **same**
+rig and the same Hamlib module:
 
 - **Rig** - `rig.setMode(mode)`, `rig.setPassband('narrow')` and a
   `useRigState` poll that reads one snapshot per tick;
@@ -19,7 +21,7 @@ module:
   `getPtt()` polled by hand, and `setMode(mode, width)` with an explicit width
   from `passbandNormal()`.
 
-The call log under the panel shows exactly which library calls each one makes.
+The log shows exactly which library calls each one makes.
 
 :::note[Requirements]
 A desktop Chromium-based browser or Firefox 151+, and a radio. Without Web
@@ -28,7 +30,8 @@ The demo writes to the radio only when you press a control - including PTT, so
 mind your antenna.
 :::
 
-The demo is not loaded with this page. The button below fetches the Hamlib
-WebAssembly module and its loader on demand.
+The demo loads with this page only: it fetches the Hamlib WebAssembly module
+and its loader, a few megabytes, which no other page of this site does. If your
+browser asks to save data, it waits for a click instead.
 
 <LiveDemo client:only="react" />

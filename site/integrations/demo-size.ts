@@ -1,11 +1,11 @@
 /**
- * What the "Load live demo" button costs, measured from the built package.
+ * What loading the live demo costs, measured from the built package.
  *
  * The bulk of the demo is the Hamlib module: `hamlib-wasm.wasm` (~5 MB raw)
  * and its Emscripten glue `hamlib-wasm.mjs` (~150 KB raw).  Both are measured
  * here at config time, gzip level 9 and brotli quality 11 - GitHub Pages
  * serves gzip, a CDN in front of it may serve brotli.  The demo's own React
- * chunk (a few tens of KB compressed) is not included; the button text says
+ * chunk (a few tens of KB compressed) is not included; the loader says
  * "about".
  */
 import { readFileSync } from 'node:fs';

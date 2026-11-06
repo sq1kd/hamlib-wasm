@@ -36,7 +36,8 @@ test.beforeEach(async ({ page }) => {
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(REACT_URL);
-  await page.getByTestId('load-demo').click();
+  /* What this spec compares is the call log, which is opt-in. */
+  await page.getByTestId('show-calls').check();
 });
 
 /** The page preselects the TS-480, so connecting is the gesture on its own. */

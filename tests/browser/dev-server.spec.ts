@@ -24,7 +24,6 @@ test('the documentation site demo instantiates the module in dev mode', async ({
   });
 
   await page.goto(REACT_DEV_URL);
-  await page.getByTestId('load-demo').click();
 
   /* The element reads "Hamlib: loading…" until the whole chain resolved:
    * the module, its default asset lookup and the wasm. */

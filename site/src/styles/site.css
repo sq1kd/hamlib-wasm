@@ -5,6 +5,11 @@
   border: 1px dashed var(--sl-color-hairline-light);
   border-radius: 0.5rem;
   text-align: center;
+  /* Roughly the height of the setup card, so the page does not jump. */
+  min-height: 14rem;
+  display: grid;
+  place-content: center;
+  justify-items: center;
 }
 
 .live-demo-loader button {
@@ -31,4 +36,33 @@
 
 .live-demo-loader .live-demo-error {
   color: var(--sl-color-red);
+}
+
+.live-demo-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--sl-color-hairline-light);
+  border-top-color: var(--sl-color-accent-high);
+  border-radius: 50%;
+  animation: live-demo-spin 0.9s linear infinite;
+}
+
+@keyframes live-demo-spin {
+  to { transform: rotate(1turn); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-demo-spinner {
+    animation-duration: 3s;
+  }
+}
+
+/* The demo page is wider than prose, so the call log can sit beside the
+ * radio; the text around it keeps Starlight's reading width. */
+.sl-container:has(.hamlib-demo, .live-demo-loader) {
+  max-width: 68rem;
+}
+
+.sl-container:has(.hamlib-demo, .live-demo-loader) .sl-markdown-content > :not(astro-island) {
+  max-width: 45rem;
 }

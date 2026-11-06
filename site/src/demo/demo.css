@@ -1,9 +1,8 @@
 /*
  * The live demo's styles, scoped to `.hamlib-demo` so they never reach the
  * documentation around it.  Colours follow the Starlight theme (light and
- * dark); the rig front panel keeps its own dark look.  Astro hoists this
- * small stylesheet into the demo page; the scripts and the Wasm still wait for
- * the click.
+ * dark); the rig front panel keeps its own dark look.  The stylesheet
+ * arrives with the demo's own chunk.
  */
 .hamlib-demo {
   --bg: var(--sl-color-bg);
@@ -30,7 +29,62 @@
 
 .hamlib-demo {
   display: grid;
+  gap: 0.75rem;
+  container-type: inline-size;
+}
+
+/* --- layout: one step at a time, the call log optional beside it --------- */
+
+.hamlib-demo .toolbar {
+  margin: 0;
+  display: flex;
+  justify-content: flex-end;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.hamlib-demo .toolbar label {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.hamlib-demo .workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
+  align-items: start;
+}
+
+@container (min-width: 56rem) {
+  .hamlib-demo .workspace[data-calls='shown'] {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+  }
+}
+
+.hamlib-demo .radio {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.hamlib-demo .radio-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hamlib-demo .radio-bar h2 {
+  margin: 0;
+  font-size: 1rem;
+  outline: none;
+}
+
+.hamlib-demo .radio-bar small {
+  color: var(--muted);
+  font-weight: normal;
 }
 
 .hamlib-demo .panel,
@@ -45,8 +99,26 @@
 .hamlib-demo .panel {
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  align-items: start;
+  max-width: 34rem;
+}
+
+.hamlib-demo .panel > * {
+  margin: 0;
+}
+
+.hamlib-demo .advanced {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.hamlib-demo .advanced summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.hamlib-demo .advanced[open] summary {
+  margin-bottom: 0.75rem;
 }
 
 .hamlib-demo .status {
@@ -87,7 +159,22 @@
 
 .hamlib-demo .actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  align-items: center;
+  color: var(--muted);
+}
+
+.hamlib-demo button.primary {
+  font-weight: 600;
+  padding: 0.55rem 1.1rem;
+  border: 0;
+  border-radius: 999rem;
+  color: var(--sl-color-black);
+  background: var(--sl-color-accent-high);
+}
+
+.hamlib-demo button.primary:not(:disabled):hover {
+  filter: brightness(1.08);
 }
 
 .hamlib-demo .backend {
@@ -124,22 +211,12 @@
 
 .hamlib-demo .error {
   color: var(--error);
+  margin: 0;
 }
 
 .hamlib-demo .limitation {
   color: var(--meter);
   font-size: 0.85rem;
-}
-
-/* Panel-scoped rules come after the general ones they refine. */
-
-.hamlib-demo .panel .status,
-.hamlib-demo .panel .actions,
-.hamlib-demo .panel [data-testid='connection-state'],
-.hamlib-demo .panel .error,
-.hamlib-demo .panel .limitation {
-  grid-column: 1 / -1;
-  margin: 0;
 }
 
 /* The detect control keeps its checkbox beside its own label, with the range
@@ -155,6 +232,11 @@
   color: var(--muted);
   font-size: 0.78rem;
   opacity: 0.85;
+}
+
+/* The second field under Advanced, after the rules that style fields. */
+.hamlib-demo .advanced .field + .field {
+  margin-top: 0.75rem;
 }
 
 /* --- the rig front panel ------------------------------------------------ */
@@ -230,6 +312,13 @@
   grid-template-columns: minmax(9rem, 12rem) 1fr;
   align-items: center;
   margin-top: 1rem;
+}
+
+/* On a phone the knob sits above the direct entry. */
+@container (max-width: 30rem) {
+  .hamlib-demo .rig-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .hamlib-demo .rig-knob {
@@ -349,6 +438,11 @@
 
 /* --- call log ----------------------------------------------------------- */
 
+.hamlib-demo .log {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .hamlib-demo .log header {
   display: flex;
   justify-content: space-between;
@@ -356,7 +450,7 @@
 }
 
 .hamlib-demo .log h2 {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: 1rem;
 }
 
@@ -364,7 +458,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 16rem;
+  max-height: 24rem;
   overflow: auto;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 0.8rem;
