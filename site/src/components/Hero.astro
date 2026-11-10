@@ -3,12 +3,13 @@
  * The landing page's hero, replacing Starlight's.
  *
  * Everything here is HTML at build time: the copy, the facts, the model list
- * and a read-only radio panel.  Two small scripts bring it to life - the
+ * and the radio panel with its controls.  Two small scripts bring it to life - the
  * waterfall behind it, and the panel, which loads Hamlib only once a reader
  * connects a radio.
  */
 import { megabytes } from '../bytes';
 import { ratesFor } from '../radio/detect';
+import { NO_CAPABILITIES } from '../radio/format';
 import { RadioPanel } from '../radio/RadioPanel';
 import { SAMPLE_STATE } from '../radio/simulate';
 import '../radio/radio.css';
@@ -54,8 +55,16 @@ const demo = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}demo/`;
         rates={ratesFor(0, 0)}
         serial
         locked={false}
-        note="Read-only: this panel never writes to your radio."
-        link={{ href: demo, text: 'Full demo with controls' }}
+        note="Tune it and key it, from the browser."
+        link={{ href: demo, text: 'See every library call' }}
+        controls={{
+          capabilities: NO_CAPABILITIES,
+          busy: false,
+          onSetFrequency: () => undefined,
+          onSetMode: () => undefined,
+          onSetPassband: () => undefined,
+          onSetPtt: () => undefined,
+        }}
       />
 
       <pre class="hw-code"><code><span class="k">const</span> rig = <span class="k">await</span> hamlib.open({'{'} modelId, baudRate: <span class="s">38400</span> {'}'});
@@ -68,12 +77,13 @@ const demo = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}demo/`;
 <script>
   import { mountRadio } from '../landing/radio';
   import { startWaterfall } from '../landing/waterfall';
+  import { emulate } from '../radio/emulate';
 
   const canvas = document.querySelector<HTMLCanvasElement>('[data-waterfall]');
   const radio = document.querySelector<HTMLElement>('[data-radio]');
 
   if (canvas !== null) startWaterfall(canvas);
-  if (radio !== null) mountRadio(radio);
+  if (radio !== null) mountRadio(radio, { emulated: await emulate() });
 
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
     button.addEventListener('click', () => {
@@ -174,6 +184,9 @@ const demo = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}demo/`;
   .hw-facts div:last-child { border: 0; }
   .hw-facts dt { font: 500 1.35rem var(--__sl-font-mono); color: var(--ink); }
   .hw-facts dd { margin: 0.1rem 0 0; font-size: 0.875rem; color: var(--faint); }
+
+  /* Lifted off the waterfall here; in the docs the panel sits flat, like the rest of the page. */
+  .hw-side :global(.radio) { box-shadow: 0 40px 90px -30px #000; }
 
   .hw-code {
     margin-top: 1rem;

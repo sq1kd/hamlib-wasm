@@ -1,6 +1,6 @@
 /**
  * The landing page's radio: the demo's panel as plain HTML until a reader
- * connects, then a real, read-only rig.
+ * connects, then a real rig it drives without React.
  *
  * Four promises are held here:
  *
@@ -9,18 +9,28 @@
  *  - Connect asks for the port first and loads Hamlib alongside it, then
  *    shows what the radio reports - here the emulated TS-480 at 14.074 MHz;
  *  - Auto-detect, the default, finds the rate and connects;
- *  - once open, the panel only reads: no command it sends sets frequency,
- *    mode or transmit, and it offers no control that would.
+ *  - once open, its polls only read: no command they send sets frequency,
+ *    mode or transmit; each control writes only when pressed.
  */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, installVirtualClock, readFakeSerial, useRig } from '../fixtures';
+import {
+  installFakeSerial,
+  installTestHelpers,
+  installVirtualClock,
+  pressPtt,
+  readFakeSerial,
+  releasePtt,
+  runClockUntilElement,
+  useRig,
+} from '../fixtures';
 
 const LANDING_URL = 'http://127.0.0.1:4176/';
 
-/* Kenwood writes: a set frequency (FA/FB + 11 digits), a set mode, or keying. */
-const KENWOOD_WRITE = /^(?:F[AB]\d{11};|MD\d;|TX\d?;|RX;)/;
+/* Kenwood writes, as the emulator records them (unframed): a set frequency
+ * (FA/FB + 11 digits), a set mode, or keying. */
+const KENWOOD_WRITE = /^(?:F[AB]\d{11}|MD\d|TX\d?|RX)$/;
 
 function wasmRequests(page: Page): string[] {
   const urls: string[] = [];
@@ -66,11 +76,12 @@ test('the panel is HTML until asked: sample readings, the catalogue, and no Wasm
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'disconnected');
   await expect(page.getByTestId('connection-state')).toHaveText('Sample');
   await expect(page.getByTestId('frequency-display')).toHaveText(/^\d{1,3}\.\d{3}\.\d{3}$/);
-  await expect(page.getByTestId('ptt-on')).toHaveCount(0);
+  await expect(page.getByTestId('ptt-button')).toBeHidden();
+  await expect(page.getByTestId('disconnect-button')).toBeHidden();
   expect(wasm).toEqual([]);
 });
 
-test('connects the emulated TS-480, shows what it reports, and only reads', async ({ page }) => {
+test('connects the emulated TS-480, shows what it reports, polls only reads and writes on request', async ({ page }) => {
   await withFakeSerial(page);
   await connectTs480(page, '9600');
 
@@ -78,8 +89,8 @@ test('connects the emulated TS-480, shows what it reports, and only reads', asyn
   await expect(page.getByTestId('mode-display')).toHaveText('USB');
   await expect(page.getByTestId('mode-USB')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('connect-button')).toBeHidden();
-  await expect(page.getByTestId('frequency-input')).toHaveCount(0);
-  await expect(page.getByTestId('ptt-on')).toHaveCount(0);
+  await expect(page.getByTestId('frequency-input')).toBeVisible();
+  await expect(page.getByTestId('ptt-button')).toHaveAttribute('aria-pressed', 'false');
 
   /* Whatever Hamlib's own open sends is its business; the panel's polls must only read. */
   const opened = (await readFakeSerial(page)).commands.length;
@@ -90,6 +101,17 @@ test('connects the emulated TS-480, shows what it reports, and only reads', asyn
 
   expect(polled.length).toBeGreaterThan(0);
   expect(polled.filter((command) => KENWOOD_WRITE.test(command))).toEqual([]);
+
+  /* Writes only when asked: a tuning step, then PTT held and let go. */
+  await page.getByTestId('tune-up').click();
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '14.075.000' });
+
+  await pressPtt(page);
+  await expect(page.getByTestId('ptt-state')).toBeVisible();
+  await expect(page.getByTestId('ptt-button')).toHaveAttribute('aria-pressed', 'true');
+  await releasePtt(page);
+  await expect(page.getByTestId('ptt-state')).toBeHidden();
+  expect((await readFakeSerial(page)).state.transmitting).toBe(false);
 
   await page.getByTestId('disconnect-button').click();
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'disconnected');
@@ -102,7 +124,7 @@ test('Auto-detect finds the rate, connects, and says which rate it used', async 
   await connectTs480(page, 'auto');
 
   await expect(page.getByTestId('frequency-display')).toHaveText('14.074.000');
-  await expect(page.locator('[data-radio-meta]')).toHaveText(/^\d+ baud · read-only$/);
+  await expect(page.locator('[data-radio-meta]')).toHaveText(/^\d+ baud$/);
 });
 
 test('without Web Serial the panel says why, keeps Connect disabled and fetches nothing', async ({ page }) => {

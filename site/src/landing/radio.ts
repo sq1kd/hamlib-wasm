@@ -1,5 +1,5 @@
 /**
- * The landing page's radio: the demo's panel, read-only, with no React.
+ * The landing page's radio: the demo's panel, with no React.
  *
  * The panel is `RadioPanel` rendered to HTML at build time; this script
  * brings it to life.  With no radio it plays sample readings.  Connect has
@@ -8,14 +8,18 @@
  * pointing at or focusing the button starts the download early, unless the
  * reader asked to save data.
  *
- * Read-only by design: it polls frequency, mode, PTT and the S-meter and has
- * no control that writes to the radio.  The demo page has the full panel.
+ * Connected, it polls frequency, mode, PTT and the S-meter, and sets
+ * frequency, mode, passband and PTT.  The demo page adds the log of every
+ * library call.
  */
-import type { Hamlib, HamlibError, Rig, RigField, RigState } from 'hamlib-wasm';
+import type { Hamlib, HamlibError, PassbandSelector, Rig, RigField, RigState } from 'hamlib-wasm';
 
 import { detectRate, rememberRate } from '../radio/detect';
+import { EMULATED_MODEL } from '../radio/emulate';
 import { POLL_MS } from '../radio/format';
-import { paint } from '../radio/paint';
+import { NOTHING, paint } from '../radio/paint';
+import { bindPtt } from '../radio/ptt';
+import type { Writable } from '../radio/paint';
 import type { PanelView } from '../radio/RadioPanel';
 import { simulate } from '../radio/simulate';
 
@@ -52,7 +56,12 @@ function message(cause: unknown): string {
   }
 }
 
-export function mountRadio(root: HTMLElement): void {
+export interface MountOptions {
+  /** The Web Serial double is installed: pick the model it speaks. */
+  readonly emulated?: boolean;
+}
+
+export function mountRadio(root: HTMLElement, options: MountOptions = {}): void {
   const $ = <T extends Element>(testId: string): T => {
     const element = root.querySelector<T>(`[data-testid="${testId}"]`);
 
@@ -74,6 +83,8 @@ export function mountRadio(root: HTMLElement): void {
   const serial = 'serial' in navigator;
   let hamlib: Promise<Hamlib> | undefined;
   let rig: Rig | undefined;
+  let current: RigState | undefined;
+  let writable: Writable = NOTHING;
   let stops: (() => void)[] = [];
   let stopSample: (() => void) | undefined;
 
@@ -134,6 +145,8 @@ export function mountRadio(root: HTMLElement): void {
     const closing = rig;
 
     rig = undefined;
+    current = undefined;
+    writable = NOTHING;
     await closing?.close().catch(() => undefined);
     lock(false);
     showSample();
@@ -172,6 +185,9 @@ export function mountRadio(root: HTMLElement): void {
     rememberRate(target.id, rig.baudRate);
 
     const { capabilities } = rig;
+
+    writable = { frequency: capabilities.setFrequency, mode: capabilities.setMode, ptt: capabilities.setPtt };
+
     const telemetry: RigField[] = [];
 
     if (capabilities.getFrequency) telemetry.push('frequency');
@@ -182,13 +198,18 @@ export function mountRadio(root: HTMLElement): void {
       phase: 'connected',
       sample: false,
       name: `${rig?.model.manufacturer ?? ''} ${rig?.model.model ?? ''}`.trim(),
-      meta: `${String(rig?.baudRate ?? '')} baud · read-only`,
+      meta: `${String(rig?.baudRate ?? '')} baud`,
       pill: 'Connected',
       state,
     });
 
-    stops.push(rig.on('state', (state) => { paint(root, view(state)); }));
-    paint(root, view(await rig.refresh()));
+    const show = (state: RigState): void => {
+      current = state;
+      paint(root, view(state), writable);
+    };
+
+    stops.push(rig.on('state', show));
+    show(await rig.refresh());
 
     /* The S-meter polls on its own, faster timer, so it moves while the slower reads wait. */
     if (telemetry.length > 0) stops.push(rig.watch({ intervalMs: POLL_MS.telemetry, fields: telemetry }));
@@ -204,7 +225,13 @@ export function mountRadio(root: HTMLElement): void {
     /* Storage disabled. */
   }
 
-  if (stored !== null && [...model.options].some((option) => option.value === stored)) {
+  const emulated = options.emulated === true
+    ? [...model.options].find((option) => option.textContent.endsWith(` ${EMULATED_MODEL}`))
+    : undefined;
+
+  if (emulated !== undefined) {
+    model.value = emulated.value;
+  } else if (stored !== null && [...model.options].some((option) => option.value === stored)) {
     model.value = stored;
   }
 
@@ -238,6 +265,63 @@ export function mountRadio(root: HTMLElement): void {
     });
   });
   disconnect.addEventListener('click', () => { void close(); });
+
+  /* Writes: each one, then a read, so the display answers at once rather than on the next poll. */
+  const write = (run: (target: Rig) => Promise<unknown>): void => {
+    const target = rig;
+
+    if (target === undefined) {
+      return;
+    }
+
+    setError(undefined);
+    run(target).then(() => target.refresh()).catch((cause: unknown) => { setError(message(cause)); });
+  };
+
+  /* Mode chips are rebuilt when the list changes, so listen on their container. */
+  root.querySelector('[data-radio-modes]')?.addEventListener('click', (event) => {
+    const chip = (event.target as Element).closest('button');
+
+    if (chip !== null && !chip.disabled && chip.textContent !== '') {
+      write((target) => target.setMode(chip.textContent));
+    }
+  });
+
+  const ptt = root.querySelector<HTMLButtonElement>('[data-testid="ptt-button"]');
+
+  if (ptt !== null) bindPtt(ptt, (on) => { write((target) => target.setPtt(on)); });
+
+  const step = root.querySelector<HTMLSelectElement>('[data-radio-controls] select');
+  const tune = (direction: number): void => {
+    const hz = current?.frequency;
+
+    if (hz !== undefined) {
+      write((target) => target.setFrequency(Math.max(0, hz + direction * Number(step?.value ?? 1000))));
+    }
+  };
+
+  root.querySelector('[data-testid="tune-down"]')?.addEventListener('click', () => { tune(-1); });
+  root.querySelector('[data-testid="tune-up"]')?.addEventListener('click', () => { tune(1); });
+
+  const entry = root.querySelector<HTMLInputElement>('[data-testid="frequency-input"]');
+  const set = root.querySelector<HTMLButtonElement>('[data-testid="frequency-set"]');
+  const submit = (): void => {
+    const hz = Number(entry?.value.replace(/[^0-9]/g, '') ?? '');
+
+    if (entry !== null) entry.value = '';
+    if (set !== null) set.disabled = true;
+    if (Number.isFinite(hz) && hz > 0) write((target) => target.setFrequency(hz));
+  };
+
+  entry?.addEventListener('input', () => { if (set !== null) set.disabled = !writable.frequency || entry.value === ''; });
+  entry?.addEventListener('keydown', (event) => { if (event.key === 'Enter') submit(); });
+  set?.addEventListener('click', submit);
+
+  for (const button of root.querySelectorAll<HTMLButtonElement>('[data-testid^="passband-"]')) {
+    const kind = button.dataset.testid?.replace('passband-', '') as PassbandSelector;
+
+    button.addEventListener('click', () => { write((target) => target.setPassband(kind)); });
+  }
   addEventListener('pagehide', () => { void close(); });
 
   pickModel();

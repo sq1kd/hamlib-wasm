@@ -6,7 +6,16 @@
  * (`format.ts`), so the static panel and the demo's live one stay alike.
  */
 import type { PanelView } from './RadioPanel';
-import { cellState, meterCells, modeList, passbandLabel, segments } from './format';
+import { cellState, keyed, meterCells, modeList, passbandLabel, segments } from './format';
+
+/** What the connected radio lets the panel set; nothing, before it connects. */
+export interface Writable {
+  readonly frequency: boolean;
+  readonly mode: boolean;
+  readonly ptt: boolean;
+}
+
+export const NOTHING: Writable = { frequency: false, mode: false, ptt: false };
 
 function find<T extends Element>(root: Element, selector: string): T {
   const element = root.querySelector<T>(selector);
@@ -18,7 +27,7 @@ function find<T extends Element>(root: Element, selector: string): T {
   return element;
 }
 
-export function paint(root: HTMLElement, view: PanelView): void {
+export function paint(root: HTMLElement, view: PanelView, writable: Writable = NOTHING): void {
   const { state } = view;
   const digits = segments(state?.frequency);
   const ptt = state?.ptt ?? 'unknown';
@@ -43,9 +52,8 @@ export function paint(root: HTMLElement, view: PanelView): void {
   const tx = find<HTMLElement>(root, '[data-testid="ptt-state"]');
 
   tx.dataset.state = ptt;
-  tx.hidden = ptt === 'off' || ptt === 'unknown';
+  tx.hidden = !keyed(ptt);
 
-  /* The landing panel never sets a mode: its chips only show which is on. */
   const modes = find(root, '[data-radio-modes]');
   const list = modeList(state?.mode);
 
@@ -62,11 +70,59 @@ export function paint(root: HTMLElement, view: PanelView): void {
     }));
   }
 
-  for (const chip of modes.children) {
+  for (const chip of modes.querySelectorAll('button')) {
     chip.setAttribute('aria-pressed', String(chip.textContent === state?.mode));
+    chip.disabled = !writable.mode;
   }
+
+  paintControls(root, view, writable);
 
   find(root, '[data-radio-meter]').querySelectorAll<HTMLElement>('i').forEach((cell, index) => {
     cell.dataset.on = cellState(index, lit);
   });
+}
+
+/** The write controls, when the panel has them: what is pressed, and what can be pressed. */
+function paintControls(root: HTMLElement, view: PanelView, writable: Writable): void {
+  const controls = root.querySelector<HTMLElement>('[data-radio-controls]');
+
+  if (controls === null) {
+    return;
+  }
+
+  const frequency = view.state?.frequency;
+  const control = <T extends HTMLElement>(testId: string): T | null => controls.querySelector<T>(`[data-testid="${testId}"]`);
+
+  const ptt = control<HTMLButtonElement>('ptt-button');
+
+  if (ptt !== null) {
+    ptt.setAttribute('aria-pressed', String(keyed(view.state?.ptt)));
+    ptt.disabled = !writable.ptt;
+  }
+
+  const tunable = writable.frequency && frequency !== undefined;
+
+  for (const testId of ['tune-down', 'tune-up']) {
+    const button = control<HTMLButtonElement>(testId);
+
+    if (button !== null) button.disabled = !tunable;
+  }
+
+  const step = controls.querySelector<HTMLSelectElement>('select');
+
+  if (step !== null) step.disabled = !tunable;
+
+  const input = control<HTMLInputElement>('frequency-input');
+  const set = control<HTMLButtonElement>('frequency-set');
+
+  if (input !== null) {
+    input.disabled = !writable.frequency;
+    input.placeholder = frequency === undefined ? 'Frequency, Hz' : String(frequency);
+  }
+
+  if (set !== null) set.disabled = !writable.frequency || input?.value === '';
+
+  for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-testid^="passband-"]')) {
+    button.disabled = !writable.mode || view.state?.mode === undefined;
+  }
 }

@@ -16,6 +16,8 @@
   --r-accent-ink: #04211b;
   --r-accent-dim: #3fbfa6;
   --r-tx: #ffcf5a;
+  /* One height for every button, select and field, so a row's edges line up. */
+  --r-control-h: 2.625rem;
 
   container-type: inline-size;
   color: var(--r-ink);
@@ -26,11 +28,11 @@
   border: 1px solid var(--r-line);
   border-radius: 14px;
   padding: 1.5rem;
-  box-shadow: 0 40px 90px -30px #000;
   text-align: start;
 }
 
-.radio p { margin: 0; }
+/* Zero specificity, so the note, limitation and error keep their own margins. */
+:where(.radio) p { margin: 0; }
 
 /* Zero specificity, so every rule below still sets its own font. */
 :where(.radio) :where(button, select, input) { font: inherit; }
@@ -41,8 +43,8 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
 .radio-head { display: flex; align-items: center; gap: 0.75rem; min-height: 1.9rem; }
 .radio-name { font-weight: 600; }
 .radio-meta { font-size: 0.875rem; color: var(--r-faint); font-variant-numeric: tabular-nums; }
+.radio-status { margin-left: auto; display: flex; }
 .radio-pill {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -58,6 +60,27 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
 .radio[data-state='connecting'] .radio-pill { color: var(--r-tx); border-color: #ffcf5a40; }
 .radio[data-state='connected'] .radio-pill { color: var(--r-accent); background: #59e0c514; border-color: #59e0c533; }
 .radio[data-state='connected'] .radio-pill::before { box-shadow: 0 0 0 3px #59e0c526; }
+
+/* Connected, the pill carries its own way out: one capsule, Disconnect its second half. */
+.radio-disconnect {
+  display: none;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--r-faint);
+  background: none;
+  border: 1px solid #59e0c533;
+  border-left-color: #59e0c51f;
+  border-radius: 0 999px 999px 0;
+  margin-left: -1px;
+  padding: 0.2rem 0.75rem 0.2rem 0.6rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.radio-disconnect:hover { color: var(--r-ink); background: #59e0c50f; }
+.radio[data-state='connected'] .radio-disconnect { display: inline-flex; }
+.radio[data-state='connected'] .radio-pill { border-radius: 999px 0 0 999px; }
 
 /* Display */
 .radio-lcd { margin-top: 1rem; background: #061210; border: 1px solid #12352f; border-radius: 8px; padding: 1.25rem 1.4rem 1rem; }
@@ -106,7 +129,9 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.68rem 1.2rem;
+  box-sizing: border-box;
+  height: var(--r-control-h);
+  padding: 0 1.2rem;
   border: 0;
   border-radius: 7px;
   font-weight: 500;
@@ -120,7 +145,6 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
 .radio-primary:active:not(:disabled) { transform: translateY(1px); }
 .radio-primary:disabled { background: #1d2a2f; color: var(--r-faint); cursor: not-allowed; }
 
-.radio-secondary,
 .radio-controls button,
 .radio-controls select,
 .radio-controls input,
@@ -130,19 +154,53 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   background: var(--r-control);
   border: 1px solid var(--r-control-line);
   border-radius: 7px;
-  padding: 0.6rem 0.75rem;
+  box-sizing: border-box;
+  height: var(--r-control-h);
+  padding: 0 0.75rem;
 }
-.radio-secondary, .radio-controls button { cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
-.radio-secondary:hover, .radio-controls button:hover:not(:disabled) { border-color: #3a4652; transform: translateY(-1px); }
-.radio-secondary:active, .radio-controls button:active:not(:disabled) { transform: translateY(1px); }
+.radio-controls button { cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+.radio-controls button:hover:not(:disabled) { border-color: #3a4652; transform: translateY(-1px); }
+.radio-controls button:active:not(:disabled) { transform: translateY(1px); }
 .radio-controls :disabled, .radio-field select:disabled { opacity: 0.55; cursor: not-allowed; }
 
-/* Write controls (demo, connected) */
-.radio-controls { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; margin-top: 1rem; }
-.radio-group { display: flex; gap: 0.35rem; }
-.radio-entry { flex: 1; min-width: 12rem; }
+/* Write controls, once connected: labelled rows, like the setup's fields. */
+.radio-controls {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.6rem 1rem;
+  align-items: center;
+  margin-top: 1.1rem;
+}
+.radio-label { font-size: 0.75rem; color: var(--r-faint); }
+.radio-row { display: flex; gap: 0.6rem; min-width: 0; }
+.radio-group { display: flex; gap: 0.35rem; min-width: 0; }
+.radio-entry { flex: 1; }
 .radio-entry input { flex: 1; min-width: 0; font-family: var(--__sl-font-mono); }
-.radio-controls .radio-ptt button { color: var(--r-tx); border-color: #5c4c18; background: #2a2410; }
+
+/* Joined groups: one control split in segments, as on a front panel. */
+.radio-joined { gap: 0; }
+.radio-joined > * { border-radius: 0; margin-left: -1px; }
+.radio-joined > :first-child { border-radius: 7px 0 0 7px; margin-left: 0; }
+.radio-joined > :last-child { border-radius: 0 7px 7px 0; }
+.radio-controls .radio-joined > :hover:not(:disabled), .radio-controls .radio-joined > :focus-visible { position: relative; z-index: 1; transform: none; }
+
+/* PTT: held to transmit, amber while held and while the radio reports itself keyed. */
+.radio-controls .radio-ptt {
+  margin-left: auto;
+  min-width: 5.5rem;
+  font: 600 0.9rem var(--__sl-font-mono);
+  letter-spacing: 0.06em;
+  color: var(--r-tx);
+  border-color: #5c4c18;
+  background: #2a2410;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.radio-controls .radio-ptt:hover:not(:disabled) { border-color: var(--r-tx); }
+.radio-controls .radio-ptt[data-held],
+.radio-controls .radio-ptt[aria-pressed='true'] { color: #07090c; background: var(--r-tx); border-color: var(--r-tx); transform: none; }
 
 /* Setup */
 .radio-setup { display: flex; gap: 0.6rem; margin-top: 1.1rem; align-items: end; }
@@ -150,12 +208,10 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
 .radio-field select { width: 100%; padding-inline: 0.6rem; }
 .radio-field select:hover:not(:disabled) { border-color: #3a4652; }
 .radio-model { flex: 1; }
-.radio[data-state='connected'] .radio-field,
-.radio[data-state='connected'] [data-testid='connect-button'] { display: none; }
-.radio [data-testid='disconnect-button'] { display: none; }
-.radio[data-state='connected'] [data-testid='disconnect-button'] { display: inline-flex; margin-left: auto; }
+.radio:not([data-state='connected']) .radio-controls,
+.radio[data-state='connected'] .radio-setup { display: none; }
 
-.radio-note { display: flex; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; margin-top: 0.85rem; font-size: 0.82rem; color: var(--r-faint); }
+.radio-note { display: flex; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--r-line); font-size: 0.82rem; color: var(--r-faint); }
 .radio-note a { color: var(--r-accent); text-decoration: none; background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size 0.2s; }
 .radio-note a:hover { background-size: 100% 1px; }
 .radio-limitation { margin-top: 0.6rem; font-size: 0.85rem; color: var(--r-tx); }
@@ -163,8 +219,21 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
 
 /* A narrow panel - a tablet's split column or a phone - puts the model on its own row. */
 @container (max-width: 34rem) {
+  .radio-controls { grid-template-columns: minmax(0, 1fr); gap: 0.3rem; }
+  .radio-controls .radio-label { margin-top: 0.4rem; }
+  .radio-row { flex-wrap: wrap; }
   .radio-setup { flex-wrap: wrap; }
   .radio-model { flex: 1 1 100%; }
   .radio-baud { flex: 1; }
   .radio-readout { font-size: 0.75rem; }
+}
+
+/* A phone's panel: the readout drops under the digits instead of past the edge. */
+@container (max-width: 24rem) {
+  .radio-head { flex-wrap: wrap; row-gap: 0.25rem; }
+  .radio-name { flex-basis: 100%; }
+  .radio-freq { flex-wrap: wrap; row-gap: 0.4rem; }
+  .radio-seg { font-size: 10.5cqi; }
+  .radio-entry { flex-basis: 100%; }
+  .radio-readout { flex-basis: 100%; margin-left: 0; grid-auto-flow: column; justify-content: start; gap: 0.75rem; align-items: baseline; }
 }

@@ -1,5 +1,5 @@
 /*
- * The live demo's frame: the toolbar and the call log beside the radio.
+ * The live demo's frame: the console of library calls with the radio.
  * The radio itself is the shared panel (`../radio/radio.css`); this file is
  * scoped to `.hamlib-demo` so it never reaches the documentation around it,
  * and its colours follow the Starlight theme.
@@ -24,129 +24,182 @@
   box-sizing: border-box;
 }
 
-/* --- layout: the radio, the call log optional beside it ------------------- */
+/* --- layout: one column; on a wide page, site.css splits it in two ----- */
 
-.hamlib-demo .toolbar {
-  margin: 0;
-  display: flex;
-  justify-content: flex-start;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.hamlib-demo .toolbar label {
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
-  cursor: pointer;
-}
-
-/* The panel keeps the landing page's proportions; the log, when shown, sits beside it. */
 .hamlib-demo .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 40rem);
-  gap: 1.25rem;
-  align-items: start;
+  gap: 1rem;
 }
 
-@container (min-width: 56rem) {
-  .hamlib-demo .workspace[data-calls='shown'] {
-    grid-template-columns: minmax(0, 40rem) minmax(16rem, 1fr);
+.hamlib-demo .radio {
+  margin-top: 1.5rem;
+}
+
+.hamlib-demo .console {
+  height: 20rem;
+}
+
+/* Beside the text, the console stays in view while the page scrolls, and
+ * stops at the last paragraph. */
+@media (min-width: 82rem) {
+  .hamlib-demo .console-rail {
+    margin-top: 1.5rem;
+  }
+
+  .hamlib-demo .console {
+    position: sticky;
+    top: calc(var(--sl-nav-height) + 1.5rem);
+    height: min(100%, 100svh - var(--sl-nav-height) - 3rem);
   }
 }
 
-/* --- call log ----------------------------------------------------------- */
+/* --- console: the panel's dark faceplate, in both site themes -------------- */
 
-.hamlib-demo .log {
+.hamlib-demo .console {
+  --c-ink: #b3bec8;
+  --c-faint: #6b7884;
+  --c-line: #1f2731;
+  --c-accent: #59e0c5;
+
   display: grid;
-  gap: 0.75rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem 1.15rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: linear-gradient(#0d1217, #0a0e12);
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  color: var(--c-ink);
+  overflow: hidden;
 }
 
-.hamlib-demo .log button {
-  font: inherit;
-  font-size: 0.8rem;
-  color: var(--sl-color-text);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.2rem 0.6rem;
+.hamlib-demo .console header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.4rem;
+  padding: 0 0.75rem 0 1.5rem;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.hamlib-demo .console-title {
+  font-weight: 600;
+  color: #e8edf2;
+  margin-right: auto;
+}
+
+.hamlib-demo .console-api {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--c-line);
+  border-radius: 7px;
+}
+
+.hamlib-demo .console-api label {
+  position: relative;
   cursor: pointer;
 }
 
-.hamlib-demo .backend {
-  border: 1px solid var(--border);
-  border-radius: 8px;
+.hamlib-demo .console-api input {
+  position: absolute;
+  inset: 0;
   margin: 0;
-  padding: 0.5rem 0.75rem 0.75rem;
-  display: grid;
-  gap: 0.5rem;
+  opacity: 0;
+  cursor: inherit;
 }
 
-.hamlib-demo .backend legend {
-  color: var(--muted);
-  font-size: 0.8rem;
-  padding: 0 0.35rem;
-}
-
-.hamlib-demo .backend label {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.5rem;
-  align-items: start;
-}
-
-.hamlib-demo .backend code {
+.hamlib-demo .console-api span {
   display: block;
+  padding: 0.15rem 0.75rem;
+  border-radius: 5px;
   font-size: 0.8rem;
+  color: var(--c-faint);
+  transition: color 0.15s, background 0.15s;
 }
 
-.hamlib-demo .backend small {
-  color: var(--muted);
-  font-size: 0.78rem;
+.hamlib-demo .console-api label:hover span {
+  color: var(--c-ink);
 }
 
-.hamlib-demo .log header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+.hamlib-demo .console-api input:checked + span {
+  background: #59e0c51a;
+  color: var(--c-accent);
 }
 
-.hamlib-demo .log h2 {
-  margin: 0;
-  font-size: 1rem;
+.hamlib-demo .console-api input:focus-visible + span {
+  outline: 2px solid var(--c-accent);
 }
 
-.hamlib-demo .log ol {
+.hamlib-demo .console-api input:disabled + span {
+  cursor: not-allowed;
+}
+
+.hamlib-demo .console header button {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--c-ink);
+  background: none;
+  border: 1px solid var(--c-line);
+  border-radius: 6px;
+  padding: 0.15rem 0.65rem;
+  cursor: pointer;
+}
+
+.hamlib-demo .console header button:disabled {
+  color: var(--c-faint);
+  cursor: default;
+}
+
+.hamlib-demo .console ol {
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 24rem;
-  overflow: auto;
-  font-family: var(--__sl-font-mono);
-  font-size: 0.8rem;
+  font: 0.8rem/1.75 var(--__sl-font-mono);
 }
 
-.hamlib-demo .log li {
+.hamlib-demo .console li {
   display: grid;
-  grid-template-columns: 4.5rem 1fr;
-  gap: 0.6rem;
-  padding: 0.2rem 0;
-  border-bottom: 1px solid var(--border);
+  grid-template-columns: 1rem 1fr;
+  gap: 0.25rem;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
-.hamlib-demo .log li[data-api='rig'] code {
-  color: var(--accent);
+.hamlib-demo .console-prompt {
+  color: var(--c-accent);
 }
 
-.hamlib-demo .log li[data-api='raw'] code {
-  color: var(--sl-color-green);
+.hamlib-demo .console li[data-api='raw'] .console-prompt {
+  color: #ffcf5a;
 }
 
-.hamlib-demo .log li.empty {
-  display: block;
-  color: var(--muted);
+.hamlib-demo .console .console-log {
+  overflow: auto;
+  padding: 0.9rem 1.5rem 1.1rem;
+}
+
+/* Before the first call: what Connect will run, in the chosen API. */
+.hamlib-demo .console-empty {
+  overflow: auto;
+  padding: 1.1rem 1.5rem;
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+  font-size: 0.82rem;
+  color: var(--c-faint);
+}
+
+.hamlib-demo .console-empty p {
+  margin: 0;
+}
+
+.hamlib-demo .console-empty code {
+  font-family: var(--__sl-font-mono);
+  color: var(--c-accent);
+  background: none;
+  padding: 0;
+}
+
+.hamlib-demo .console .console-empty ol {
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed var(--c-line);
+  border-radius: 8px;
+  color: #7f8c98;
 }

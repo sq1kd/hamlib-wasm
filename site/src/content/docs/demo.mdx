@@ -12,18 +12,13 @@ panel plays sample readings.
 
 <LiveDemo client:only="react" />
 
-:::caution[It writes to your radio]
-Unlike the read-only panel on the home page, this one sets frequency, mode
-and passband - and **TX on** keys the transmitter. Mind your antenna.
-:::
-
 **Auto-detect** tries the rates the model supports, highest first, and
 remembers the one that answered, so the next connect tries it first. Picking
 the rate set in the radio's menu skips the search.
 
-Tick **Show library calls** to see what the panel does under the hood. The log
-also lets you choose, before connecting, which of two ways drives the **same**
-rig and the same Hamlib module:
+**Library calls**, with the radio, logs every call the panel makes. Its
+switch picks, before connecting, which of two ways drives the **same** rig and
+the same Hamlib module:
 
 - **Rig** - `rig.setMode(mode)`, `rig.setPassband('narrow')` and two
   `useRigState` polls: frequency, mode and PTT once a second, and the S-meter

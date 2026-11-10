@@ -197,6 +197,17 @@ export async function runClockUntilPortClosed(page: Page): Promise<void> {
   await page.evaluate(() => window.__virtualClock.until(() => !window.__fakeSerial.isOpen));
 }
 
+/** Hold the panel's PTT button down with the mouse: the radio keys on the press. */
+export async function pressPtt(page: Page): Promise<void> {
+  await page.getByTestId('ptt-button').hover();
+  await page.mouse.down();
+}
+
+/** Let go of a held PTT button: the radio unkeys on the release. */
+export async function releasePtt(page: Page): Promise<void> {
+  await page.mouse.up();
+}
+
 /** Timers and intervals still scheduled in the page. */
 export async function pendingTimers(page: Page): Promise<number> {
   return page.evaluate(() => window.__virtualClock.pendingTimers());

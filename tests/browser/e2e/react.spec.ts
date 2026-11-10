@@ -3,8 +3,9 @@
  *
  * Two things are proved here: that the default entry really drives a rig through
  * the React hooks, and that the raw entry produces the same screen from its
- * own calls - the call log is the visible difference between them.  The PTT
- * commands are proved to stand on their own, without a poll in between.
+ * own calls - the call log is the visible difference between them.  A held
+ * PTT is proved to key on the press and unkey on the release, without a poll
+ * in between.
  *
  * The page runs on a manual virtual clock (fixtures/virtual-clock.ts): the
  * panel polls on an interval, and time must not run while the page merely
@@ -19,7 +20,9 @@ import {
   installFakeSerial,
   installTestHelpers,
   installVirtualClock,
+  pressPtt,
   readFakeSerial,
+  releasePtt,
   runClockUntilElement,
   runClockUntilPortClosed,
   setReplyDelay,
@@ -36,8 +39,6 @@ test.beforeEach(async ({ page }) => {
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(REACT_URL);
-  /* What this spec compares is the call log, which is opt-in. */
-  await page.getByTestId('show-calls').check();
 });
 
 /** The page preselects the TS-480; the rate is its highest, so the open is one attempt. */
@@ -63,12 +64,13 @@ test('drives a rig through the rig backend', async ({ page }) => {
   await runClockUntilElement(page, { testId: 'mode-display', text: 'CW' });
   await expect(page.getByTestId('mode-display')).toHaveText('CW');
 
-  /* Two commands, one observed readout: the rig answers with what it did. */
-  await page.getByTestId('ptt-on').click();
+  /* Held, then let go: the rig answers with what it did. */
+  await pressPtt(page);
   await runClockUntilElement(page, { testId: 'ptt-state', state: 'on' });
   await expect(page.getByTestId('ptt-state')).toHaveAttribute('data-state', 'on');
+  await expect(page.getByTestId('ptt-button')).toHaveAttribute('aria-pressed', 'true');
 
-  await page.getByTestId('ptt-off').click();
+  await releasePtt(page);
   await runClockUntilElement(page, { testId: 'ptt-state', state: 'off' });
   await expect(page.getByTestId('ptt-state')).toHaveAttribute('data-state', 'off');
 
@@ -90,14 +92,14 @@ test('drives a rig through the rig backend', async ({ page }) => {
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'disconnected');
 });
 
-test('sends both PTT commands without waiting for a poll', async ({ page }) => {
+test('a quick PTT tap sends both commands without waiting for a poll', async ({ page }) => {
   await connect(page);
 
-  /* TX on then TX off, back to back: neither button is gated on the snapshot
-   * the last poll published, so the second command cannot be built from a
-   * stale "off" and silently repeat the first. */
-  await page.getByTestId('ptt-on').click();
-  await page.getByTestId('ptt-off').click();
+  /* Press then release, back to back: neither is built from the snapshot the
+   * last poll published, so the release cannot read a stale "off" and
+   * silently repeat the press. */
+  await pressPtt(page);
+  await releasePtt(page);
 
   /* Run the clock until both have reached the emulator and the panel shows
    * the outcome. */

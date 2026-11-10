@@ -21,7 +21,7 @@ import type { RigCapabilities, Rig, PttState, RigState, SerialPortLike } from 'h
 import type { RawRig } from 'hamlib-wasm/raw';
 import { useRig, useRigError, useRigState } from 'hamlib-wasm/react';
 
-import { POLL_MS } from '../radio/format';
+import { NO_CAPABILITIES, POLL_MS } from '../radio/format';
 import type { PassbandKind } from '../radio/RadioPanel';
 
 export type Api = 'rig' | 'raw';
@@ -32,17 +32,6 @@ export interface LogEntry {
 }
 
 export type Log = (entry: LogEntry) => void;
-
-
-const NO_CAPABILITIES: RigCapabilities = {
-  getFrequency: false,
-  setFrequency: false,
-  getMode: false,
-  setMode: false,
-  getPtt: false,
-  setPtt: false,
-  levels: [],
-};
 
 const PTT_STATES: readonly PttState[] = ['off', 'on', 'on-mic', 'on-data'];
 

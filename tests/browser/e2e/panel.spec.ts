@@ -28,8 +28,10 @@ import {
   installFakeSerial,
   installTestHelpers,
   installVirtualClock,
+  pressPtt,
   readFakeSerial,
   releasePortOpen,
+  releasePtt,
   runClockUntilElement,
   runClockUntilPortClosed,
   setEmulatorSilent,
@@ -78,8 +80,7 @@ test('a frequency-only model connects, shows unknown fields and disconnects', as
   await expect(page.getByTestId('frequency-input')).toBeEnabled();
   await expect(page.getByTestId('mode-CW')).toBeEnabled();
   await expect(page.getByTestId('passband-normal')).toBeDisabled();
-  await expect(page.getByTestId('ptt-on')).toBeDisabled();
-  await expect(page.getByTestId('ptt-off')).toBeDisabled();
+  await expect(page.getByTestId('ptt-button')).toBeDisabled();
 
   /* The setter works even though the mode cannot be read back. */
   await page.getByTestId('frequency-input').fill('7100000');
@@ -101,7 +102,6 @@ test('a frequency-only model connects, shows unknown fields and disconnects', as
 test('a rig that never answers fails the acquisition loudly and releases the port', async ({ page }) => {
   await page.goto(REACT_URL);
   await useRig(page, 'yaesu-frg100');
-  await page.getByTestId('show-calls').check();
   await page.getByTestId('backend-raw').check();
 
   /* Park the acquisition at the port chooser, silence the emulator, then let it
@@ -140,7 +140,6 @@ test('a rig that never answers fails the acquisition loudly and releases the por
 
 test('a rejected command reaches the error display of the raw backend', async ({ page }) => {
   await page.goto(REACT_URL);
-  await page.getByTestId('show-calls').check();
   await page.getByTestId('backend-raw').check();
 
   await selectModel(page, 'Kenwood TS-480');
@@ -149,10 +148,11 @@ test('a rejected command reaches the error display of the raw backend', async ({
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected');
   await expect(page.getByTestId('frequency-display')).toHaveText('14.074.000');
 
-  /* The emulator refuses writes but keeps answering reads, so the PTT command
-   * fails on its own without a poll failure racing it for the same error slot. */
+  /* The emulator refuses writes but keeps answering reads, so the PTT commands
+   * fail on their own without a poll failure racing them for the same error slot. */
   await setWritesFailing(page, true);
-  await page.getByTestId('ptt-off').click();
+  await pressPtt(page);
+  await releasePtt(page);
 
   /* The panel callback discards the rejection, so the failure has to be in the
    * backend error state to be visible at all. */

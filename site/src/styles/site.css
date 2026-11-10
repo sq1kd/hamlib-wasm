@@ -154,12 +154,58 @@
   }
 }
 
-/* The demo page is wider than prose, so the call log can sit beside the
- * radio; the text around it keeps Starlight's reading width. */
-.sl-container:has(.hamlib-demo, .live-demo-loader) {
-  max-width: 68rem;
+/* Reading width: Starlight's 45rem leaves code blocks clipped and a wide
+ * screen mostly empty, so the column grows with the viewport. */
+@media (min-width: 80rem) {
+  :root { --sl-content-width: 50rem; }
 }
 
-.sl-container:has(.hamlib-demo, .live-demo-loader) .sl-markdown-content > :not(astro-island) {
-  max-width: 45rem;
+@media (min-width: 110rem) {
+  :root { --sl-content-width: 56rem; }
+}
+
+/*
+ * The demo page.  One column of Starlight's reading width carries the title,
+ * the text, the radio and its call console, so every block shares two edges.
+ * Wide enough, the column widens and splits in two tracks: the radio and the
+ * text on the left, at the landing page's panel width, and the console in the
+ * right track, from the radio's top to the last paragraph.  Here, not in
+ * demo.css, so the loader holds the radio's place before the demo arrives.
+ */
+body:has(.hamlib-demo, .live-demo-loader) {
+  --sl-content-width: 45rem;
+}
+
+@media (min-width: 82rem) {
+  body:has(.hamlib-demo, .live-demo-loader) {
+    --sl-content-width: 68rem;
+  }
+
+  .sl-markdown-content:has(.hamlib-demo, .live-demo-loader) {
+    display: grid;
+    grid-template-columns: minmax(0, 36rem) minmax(0, 1fr);
+    column-gap: 2.5rem;
+    align-content: start;
+  }
+
+  .sl-markdown-content:has(.hamlib-demo, .live-demo-loader) > *,
+  .sl-markdown-content .hamlib-demo .radio {
+    grid-column: 1;
+  }
+
+  /* The island and the demo's wrappers step aside: the radio and the console
+   * are the grid's own items. */
+  .sl-markdown-content > astro-island:has(.hamlib-demo),
+  .sl-markdown-content .hamlib-demo,
+  .sl-markdown-content .hamlib-demo .workspace {
+    display: contents;
+  }
+
+  /* From the radio's row to past the last paragraph; sized by the rows, never
+   * sizing them. */
+  .sl-markdown-content .hamlib-demo .console-rail {
+    grid-column: 2;
+    grid-row: 2 / span 24;
+    contain: size;
+  }
 }

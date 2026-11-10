@@ -6,6 +6,27 @@
  * from here, so the two never disagree about what a reading looks like.
  */
 
+import type { RigCapabilities } from 'hamlib-wasm';
+
+/** Before a radio is connected: nothing can be set. */
+export const NO_CAPABILITIES: RigCapabilities = {
+  getFrequency: false,
+  setFrequency: false,
+  getMode: false,
+  setMode: false,
+  getPtt: false,
+  setPtt: false,
+  levels: [],
+};
+
+/** Whether a PTT reading means the radio is keyed. */
+export function keyed(ptt: string | undefined): boolean {
+  return ptt !== undefined && ptt !== 'off' && ptt !== 'unknown';
+}
+
+/** Tuning increments, in Hz. */
+export const STEPS: readonly number[] = [10, 100, 1000, 10_000, 100_000];
+
 /** The modes the panel lists; the current mode is added when it is not one of them. */
 export const MODES: readonly string[] = ['LSB', 'USB', 'CW', 'CW-R', 'AM', 'FM', 'RTTY', 'DATA-USB'];
 

@@ -7,12 +7,13 @@
  * panel, and the landing page ships no React.  The data attributes `paint.ts`
  * looks for are part of this markup's contract.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
 import type { RigCapabilities, RigState } from 'hamlib-wasm';
 
-import { cellState, METER_CELLS, meterCells, modeList, passbandLabel, segments } from './format';
+import { cellState, keyed, METER_CELLS, meterCells, modeList, passbandLabel, segments, STEPS } from './format';
+import { bindPtt } from './ptt';
 
 export type Phase = 'disconnected' | 'connecting' | 'connected';
 
@@ -39,13 +40,14 @@ export interface PanelView {
   readonly state: RigState | undefined;
 }
 
-/** The demo's write controls, shown once a radio is connected. */
+/** The write controls, shown once a radio is connected. */
 export interface PanelControls {
   readonly capabilities: RigCapabilities;
   readonly busy: boolean;
   readonly onSetFrequency: (hz: number) => void;
   readonly onSetMode: (mode: string) => void;
   readonly onSetPassband: (kind: PassbandKind) => void;
+  /** Held: `true` on press, `false` on release. */
   readonly onSetPtt: (on: boolean) => void;
 }
 
@@ -75,9 +77,6 @@ export interface RadioPanelProps {
   readonly prerender?: boolean;
 }
 
-/** Tuning increments, in Hz. */
-const STEPS: readonly number[] = [10, 100, 1000, 10_000, 100_000];
-
 const PASSBANDS: readonly PassbandKind[] = ['narrow', 'normal', 'wide'];
 
 const CELLS: readonly number[] = Array.from({ length: METER_CELLS }, (_, cell) => cell);
@@ -96,7 +95,12 @@ function byManufacturer(models: readonly PanelModel[]): [string, PanelModel[]][]
   return [...groups.entries()];
 }
 
-function Controls({ controls, state }: { readonly controls: PanelControls; readonly state: RigState | undefined }): ReactElement {
+interface ControlsProps {
+  readonly controls: PanelControls;
+  readonly state: RigState | undefined;
+}
+
+function Controls({ controls, state }: ControlsProps): ReactElement {
   const { capabilities, busy } = controls;
   const [step, setStep] = useState(1000);
   const [entry, setEntry] = useState('');
@@ -105,9 +109,12 @@ function Controls({ controls, state }: { readonly controls: PanelControls; reado
   const canSetFrequency = !busy && capabilities.setFrequency;
   const canTune = canSetFrequency && frequency !== undefined;
   const canSetMode = !busy && capabilities.setMode;
-  /* PTT is a command, not a toggle of the snapshot: both buttons stay live
-   * whatever the last read said, and whatever is pending. */
-  const canSetPtt = capabilities.setPtt;
+  const ptt = useRef<HTMLButtonElement>(null);
+  const onSetPtt = useRef(controls.onSetPtt);
+
+  /* Bound once: re-binding on a new callback would release a held key. */
+  useEffect(() => { onSetPtt.current = controls.onSetPtt; });
+  useEffect(() => (ptt.current === null ? undefined : bindPtt(ptt.current, (on) => { onSetPtt.current(on); })), []);
 
   const tune = (steps: number): void => {
     if (frequency !== undefined) {
@@ -126,45 +133,58 @@ function Controls({ controls, state }: { readonly controls: PanelControls; reado
   };
 
   return (
-    <div className="radio-controls">
-      <div className="radio-group">
-        <button data-testid="tune-down" type="button" aria-label="Tune down" disabled={!canTune} onClick={() => { tune(-1); }}>−</button>
-        <select aria-label="Tuning step" value={String(step)} disabled={!canTune} onChange={(event) => { setStep(Number(event.target.value)); }}>
-          {STEPS.map((value) => <option key={value} value={String(value)}>{`${group(value)} Hz`}</option>)}
-        </select>
-        <button data-testid="tune-up" type="button" aria-label="Tune up" disabled={!canTune} onClick={() => { tune(1); }}>+</button>
+    <div className="radio-controls" data-radio-controls>
+      <span className="radio-label">Tune</span>
+      <div className="radio-row">
+        <div className="radio-group radio-joined">
+          <button data-testid="tune-down" type="button" aria-label="Tune down" disabled={!canTune} onClick={() => { tune(-1); }}>−</button>
+          <select aria-label="Tuning step" value={String(step)} disabled={!canTune} onChange={(event) => { setStep(Number(event.target.value)); }}>
+            {STEPS.map((value) => <option key={value} value={String(value)}>{`${group(value)} Hz`}</option>)}
+          </select>
+          <button data-testid="tune-up" type="button" aria-label="Tune up" disabled={!canTune} onClick={() => { tune(1); }}>+</button>
+        </div>
+        <div className="radio-group radio-joined radio-entry">
+          <input
+            data-testid="frequency-input"
+            aria-label="Frequency in Hz"
+            type="number"
+            inputMode="numeric"
+            placeholder={frequency === undefined ? 'Frequency, Hz' : String(frequency)}
+            value={entry}
+            disabled={!canSetFrequency}
+            onChange={(event) => { setEntry(event.target.value); }}
+            onKeyDown={(event) => { if (event.key === 'Enter') { submit(); } }}
+          />
+          <button data-testid="frequency-set" type="button" disabled={!canSetFrequency || entry === ''} onClick={submit}>Set</button>
+        </div>
       </div>
-      <div className="radio-group radio-entry">
-        <input
-          data-testid="frequency-input"
-          aria-label="Frequency in Hz"
-          type="number"
-          inputMode="numeric"
-          placeholder={frequency === undefined ? 'Frequency, Hz' : String(frequency)}
-          value={entry}
-          disabled={!canSetFrequency}
-          onChange={(event) => { setEntry(event.target.value); }}
-          onKeyDown={(event) => { if (event.key === 'Enter') { submit(); } }}
-        />
-        <button data-testid="frequency-set" type="button" disabled={!canSetFrequency || entry === ''} onClick={submit}>Set</button>
+
+      <span className="radio-label" id="radio-passband-label">Passband</span>
+      <div className="radio-row">
+        <fieldset className="radio-group radio-joined" aria-labelledby="radio-passband-label">
+          {PASSBANDS.map((kind) => (
+            <button
+              key={kind}
+              data-testid={`passband-${kind}`}
+              type="button"
+              disabled={!canSetMode || state?.mode === undefined}
+              onClick={() => { controls.onSetPassband(kind); }}
+            >
+              {kind}
+            </button>
+          ))}
+        </fieldset>
+        <button
+          ref={ptt}
+          className="radio-ptt"
+          data-testid="ptt-button"
+          type="button"
+          aria-pressed={keyed(state?.ptt)}
+          disabled={busy || !capabilities.setPtt}
+        >
+          PTT
+        </button>
       </div>
-      <fieldset className="radio-group" aria-label="Passband">
-        {PASSBANDS.map((kind) => (
-          <button
-            key={kind}
-            data-testid={`passband-${kind}`}
-            type="button"
-            disabled={!canSetMode || state?.mode === undefined}
-            onClick={() => { controls.onSetPassband(kind); }}
-          >
-            {kind}
-          </button>
-        ))}
-      </fieldset>
-      <fieldset className="radio-group radio-ptt" aria-label="Push to talk">
-        <button data-testid="ptt-on" type="button" disabled={!canSetPtt} onClick={() => { controls.onSetPtt(true); }}>TX on</button>
-        <button data-testid="ptt-off" type="button" disabled={!canSetPtt} onClick={() => { controls.onSetPtt(false); }}>TX off</button>
-      </fieldset>
     </div>
   );
 }
@@ -175,16 +195,29 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
   const digits = segments(state?.frequency);
   const lit = meterCells(state?.levels?.STRENGTH);
   const ptt = state?.ptt ?? 'unknown';
-  const transmitting = ptt !== 'off' && ptt !== 'unknown';
+  const transmitting = keyed(ptt);
   const canSetMode = controls !== undefined && !controls.busy && controls.capabilities.setMode;
   const selected = props.models.find((model) => model.id === props.modelId);
 
   return (
-    <section className="radio not-content" data-radio data-state={view.phase} data-sample={view.sample ? '' : undefined} aria-label="Radio">
+    <section
+      className="radio not-content"
+      data-radio
+      data-state={view.phase}
+      data-sample={view.sample ? '' : undefined}
+      aria-label="Radio"
+    >
       <header className="radio-head">
         <span className="radio-name" data-radio-name>{view.name}</span>
         <span className="radio-meta" data-radio-meta>{view.meta}</span>
-        <span className="radio-pill" data-testid="connection-state" data-state={view.phase} aria-live="polite">{view.pill}</span>
+        <span className="radio-status">
+          <span className="radio-pill" data-testid="connection-state" data-state={view.phase} aria-live="polite">{view.pill}</span>
+          {(props.prerender === true || view.phase === 'connected') && (
+            <button className="radio-disconnect" data-testid="disconnect-button" type="button" onClick={props.onDisconnect}>
+              Disconnect
+            </button>
+          )}
+        </span>
       </header>
 
       <div className="radio-lcd">
@@ -222,7 +255,9 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
         </div>
       </div>
 
-      {view.phase === 'connected' && controls !== undefined && <Controls controls={controls} state={state} />}
+      {controls !== undefined && (props.prerender === true || view.phase === 'connected') && (
+        <Controls controls={controls} state={state} />
+      )}
 
       <div className="radio-setup">
         <label className="radio-field radio-model">
@@ -267,11 +302,6 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
         >
           Connect your radio
         </button>
-        {(props.prerender === true || view.phase === 'connected') && (
-          <button className="radio-secondary" data-testid="disconnect-button" type="button" onClick={props.onDisconnect}>
-            Disconnect
-          </button>
-        )}
       </div>
 
       {(props.prerender === true || selected?.limitation !== undefined) && (

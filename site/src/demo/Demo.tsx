@@ -6,8 +6,8 @@
  * fetched by any other documentation page.
  *
  * The same panel as the landing page, with its controls: sample readings
- * until a radio is connected, then the radio's own.  The call log, and the
- * choice of API that only shows in it, stay behind a toggle.
+ * until a radio is connected, then the radio's own.  The console of library
+ * calls, with its choice of API, sits beside the radio at a fixed height.
  */
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
@@ -18,6 +18,7 @@ import { HamlibProvider, useHamlibContext, useModels } from 'hamlib-wasm/react';
 
 import { DemoLoading } from '../components/DemoLoading';
 import { detectRate, ratesFor, rememberRate } from '../radio/detect';
+import { EMULATED_MODEL, emulate } from '../radio/emulate';
 import { RadioPanel } from '../radio/RadioPanel';
 import type { PanelModel, PanelView } from '../radio/RadioPanel';
 import { simulate } from '../radio/simulate';
@@ -31,9 +32,11 @@ const OPTIONS: HamlibOptions = { levels: ['STRENGTH', 'SWR'] };
 
 const LOG_LIMIT = 40;
 
-/* What a returning reader chose last time: the model and the log toggle. */
+/* Development only: `?emulate` answers Web Serial with the test suite's TS-480. */
+const EMULATED = await emulate();
+
+/* What a returning reader chose last time: the model. */
 const MODEL_KEY = 'hamlib-demo:model';
-const CALLS_KEY = 'hamlib-demo:calls';
 
 function recall(key: string): string | null {
   try {
@@ -51,16 +54,41 @@ function remember(key: string, value: string): void {
   }
 }
 
-const APIS: readonly { readonly api: Api; readonly code: string; readonly note: string }[] = [
+interface ApiOption {
+  readonly api: Api;
+  readonly label: string;
+  readonly code: string;
+  readonly note: string;
+  /** The calls Connect will make, shown until it does. */
+  readonly preview: readonly string[];
+}
+
+const APIS: readonly [ApiOption, ApiOption] = [
   {
     api: 'rig',
+    label: 'Rig',
     code: 'rig.setMode(mode)',
-    note: 'one snapshot, passband filled in, polled by watch()',
+    note: 'one snapshot, passband filled in, polled for you',
+    preview: [
+      'open({ modelId, baudRate })',
+      "useRigState(rig, { pollMs: 1000 })",
+      "useRigState(rig, { pollMs: 250, fields: ['levels'] })",
+      "setMode('USB')",
+      'setPtt(true)',
+    ],
   },
   {
     api: 'raw',
+    label: 'Raw',
     code: 'rig.raw.setMode(mode, width)',
     note: 'the RawRig: one call per Hamlib operation, polled by hand',
+    preview: [
+      'open({ modelId, baudRate })',
+      'getFrequency()',
+      'getMode()',
+      'getPtt()',
+      "setMode('USB', width)",
+    ],
   },
 ];
 
@@ -72,7 +100,8 @@ interface Logged extends LogEntry {
 function defaultModel(models: readonly RigModel[]): RigModel | undefined {
   const stored = Number(recall(MODEL_KEY) ?? Number.NaN);
 
-  return models.find((model) => model.id === stored)
+  return (EMULATED ? models.find((model) => model.model === EMULATED_MODEL) : undefined)
+    ?? models.find((model) => model.id === stored)
     ?? models.find((model) => model.model === 'TS-480')
     ?? models.find((model) => model.support === 'verified')
     ?? models[0];
@@ -101,7 +130,6 @@ function App(): ReactElement {
   const panelModels = useMemo(() => models.map(toPanel), [models]);
 
   const [api, setApi] = useState<Api>('rig');
-  const [showCalls, setShowCalls] = useState(() => recall(CALLS_KEY) === 'true');
   const [entries, setEntries] = useState<readonly Logged[]>([]);
   const [modelId, setModelId] = useState<number | undefined>(undefined);
   const [baud, setBaud] = useState('auto');
@@ -145,6 +173,8 @@ function App(): ReactElement {
       rememberRate(rig.model.id, rig.baudRate);
     }
   }, [rig]);
+
+  const chosen = APIS.find((option) => option.api === api) ?? APIS[0];
 
   if (loading && loadError === undefined) {
     return <DemoLoading />;
@@ -228,22 +258,7 @@ function App(): ReactElement {
 
   return (
     <div className="hamlib-demo not-content">
-      <p className="toolbar">
-        <label>
-          <input
-            data-testid="show-calls"
-            type="checkbox"
-            checked={showCalls}
-            onChange={(event) => {
-              setShowCalls(event.target.checked);
-              remember(CALLS_KEY, String(event.target.checked));
-            }}
-          />
-          Show library calls
-        </label>
-      </p>
-
-      <div className="workspace" data-calls={showCalls ? 'shown' : 'hidden'}>
+      <div className="workspace">
         <RadioPanel
           view={view}
           models={panelModels}
@@ -276,43 +291,54 @@ function App(): ReactElement {
           onDisconnect={() => { void backend.disconnect().catch(() => undefined); }}
         />
 
-        {showCalls && (
-          <section className="log" aria-label="Library calls">
-            <fieldset className="backend">
-              <legend>Drive the panel through</legend>
-              {APIS.map((option) => (
-                <label key={option.api}>
-                  <input
-                    data-testid={`backend-${option.api}`}
-                    type="radio"
-                    name="backend"
-                    checked={api === option.api}
-                    disabled={busy || connected}
-                    onChange={() => { setApi(option.api); }}
-                  />
-                  <span>
-                    <code>{option.code}</code>
-                    <small>{option.note}</small>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-
+        <aside className="console-rail" aria-label="Library calls">
+          <section className="console">
             <header>
-              <h2>Library calls</h2>
-              <button type="button" onClick={() => { setEntries([]); }}>Clear</button>
+              <span className="console-title">Library calls</span>
+              <div className="console-api" role="radiogroup" aria-label="Drive the panel through">
+                {APIS.map((option) => (
+                  <label key={option.api} title={option.note}>
+                    <input
+                      data-testid={`backend-${option.api}`}
+                      type="radio"
+                      name="backend"
+                      checked={api === option.api}
+                      disabled={busy || connected}
+                      onChange={() => { setApi(option.api); }}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+              <button type="button" onClick={() => { setEntries([]); }} disabled={entries.length === 0}>Clear</button>
             </header>
-            <ol data-testid="call-log">
-              {entries.map((entry) => (
-                <li key={entry.id} data-api={entry.api}>
-                  <code>{entry.api}</code>
-                  <span>{entry.call}</span>
-                </li>
-              ))}
-              {entries.length === 0 && <li className="empty">no calls yet</li>}
-            </ol>
+            {entries.length === 0
+              ? (
+                <div className="console-empty" data-testid="call-log">
+                  <p><code>{chosen.code}</code> {chosen.note}.</p>
+                  <ol aria-label="Calls Connect will make">
+                    {chosen.preview.map((call) => (
+                      <li key={call} data-api={api}>
+                        <span className="console-prompt" aria-hidden="true">›</span>
+                        <span>{call}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <p>Connect a radio and every call lands here as it is made.</p>
+                </div>
+              )
+              : (
+                <ol className="console-log" data-testid="call-log">
+                  {entries.map((entry) => (
+                    <li key={entry.id} data-api={entry.api}>
+                      <span className="console-prompt" aria-hidden="true">›</span>
+                      <span>{entry.call}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
           </section>
-        )}
+        </aside>
       </div>
     </div>
   );
