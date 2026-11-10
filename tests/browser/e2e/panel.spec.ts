@@ -46,9 +46,11 @@ test.beforeEach(async ({ page }) => {
   await installTestHelpers(page);
 });
 
+/** Pick a model and its highest rate, so the open is one attempt, not an Auto-detect search. */
 async function selectModel(page: Page, label: string): Promise<void> {
   await expect(page.getByTestId('model-select')).toBeEnabled();
   await page.getByTestId('model-select').selectOption({ label });
+  await page.getByTestId('baud-select').selectOption({ index: 1 });
 }
 
 test('a frequency-only model connects, shows unknown fields and disconnects', async ({ page }) => {
@@ -57,12 +59,12 @@ test('a frequency-only model connects, shows unknown fields and disconnects', as
   /* The FRG-100 receiver: its backend declares frequency only. */
   await useRig(page, 'yaesu-frg100');
 
-  await selectModel(page, 'FRG-100');
+  await selectModel(page, 'Yaesu FRG-100');
   await page.getByTestId('connect-button').click();
-  await runClockUntilElement(page, { testId: 'frequency-display', text: '7,050,000' });
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '7.050.000' });
 
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected');
-  await expect(page.getByTestId('frequency-display')).toHaveText('7,050,000');
+  await expect(page.getByTestId('frequency-display')).toHaveText('7.050.000');
 
   /* Fields the model cannot read stay visibly unknown - never invented. */
   await expect(page.getByTestId('mode-display')).toHaveText('—');
@@ -82,8 +84,8 @@ test('a frequency-only model connects, shows unknown fields and disconnects', as
   /* The setter works even though the mode cannot be read back. */
   await page.getByTestId('frequency-input').fill('7100000');
   await page.getByTestId('frequency-set').click();
-  await runClockUntilElement(page, { testId: 'frequency-display', text: '7,100,000' });
-  await expect(page.getByTestId('frequency-display')).toHaveText('7,100,000');
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '7.100.000' });
+  await expect(page.getByTestId('frequency-display')).toHaveText('7.100.000');
 
   await page.getByTestId('disconnect-button').click();
   await runClockUntilElement(page, { testId: 'connection-state', state: 'disconnected' });
@@ -106,7 +108,7 @@ test('a rig that never answers fails the acquisition loudly and releases the por
    * through: the FRG-100 backend's open path writes one frame, and with nothing
    * answering the rig never speaks at all. */
   await holdNextPortOpen(page);
-  await selectModel(page, 'FRG-100');
+  await selectModel(page, 'Yaesu FRG-100');
   await page.getByTestId('connect-button').click();
   await waitForPortOpenPending(page);
 
@@ -129,7 +131,7 @@ test('a rig that never answers fails the acquisition loudly and releases the por
   await expect(page.getByTestId('error-message')).toContainText('nothing arrived');
   await expect(page.getByTestId('error-message')).toContainText('baud');
   /* Still on the setup step: no radio to drive, nothing to disconnect. */
-  await expect(page.getByTestId('frequency-display')).toHaveCount(0);
+  await expect(page.getByTestId('frequency-input')).toHaveCount(0);
   await expect(page.getByTestId('disconnect-button')).toHaveCount(0);
 
   expect((await readFakeSerial(page)).isOpen).toBe(false);
@@ -141,11 +143,11 @@ test('a rejected command reaches the error display of the raw backend', async ({
   await page.getByTestId('show-calls').check();
   await page.getByTestId('backend-raw').check();
 
-  await expect(page.getByTestId('model-select')).toBeEnabled();
+  await selectModel(page, 'Kenwood TS-480');
   await page.getByTestId('connect-button').click();
-  await runClockUntilElement(page, { testId: 'frequency-display', text: '14,074,000' });
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '14.074.000' });
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected');
-  await expect(page.getByTestId('frequency-display')).toHaveText('14,074,000');
+  await expect(page.getByTestId('frequency-display')).toHaveText('14.074.000');
 
   /* The emulator refuses writes but keeps answering reads, so the PTT command
    * fails on its own without a poll failure racing it for the same error slot. */
@@ -168,10 +170,10 @@ test('a rejected command reaches the error display of the raw backend', async ({
   await runClockUntilPortClosed(page);
   expect((await readFakeSerial(page)).isOpen).toBe(false);
   await page.getByTestId('connect-button').click();
-  await runClockUntilElement(page, { testId: 'frequency-display', text: '14,074,000' });
-  await expect(page.getByTestId('frequency-display')).toHaveText('14,074,000');
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '14.074.000' });
+  await expect(page.getByTestId('frequency-display')).toHaveText('14.074.000');
   await page.getByTestId('frequency-input').fill('7074000');
   await page.getByTestId('frequency-set').click();
-  await runClockUntilElement(page, { testId: 'frequency-display', text: '7,074,000' });
-  await expect(page.getByTestId('frequency-display')).toHaveText('7,074,000');
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '7.074.000' });
+  await expect(page.getByTestId('frequency-display')).toHaveText('7.074.000');
 });

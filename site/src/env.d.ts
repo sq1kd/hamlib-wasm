@@ -7,3 +7,6 @@ declare const __DEMO_DOWNLOAD__: {
   readonly gzip: number;
   readonly brotli: number;
 };
+
+/** The model catalogue and Hamlib release; see integrations/catalogue.ts. */
+declare const __CATALOGUE__: import('../integrations/catalogue').Catalogue;

@@ -5,20 +5,25 @@
  * demo page's island, so the Emscripten glue and the Wasm it pulls in are not
  * fetched by any other documentation page.
  *
- * Two steps: pick a model and connect, then drive the radio.  The call log,
- * and the choice of API that only shows in it, stay behind a toggle.
+ * The same panel as the landing page, with its controls: sample readings
+ * until a radio is connected, then the radio's own.  The call log, and the
+ * choice of API that only shows in it, stay behind a toggle.
  */
-import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
 import { HamlibError } from 'hamlib-wasm';
-import type { HamlibOptions, RigModel, SerialPortLike } from 'hamlib-wasm';
+import type { HamlibOptions, RigModel, RigState, SerialPortLike } from 'hamlib-wasm';
 import { HamlibProvider, useHamlibContext, useModels } from 'hamlib-wasm/react';
 
 import { DemoLoading } from '../components/DemoLoading';
+import { detectRate, ratesFor, rememberRate } from '../radio/detect';
+import { RadioPanel } from '../radio/RadioPanel';
+import type { PanelModel, PanelView } from '../radio/RadioPanel';
+import { simulate } from '../radio/simulate';
 import { useBackend } from './backend';
 import type { Api, Log, LogEntry } from './backend';
-import { RigPanel } from './RigPanel';
+import '../radio/radio.css';
 import './demo.css';
 
 /* A module constant: the provider reads its options once. */
@@ -73,36 +78,44 @@ function defaultModel(models: readonly RigModel[]): RigModel | undefined {
     ?? models[0];
 }
 
-/** Group the catalogue by manufacturer, preserving its order. */
-function byManufacturer(models: readonly RigModel[]): [string, RigModel[]][] {
-  const groups = new Map<string, RigModel[]>();
+function toPanel(model: RigModel): PanelModel {
+  return {
+    id: model.id,
+    manufacturer: model.manufacturer,
+    model: model.model,
+    ...(model.limitation === undefined ? {} : { limitation: model.limitation }),
+    rateMin: model.serialRateMin,
+    rateMax: model.serialRateMax,
+  };
+}
 
-  for (const model of models) {
-    groups.set(model.manufacturer, [...(groups.get(model.manufacturer) ?? []), model]);
-  }
-
-  return [...groups.entries()];
+function asHamlibError(cause: unknown, operation: string): HamlibError {
+  return cause instanceof HamlibError
+    ? cause
+    : new HamlibError(cause instanceof Error ? cause.message : String(cause), { code: 'TRANSPORT_FAILURE', operation });
 }
 
 function App(): ReactElement {
   const { hamlib, loading, error: loadError } = useHamlibContext();
   const models = useModels();
+  const panelModels = useMemo(() => models.map(toPanel), [models]);
 
   const [api, setApi] = useState<Api>('rig');
   const [showCalls, setShowCalls] = useState(() => recall(CALLS_KEY) === 'true');
   const [entries, setEntries] = useState<readonly Logged[]>([]);
   const [modelId, setModelId] = useState<number | undefined>(undefined);
-  const [baudRate, setBaudRate] = useState('');
-  const [detect, setDetect] = useState(false);
+  const [baud, setBaud] = useState('auto');
+  const [trying, setTrying] = useState<number | undefined>(undefined);
   const [detecting, setDetecting] = useState(false);
   const [detectError, setDetectError] = useState<HamlibError | undefined>(undefined);
-  const radioRef = useRef<HTMLHeadingElement>(null);
+  const [sample, setSample] = useState<RigState | undefined>(undefined);
 
   const log = useCallback<Log>((entry) => {
     setEntries((current) => [{ ...entry, id: Math.random() }, ...current].slice(0, LOG_LIMIT));
   }, []);
 
   const backend = useBackend(api, log);
+  const { rig } = backend;
 
   useEffect(() => {
     if (modelId === undefined && models.length > 0) {
@@ -110,31 +123,41 @@ function App(): ReactElement {
     }
   }, [modelId, models]);
 
-  const selected = useMemo(() => models.find((model) => model.id === modelId), [models, modelId]);
-  const connected = backend.rig !== undefined;
+  const selected = useMemo(() => panelModels.find((model) => model.id === modelId), [panelModels, modelId]);
+  const rates = useMemo(() => (selected === undefined ? [] : ratesFor(selected.rateMin, selected.rateMax)), [selected]);
+  const connected = rig !== undefined;
   const busy = backend.connecting || detecting;
   const serial = typeof navigator !== 'undefined' && 'serial' in navigator;
   const error = loadError ?? detectError ?? backend.error;
 
-  /* The connect button goes away with the setup step; keep focus in the demo. */
+  /* With no radio, the panel plays sample readings - and stops the moment one connects. */
   useEffect(() => {
-    if (connected) {
-      radioRef.current?.focus();
+    if (connected || busy) {
+      return undefined;
     }
-  }, [connected]);
+
+    return simulate(setSample);
+  }, [connected, busy]);
+
+  /* The rate that worked is the first one Auto-detect tries next time. */
+  useEffect(() => {
+    if (rig !== undefined) {
+      rememberRate(rig.model.id, rig.baudRate);
+    }
+  }, [rig]);
 
   if (loading && loadError === undefined) {
     return <DemoLoading />;
   }
 
   const connect = (): void => {
-    if (modelId === undefined || hamlib === undefined) {
+    if (selected === undefined || hamlib === undefined) {
       return;
     }
 
     const open = async (): Promise<void> => {
-      if (!detect) {
-        await backend.connect(modelId, baudRate === '' ? undefined : Number(baudRate));
+      if (baud !== 'auto') {
+        await backend.connect(selected.id, Number(baud));
         return;
       }
 
@@ -145,20 +168,21 @@ function App(): ReactElement {
       try {
         log({ api, call: 'requestPort()' });
         port = await hamlib.requestPort();
-        log({ api, call: `detectBaudRate({ modelId: ${String(modelId)} })` });
         setDetecting(true);
-        found = await hamlib.detectBaudRate({ modelId, port });
+        found = await detectRate(hamlib, selected, port, (rate) => {
+          setTrying(rate);
+          log({ api, call: `detectBaudRate({ modelId: ${String(selected.id)}, rates: [${String(rate)}] })` });
+        });
       } catch (cause) {
-        setDetectError(cause instanceof HamlibError
-          ? cause
-          : new HamlibError(String(cause), { code: 'TRANSPORT_FAILURE', operation: 'detectBaudRate' }));
+        setDetectError(asHamlibError(cause, 'detectBaudRate'));
         return;
       } finally {
         setDetecting(false);
+        setTrying(undefined);
       }
 
-      setBaudRate(String(found));
-      await backend.connect(modelId, found, port);
+      setBaud(String(found));
+      await backend.connect(selected.id, found, port);
     };
 
     setDetectError(undefined);
@@ -166,132 +190,40 @@ function App(): ReactElement {
     void open().catch(() => undefined);
   };
 
-  const errorMessage = error !== undefined && (
-    <p className="error" data-testid="error-message" role="alert">{error.message}</p>
-  );
+  let view: PanelView;
 
-  const setup = (
-    <section className="panel setup" aria-label="Connect a radio">
-      <p className="status">
-        <span data-testid="hamlib-version">{hamlib?.version ?? 'Hamlib unavailable'}</span>
-        {' · '}
-        <span data-testid="web-serial-status" data-state={serial ? 'available' : 'unavailable'}>
-          {serial
-            ? 'Web Serial available'
-            : 'Web Serial unavailable: use a desktop Chromium-based browser or Firefox 151+'}
-        </span>
-      </p>
+  if (rig !== undefined) {
+    view = {
+      phase: 'connected',
+      sample: false,
+      name: `${rig.model.manufacturer} ${rig.model.model}`,
+      meta: `${String(rig.baudRate)} baud`,
+      pill: 'Connected',
+      state: backend.state,
+    };
+  } else if (busy) {
+    view = {
+      phase: 'connecting',
+      sample: false,
+      name: 'Connecting',
+      meta: '',
+      pill: trying === undefined ? 'Connecting' : `Trying ${String(trying)}`,
+      state: undefined,
+    };
+  } else {
+    view = { phase: 'disconnected', sample: true, name: 'No radio connected', meta: 'sample readings', pill: 'Sample', state: sample };
+  }
 
-      <label className="field">
-        Model
-        <select
-          data-testid="model-select"
-          value={modelId === undefined ? '' : String(modelId)}
-          disabled={hamlib === undefined || busy}
-          onChange={(event) => {
-            setModelId(Number(event.target.value));
-            remember(MODEL_KEY, event.target.value);
-          }}
-        >
-          {models.length === 0 && <option value="">no models</option>}
-          {byManufacturer(models).map(([manufacturer, group]) => (
-            <optgroup key={manufacturer} label={manufacturer}>
-              {group.map((model) => (
-                <option key={model.id} value={String(model.id)}>
-                  {model.model}
-                  {model.support === 'verified' ? ' ✓' : ''}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-
-      <details className="advanced">
-        <summary>Advanced</summary>
-
-        <label className="field">
-          Baud rate (optional)
-          <input
-            data-testid="baud-input"
-            type="number"
-            inputMode="numeric"
-            placeholder={selected === undefined ? 'model default' : String(selected.serialRateMax)}
-            value={baudRate}
-            disabled={busy || detect}
-            onChange={(event) => { setBaudRate(event.target.value); }}
-          />
-        </label>
-
-        <label className="field checkbox">
-          <input
-            data-testid="detect-input"
-            type="checkbox"
-            checked={detect}
-            disabled={busy}
-            onChange={(event) => { setDetect(event.target.checked); }}
-          />
-          Detect the baud rate
-          <small>
-            {selected === undefined
-              ? 'tries the rates the model declares'
-              : `tries ${String(selected.serialRateMin)}–${String(selected.serialRateMax)} baud`}
-          </small>
-        </label>
-      </details>
-
-      {selected?.limitation !== undefined && (
-        <p className="limitation" data-testid="model-limitation">
-          {selected.manufacturer} {selected.model}: {selected.limitation}
-        </p>
-      )}
-
-      <p className="actions">
-        <button
-          className="primary"
-          data-testid="connect-button"
-          type="button"
-          disabled={!serial || hamlib === undefined || busy}
-          onClick={connect}
-        >
-          {busy ? (detecting ? 'Detecting baud rate…' : 'Connecting…') : 'Grant port & connect'}
-        </button>
-        <span data-testid="connection-state" data-state="disconnected">disconnected</span>
-      </p>
-
-      {errorMessage}
-    </section>
-  );
-
-  const radio = (
-    <div className="radio">
-      <header className="radio-bar">
-        <h2 ref={radioRef} tabIndex={-1} data-testid="connection-state" data-state="connected">
-          {selected === undefined ? 'connected' : `connected: ${selected.manufacturer} ${selected.model}`}
-          {baudRate !== '' && <small> · {baudRate} baud</small>}
-        </h2>
-        <button
-          data-testid="disconnect-button"
-          type="button"
-          onClick={() => { void backend.disconnect().catch(() => undefined); }}
-        >
-          Disconnect
-        </button>
-      </header>
-
-      {errorMessage}
-
-      <RigPanel
-        state={backend.state}
-        capabilities={backend.capabilities}
-        connected={connected}
-        busy={busy}
-        onSetFrequency={backend.setFrequency}
-        onSetMode={backend.setMode}
-        onSetPassband={backend.setPassband}
-        onSetPtt={backend.setPtt}
-      />
-    </div>
+  const note = (
+    <>
+      <span data-testid="hamlib-version">{hamlib?.version ?? 'Hamlib unavailable'}</span>
+      {' · '}
+      <span data-testid="web-serial-status" data-state={serial ? 'available' : 'unavailable'}>
+        {serial
+          ? 'Web Serial available'
+          : 'Web Serial unavailable: use desktop Chrome, Edge or Firefox 151+'}
+      </span>
+    </>
   );
 
   return (
@@ -312,7 +244,37 @@ function App(): ReactElement {
       </p>
 
       <div className="workspace" data-calls={showCalls ? 'shown' : 'hidden'}>
-        {connected ? radio : setup}
+        <RadioPanel
+          view={view}
+          models={panelModels}
+          modelId={modelId}
+          baud={baud}
+          rates={rates}
+          serial={serial}
+          locked={hamlib === undefined || busy}
+          note={note}
+          {...(error === undefined ? {} : { error: error.message })}
+          {...(connected
+            ? {
+              controls: {
+                capabilities: backend.capabilities,
+                busy,
+                onSetFrequency: backend.setFrequency,
+                onSetMode: backend.setMode,
+                onSetPassband: backend.setPassband,
+                onSetPtt: backend.setPtt,
+              },
+            }
+            : {})}
+          onModel={(id) => {
+            setModelId(id);
+            setBaud('auto');
+            remember(MODEL_KEY, String(id));
+          }}
+          onBaud={setBaud}
+          onConnect={connect}
+          onDisconnect={() => { void backend.disconnect().catch(() => undefined); }}
+        />
 
         {showCalls && (
           <section className="log" aria-label="Library calls">

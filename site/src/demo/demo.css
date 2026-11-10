@@ -1,24 +1,21 @@
 /*
- * The live demo's styles, scoped to `.hamlib-demo` so they never reach the
- * documentation around it.  Colours follow the Starlight theme (light and
- * dark); the rig front panel keeps its own dark look.  The stylesheet
- * arrives with the demo's own chunk.
+ * The live demo's frame: the toolbar and the call log beside the radio.
+ * The radio itself is the shared panel (`../radio/radio.css`); this file is
+ * scoped to `.hamlib-demo` so it never reaches the documentation around it,
+ * and its colours follow the Starlight theme.
  */
 .hamlib-demo {
-  --bg: var(--sl-color-bg);
-  --fg: var(--sl-color-text);
   --muted: var(--sl-color-gray-3);
   --surface: var(--sl-color-bg-nav);
   --border: var(--sl-color-hairline-light);
   --accent: var(--sl-color-text-accent);
-  --success: var(--sl-color-green);
-  --error: var(--sl-color-red);
-  --meter: #f08a24;
 
-  color: var(--fg);
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
   font-size: var(--sl-text-sm);
   line-height: 1.55;
-  margin-top: 1.5rem;
+  container-type: inline-size;
 }
 
 .hamlib-demo *,
@@ -27,18 +24,12 @@
   box-sizing: border-box;
 }
 
-.hamlib-demo {
-  display: grid;
-  gap: 0.75rem;
-  container-type: inline-size;
-}
-
-/* --- layout: one step at a time, the call log optional beside it --------- */
+/* --- layout: the radio, the call log optional beside it ------------------- */
 
 .hamlib-demo .toolbar {
   margin: 0;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   color: var(--muted);
   font-size: 0.85rem;
 }
@@ -50,131 +41,40 @@
   cursor: pointer;
 }
 
+/* The panel keeps the landing page's proportions; the log, when shown, sits beside it. */
 .hamlib-demo .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 40rem);
   gap: 1.25rem;
   align-items: start;
 }
 
 @container (min-width: 56rem) {
   .hamlib-demo .workspace[data-calls='shown'] {
-    grid-template-columns: minmax(0, 1fr) 20rem;
+    grid-template-columns: minmax(0, 40rem) minmax(16rem, 1fr);
   }
 }
 
-.hamlib-demo .radio {
+/* --- call log ----------------------------------------------------------- */
+
+.hamlib-demo .log {
   display: grid;
   gap: 0.75rem;
-}
-
-.hamlib-demo .radio-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.hamlib-demo .radio-bar h2 {
-  margin: 0;
-  font-size: 1rem;
-  outline: none;
-}
-
-.hamlib-demo .radio-bar small {
-  color: var(--muted);
-  font-weight: normal;
-}
-
-.hamlib-demo .panel,
-.hamlib-demo .rig,
-.hamlib-demo .log {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1rem 1.15rem;
 }
 
-.hamlib-demo .panel {
-  display: grid;
-  gap: 0.85rem;
-  max-width: 34rem;
-}
-
-.hamlib-demo .panel > * {
-  margin: 0;
-}
-
-.hamlib-demo .advanced {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.hamlib-demo .advanced summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.hamlib-demo .advanced[open] summary {
-  margin-bottom: 0.75rem;
-}
-
-.hamlib-demo .status {
-  color: var(--muted);
-}
-
-.hamlib-demo .field {
-  display: grid;
-  gap: 0.3rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.hamlib-demo select,
-.hamlib-demo input,
-.hamlib-demo button {
+.hamlib-demo .log button {
   font: inherit;
-  color: inherit;
-  background: var(--bg);
+  font-size: 0.8rem;
+  color: var(--sl-color-text);
+  background: none;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.4rem 0.55rem;
-}
-
-.hamlib-demo button {
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
   cursor: pointer;
-  background: var(--surface);
-}
-
-.hamlib-demo button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.hamlib-demo button:not(:disabled):hover {
-  border-color: var(--accent);
-}
-
-.hamlib-demo .actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  color: var(--muted);
-}
-
-.hamlib-demo button.primary {
-  font-weight: 600;
-  padding: 0.55rem 1.1rem;
-  border: 0;
-  border-radius: 999rem;
-  color: var(--sl-color-black);
-  background: var(--sl-color-accent-high);
-}
-
-.hamlib-demo button.primary:not(:disabled):hover {
-  filter: brightness(1.08);
 }
 
 .hamlib-demo .backend {
@@ -209,240 +109,6 @@
   font-size: 0.78rem;
 }
 
-.hamlib-demo .error {
-  color: var(--error);
-  margin: 0;
-}
-
-.hamlib-demo .limitation {
-  color: var(--meter);
-  font-size: 0.85rem;
-}
-
-/* The detect control keeps its checkbox beside its own label, with the range
- * hint underneath both. */
-.hamlib-demo .field.checkbox {
-  grid-template-columns: auto 1fr;
-  gap: 0.3rem 0.5rem;
-  align-items: center;
-}
-
-.hamlib-demo .field.checkbox small {
-  grid-column: 2;
-  color: var(--muted);
-  font-size: 0.78rem;
-  opacity: 0.85;
-}
-
-/* The second field under Advanced, after the rules that style fields. */
-.hamlib-demo .advanced .field + .field {
-  margin-top: 0.75rem;
-}
-
-/* --- the rig front panel ------------------------------------------------ */
-
-.hamlib-demo .rig {
-  background: linear-gradient(180deg, #2b2f37, #1b1e24);
-  border-color: #000;
-  color: #e9edf3;
-  padding: 1.1rem;
-}
-
-.hamlib-demo .rig-display {
-  background: #07130d;
-  border: 1px solid #000;
-  border-radius: 8px;
-  padding: 0.85rem 1rem;
-  display: grid;
-  gap: 0.6rem;
-}
-
-.hamlib-demo .rig-frequency {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-}
-
-.hamlib-demo .rig-frequency output {
-  font-size: clamp(1.8rem, 7vw, 3rem);
-  letter-spacing: 0.04em;
-  color: #7dfba1;
-  text-shadow: 0 0 12px rgb(125 251 161 / 45%);
-}
-
-.hamlib-demo .rig-unit {
-  color: #4c9c6c;
-  font-size: 0.9rem;
-}
-
-.hamlib-demo .rig-readouts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  margin: 0;
-  font-size: 0.8rem;
-}
-
-.hamlib-demo .rig-readouts div {
-  display: grid;
-}
-
-.hamlib-demo .rig-readouts dt {
-  color: #4c9c6c;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.hamlib-demo .rig-readouts dd {
-  margin: 0;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 1rem;
-}
-
-.hamlib-demo .rig-readouts dd[data-state='on'],
-.hamlib-demo .rig-readouts dd[data-state='on-mic'],
-.hamlib-demo .rig-readouts dd[data-state='on-data'] {
-  color: var(--meter);
-}
-
-.hamlib-demo .rig-controls {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(9rem, 12rem) 1fr;
-  align-items: center;
-  margin-top: 1rem;
-}
-
-/* On a phone the knob sits above the direct entry. */
-@container (max-width: 30rem) {
-  .hamlib-demo .rig-controls {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.hamlib-demo .rig-knob {
-  display: grid;
-  gap: 0.5rem;
-  justify-items: center;
-}
-
-.hamlib-demo .knob {
-  width: 9rem;
-  height: 9rem;
-  touch-action: none;
-}
-
-.hamlib-demo .knob-body {
-  fill: #22262d;
-}
-
-.hamlib-demo .knob-rim {
-  fill: none;
-  stroke: #3b414b;
-  stroke-width: 3;
-}
-
-.hamlib-demo .knob-cap {
-  fill: #2f343d;
-  stroke: #464d59;
-}
-
-.hamlib-demo .knob-mark {
-  fill: #9fb0c4;
-}
-
-.hamlib-demo .rig-step {
-  display: flex;
-  gap: 0.3rem;
-  align-items: center;
-}
-
-.hamlib-demo .rig-step button {
-  min-width: 2.2rem;
-  background: #2a2f37;
-  border-color: #454c58;
-  color: #e9edf3;
-}
-
-.hamlib-demo .rig-step select {
-  background: #2a2f37;
-  border-color: #454c58;
-  color: #e9edf3;
-}
-
-.hamlib-demo .rig-entry {
-  display: flex;
-  gap: 0.5rem;
-  align-items: end;
-}
-
-.hamlib-demo .rig-entry label {
-  display: grid;
-  gap: 0.3rem;
-  font-size: 0.8rem;
-  color: #9fb0c4;
-}
-
-.hamlib-demo .rig-entry input,
-.hamlib-demo .rig-entry button,
-.hamlib-demo .rig-modes button,
-.hamlib-demo .rig-passband button,
-.hamlib-demo .rig-ptt button {
-  background: #2a2f37;
-  border-color: #454c58;
-  color: #e9edf3;
-}
-
-.hamlib-demo .rig-modes,
-.hamlib-demo .rig-passband,
-.hamlib-demo .rig-ptt {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  align-items: center;
-  grid-column: 1 / -1;
-}
-
-/* The mode row is a fieldset now; the browser's own chrome is not wanted. */
-.hamlib-demo fieldset.rig-modes {
-  border: 0;
-  margin: 0;
-  padding: 0;
-  min-inline-size: 0;
-}
-
-.hamlib-demo .knob-wrap {
-  display: inline-flex;
-  border-radius: 50%;
-}
-
-.hamlib-demo .knob-wrap:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-}
-
-.hamlib-demo .rig-modes button[aria-pressed='true'] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.hamlib-demo .rig-label {
-  color: #9fb0c4;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  min-width: 6rem;
-}
-
-/* --- call log ----------------------------------------------------------- */
-
-.hamlib-demo .log {
-  display: grid;
-  gap: 0.75rem;
-}
-
 .hamlib-demo .log header {
   display: flex;
   justify-content: space-between;
@@ -460,7 +126,7 @@
   list-style: none;
   max-height: 24rem;
   overflow: auto;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-family: var(--__sl-font-mono);
   font-size: 0.8rem;
 }
 
@@ -477,7 +143,7 @@
 }
 
 .hamlib-demo .log li[data-api='raw'] code {
-  color: var(--success);
+  color: var(--sl-color-green);
 }
 
 .hamlib-demo .log li.empty {

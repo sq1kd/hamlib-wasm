@@ -6,9 +6,7 @@
  */
 import type { ReactElement } from 'react';
 
-export function megabytes(bytes: number): string {
-  return `${(bytes / 1_000_000).toFixed(1)} MB`;
-}
+import { megabytes } from '../bytes';
 
 export function DemoLoading(): ReactElement {
   return (

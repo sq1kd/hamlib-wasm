@@ -12,7 +12,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ComponentType, ReactElement } from 'react';
 
-import { DemoLoading, megabytes } from './DemoLoading';
+import { megabytes } from '../bytes';
+import { DemoLoading } from './DemoLoading';
 
 const SIZE = __DEMO_DOWNLOAD__;
 

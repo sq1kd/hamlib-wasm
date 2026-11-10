@@ -1,0 +1,170 @@
+/*
+ * The radio panel, on the landing page and the demo page alike.
+ *
+ * A lit display on a dark faceplate in both site themes: the panel carries
+ * its own colours instead of following Starlight's.
+ */
+.radio {
+  --r-surface: #0f141a;
+  --r-raised: #141b22;
+  --r-line: #1f2731;
+  --r-control: #161d25;
+  --r-control-line: #26303a;
+  --r-ink: #e8edf2;
+  --r-faint: #6b7884;
+  --r-accent: #59e0c5;
+  --r-accent-ink: #04211b;
+  --r-accent-dim: #3fbfa6;
+  --r-tx: #ffcf5a;
+
+  container-type: inline-size;
+  color: var(--r-ink);
+  font-family: var(--__sl-font);
+  font-size: 1rem;
+  line-height: 1.5;
+  background: linear-gradient(var(--r-raised), var(--r-surface));
+  border: 1px solid var(--r-line);
+  border-radius: 14px;
+  padding: 1.5rem;
+  box-shadow: 0 40px 90px -30px #000;
+  text-align: start;
+}
+
+.radio p { margin: 0; }
+
+/* Zero specificity, so every rule below still sets its own font. */
+:where(.radio) :where(button, select, input) { font: inherit; }
+
+fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; min-width: 0; }
+
+/* Header */
+.radio-head { display: flex; align-items: center; gap: 0.75rem; min-height: 1.9rem; }
+.radio-name { font-weight: 600; }
+.radio-meta { font-size: 0.875rem; color: var(--r-faint); font-variant-numeric: tabular-nums; }
+.radio-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--r-faint);
+  border: 1px solid var(--r-line);
+  padding: 0.2rem 0.65rem 0.2rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.radio-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.radio[data-state='connecting'] .radio-pill { color: var(--r-tx); border-color: #ffcf5a40; }
+.radio[data-state='connected'] .radio-pill { color: var(--r-accent); background: #59e0c514; border-color: #59e0c533; }
+.radio[data-state='connected'] .radio-pill::before { box-shadow: 0 0 0 3px #59e0c526; }
+
+/* Display */
+.radio-lcd { margin-top: 1rem; background: #061210; border: 1px solid #12352f; border-radius: 8px; padding: 1.25rem 1.4rem 1rem; }
+.radio-freq { display: flex; align-items: baseline; gap: 0.75rem; }
+.radio-seg { position: relative; font: min(3.9rem, 11cqi)/1 'DSEG7 Classic', monospace; color: var(--r-accent); white-space: pre; }
+.radio-ghost { color: #59e0c512; }
+.radio-lit { position: absolute; right: 0; top: 0; text-shadow: 0 0 14px #59e0c540; }
+.radio[data-sample] .radio-lit { color: #59e0c5b0; text-shadow: none; }
+.radio[data-state='connecting'] .radio-lit { color: #59e0c560; text-shadow: none; }
+.radio-unit { font-size: 1rem; font-weight: 500; color: #2fa891; }
+.radio-readout {
+  margin-left: auto;
+  display: grid;
+  justify-items: end;
+  gap: 0.15rem;
+  font: 0.85rem var(--__sl-font-mono);
+  color: var(--r-accent-dim);
+  align-self: center;
+  white-space: nowrap;
+}
+.radio-readout [data-testid='mode-display'] { color: var(--r-accent); font-size: 1rem; }
+.radio-tx { font-weight: 600; color: #07090c; background: var(--r-tx); padding: 0 0.45rem; border-radius: 4px; }
+
+.radio-modes { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.9rem; }
+.radio-modes button {
+  font: 500 0.75rem var(--__sl-font-mono);
+  padding: 0.15rem 0.45rem;
+  border: 1px solid #1d4a42;
+  border-radius: 4px;
+  background: none;
+  color: var(--r-accent-dim);
+}
+.radio-modes button:disabled { cursor: default; }
+.radio-modes button:not(:disabled) { cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+.radio-modes button:not(:disabled):hover { border-color: var(--r-accent); transform: translateY(-1px); }
+.radio-modes button[aria-pressed='true'] { background: var(--r-accent); color: var(--r-accent-ink); border-color: var(--r-accent); }
+
+.radio-meter { margin-top: 1rem; display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; }
+.radio-meter i { height: 9px; border-radius: 1px; background: #11302a; transition: background 0.12s; }
+.radio-meter i[data-on='on'] { background: var(--r-accent); }
+.radio-meter i[data-on='over'] { background: var(--r-tx); }
+.radio-scale { display: flex; justify-content: space-between; margin-top: 0.35rem; font: 0.7rem var(--__sl-font-mono); color: #2f7a6c; }
+
+/* Buttons and fields */
+.radio-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.68rem 1.2rem;
+  border: 0;
+  border-radius: 7px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--r-accent);
+  color: var(--r-accent-ink);
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+.radio-primary:hover:not(:disabled) { background: #7deccf; transform: translateY(-1px); }
+.radio-primary:active:not(:disabled) { transform: translateY(1px); }
+.radio-primary:disabled { background: #1d2a2f; color: var(--r-faint); cursor: not-allowed; }
+
+.radio-secondary,
+.radio-controls button,
+.radio-controls select,
+.radio-controls input,
+.radio-field select {
+  font-size: 0.9rem;
+  color: var(--r-ink);
+  background: var(--r-control);
+  border: 1px solid var(--r-control-line);
+  border-radius: 7px;
+  padding: 0.6rem 0.75rem;
+}
+.radio-secondary, .radio-controls button { cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+.radio-secondary:hover, .radio-controls button:hover:not(:disabled) { border-color: #3a4652; transform: translateY(-1px); }
+.radio-secondary:active, .radio-controls button:active:not(:disabled) { transform: translateY(1px); }
+.radio-controls :disabled, .radio-field select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Write controls (demo, connected) */
+.radio-controls { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; margin-top: 1rem; }
+.radio-group { display: flex; gap: 0.35rem; }
+.radio-entry { flex: 1; min-width: 12rem; }
+.radio-entry input { flex: 1; min-width: 0; font-family: var(--__sl-font-mono); }
+.radio-controls .radio-ptt button { color: var(--r-tx); border-color: #5c4c18; background: #2a2410; }
+
+/* Setup */
+.radio-setup { display: flex; gap: 0.6rem; margin-top: 1.1rem; align-items: end; }
+.radio-field { display: grid; gap: 0.3rem; font-size: 0.75rem; color: var(--r-faint); min-width: 0; }
+.radio-field select { width: 100%; padding-inline: 0.6rem; }
+.radio-field select:hover:not(:disabled) { border-color: #3a4652; }
+.radio-model { flex: 1; }
+.radio[data-state='connected'] .radio-field,
+.radio[data-state='connected'] [data-testid='connect-button'] { display: none; }
+.radio [data-testid='disconnect-button'] { display: none; }
+.radio[data-state='connected'] [data-testid='disconnect-button'] { display: inline-flex; margin-left: auto; }
+
+.radio-note { display: flex; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; margin-top: 0.85rem; font-size: 0.82rem; color: var(--r-faint); }
+.radio-note a { color: var(--r-accent); text-decoration: none; background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size 0.2s; }
+.radio-note a:hover { background-size: 100% 1px; }
+.radio-limitation { margin-top: 0.6rem; font-size: 0.85rem; color: var(--r-tx); }
+.radio-error { margin-top: 0.5rem; font-size: 0.85rem; color: var(--r-tx); }
+
+/* A narrow panel - a tablet's split column or a phone - puts the model on its own row. */
+@container (max-width: 34rem) {
+  .radio-setup { flex-wrap: wrap; }
+  .radio-model { flex: 1 1 100%; }
+  .radio-baud { flex: 1; }
+  .radio-readout { font-size: 0.75rem; }
+}

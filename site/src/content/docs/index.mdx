@@ -1,36 +1,33 @@
 ---
 title: hamlib-wasm
-description: Hamlib CAT control compiled to WebAssembly - Web Serial in the browser, serialport in Node and Electron.
+description: Control ham radios from a web page. Hamlib's CAT backends compiled to WebAssembly - Web Serial in the browser, serialport in Node and Electron.
 template: splash
 hero:
-  tagline: Hamlib's own CAT backends, compiled to WebAssembly. Talk to your radio from a web page over Web Serial, or from Node and Electron over serialport - no native helper to install.
+  title: Control your radio from a web page.
+  tagline: Hamlib's own CAT backends, compiled to WebAssembly. Web Serial in Chrome, Edge and Firefox; serialport in Node and Electron. Nothing native to install.
   actions:
-    - text: Get started
+    - text: Read the guide
       link: getting-started/
-      icon: right-arrow
-    - text: Try the live demo
-      link: demo/
-      icon: rocket
-      variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid>
-  <Card title="Upstream Hamlib, not a port" icon="approve-check">
-    The rig backends are the pinned upstream Hamlib release compiled with
-    Emscripten. A model behaves the way `rigctl` drives it.
+  <Card title="Same backends as rigctl" icon="approve-check">
+    The rig backends are the pinned upstream Hamlib release, compiled with
+    Emscripten, not a port. A model behaves the way `rigctl` drives it.
   </Card>
-  <Card title="Two API surfaces" icon="puzzle">
-    A default surface with snapshots, events and booleans, and a raw surface with
-    a typed method per upstream Hamlib call - on the same rig.
+  <Card title="One rig object, or every Hamlib call" icon="puzzle">
+    Start with state snapshots, events and plain booleans. When you need split,
+    memories or antennas, `rig.raw` has a typed method per Hamlib call, on the
+    same connection.
   </Card>
   <Card title="Browser, Node and Electron" icon="laptop">
-    Web Serial in desktop Chromium-based browsers and Firefox 151+; the
-    `serialport` package in Node and an Electron main process.
+    Web Serial in desktop Chrome, Edge and Firefox 151+; the `serialport`
+    package in Node and an Electron main process. One API in all three.
   </Card>
   <Card title="React hooks" icon="seti:react">
-    A provider and hooks that own the module, the rig and the polling, and get
-    StrictMode and unmount races right.
+    A provider and hooks that own the module, the rig and the polling, and
+    survive StrictMode double mounts and unmounts mid-call.
   </Card>
 </CardGrid>

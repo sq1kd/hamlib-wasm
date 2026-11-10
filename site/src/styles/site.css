@@ -1,4 +1,101 @@
-/* The live demo's loader: everything else on the site is Starlight's own. */
+/*
+ * The site's look: Starlight's own components, re-coloured and re-set.
+ *
+ * Dark is a near-black ground with a teal accent and amber for transmit, the
+ * colours of the landing page's radio display; light keeps the same teal,
+ * darkened for contrast.  Type is IBM Plex Sans and Mono; the radio's
+ * frequency readout is DSEG7, loaded only by the pages that show it.
+ */
+@font-face {
+  font-family: 'DSEG7 Classic';
+  src: url('../fonts/dseg/DSEG7Classic-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+
+:root {
+  --sl-font: 'IBM Plex Sans';
+  --sl-font-mono: 'IBM Plex Mono';
+}
+
+:root,
+::backdrop {
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e8edf2;
+  --sl-color-gray-2: #c3ccd5;
+  --sl-color-gray-3: #8e9aa6;
+  --sl-color-gray-4: #5f6b77;
+  --sl-color-gray-5: #26303a;
+  --sl-color-gray-6: #10161c;
+  --sl-color-black: #07090c;
+  --sl-color-accent-low: #0f3a33;
+  --sl-color-accent: #2fbfa3;
+  --sl-color-accent-high: #59e0c5;
+  --sl-color-bg-nav: #07090c;
+  /* Notes and tips: the teal family, not Starlight's indigo and purple. */
+  --sl-color-blue-low: #0b2622;
+  --sl-color-blue: #2fbfa3;
+  --sl-color-blue-high: #a6f2e2;
+  --sl-color-purple-low: #0b2622;
+  --sl-color-purple: #2fbfa3;
+  --sl-color-purple-high: #a6f2e2;
+  --sl-color-hairline-light: #26303a;
+  --sl-color-hairline: #1a222b;
+}
+
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+  --sl-color-white: #07090c;
+  --sl-color-gray-1: #141b22;
+  --sl-color-gray-2: #26303a;
+  --sl-color-gray-3: #4b5764;
+  --sl-color-gray-4: #75818d;
+  --sl-color-gray-5: #c3ccd5;
+  --sl-color-gray-6: #e6ebef;
+  --sl-color-gray-7: #f4f7f9;
+  --sl-color-black: #ffffff;
+  --sl-color-accent-low: #d2f4ec;
+  --sl-color-accent: #14937b;
+  --sl-color-accent-high: #0b5c4d;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-blue-low: #e1f6f1;
+  --sl-color-blue: #14937b;
+  --sl-color-blue-high: #0b5c4d;
+  --sl-color-purple-low: #e1f6f1;
+  --sl-color-purple: #14937b;
+  --sl-color-purple-high: #0b5c4d;
+}
+
+/* Every card icon in the one accent, not Starlight's rotating colours. */
+.card .icon {
+  color: var(--sl-color-accent-high);
+  background-color: var(--sl-color-accent-low);
+  border-color: var(--sl-color-accent-low);
+}
+
+/* The landing page: the hero runs edge to edge, the cards below keep a wrap. */
+[data-has-hero] main {
+  overflow-x: clip;
+}
+
+[data-has-hero] .content-panel {
+  padding: 0;
+}
+
+[data-has-hero] .content-panel > .sl-container {
+  max-width: none;
+}
+
+[data-has-hero] .sl-markdown-content,
+[data-has-hero] .content-panel footer {
+  width: min(75rem, 100% - 2 * var(--sl-content-pad-x));
+  margin-inline: auto;
+}
+
+[data-has-hero] .sl-markdown-content {
+  padding-block: 4rem 2rem;
+}
+
+/* The live demo's loader. */
 .live-demo-loader {
   margin-top: 1.5rem;
   padding: 1.25rem;

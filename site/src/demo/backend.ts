@@ -7,7 +7,7 @@
  *
  *  - `rig`: the rig's own methods, and `useRigState` polling through the
  *    library's `watch()` - one `refresh()`-style snapshot, the passband filled
- *    in from the model;
+ *    in from the model - with the S-meter on a second, faster registration;
  *  - `raw`: the same screen through `rig.raw`, the `RawRig` - explicit
  *    `getFrequency()`/`getMode()`/`getPtt()` reads polled by hand and an
  *    explicit passband on every `setMode()`.
@@ -21,7 +21,8 @@ import type { RigCapabilities, Rig, PttState, RigState, SerialPortLike } from 'h
 import type { RawRig } from 'hamlib-wasm/raw';
 import { useRig, useRigError, useRigState } from 'hamlib-wasm/react';
 
-import type { PassbandKind } from './RigPanel';
+import { POLL_MS } from '../radio/format';
+import type { PassbandKind } from '../radio/RadioPanel';
 
 export type Api = 'rig' | 'raw';
 
@@ -32,8 +33,6 @@ export interface LogEntry {
 
 export type Log = (entry: LogEntry) => void;
 
-/** How often a connected rig is re-read, in milliseconds. */
-export const POLL_MS = 1000;
 
 const NO_CAPABILITIES: RigCapabilities = {
   getFrequency: false,
@@ -114,11 +113,16 @@ export interface Backend {
 export function useBackend(api: Api, log: Log): Backend {
   const { rig, connecting, error: connectError, connect, disconnect } = useRig();
 
-  /* rig: the library polls.  The demo shows meters, so it asks for levels. */
+  /* rig: the library polls - frequency, mode and PTT once a second, and the
+   * S-meter on its own faster timer, so it moves while the slower reads wait.
+   * Both registrations publish into the one snapshot each hook returns. */
   const rigState = useRigState(api === 'rig' ? rig : undefined, {
-    pollMs: POLL_MS,
-    fields: ['frequency', 'mode', 'ptt', 'levels'],
+    pollMs: POLL_MS.telemetry,
+    fields: ['frequency', 'mode', 'ptt'],
   });
+  const metered = api === 'rig' && rig !== undefined && rig.capabilities.levels.length > 0;
+
+  useRigState(metered ? rig : undefined, { pollMs: POLL_MS.meter, fields: ['levels'] });
   const rigError = useRigError(rig);
 
   /* raw: the app polls, and orders its own multi-call actions. */
@@ -168,7 +172,7 @@ export function useBackend(api: Api, log: Log): Backend {
     };
 
     poll();
-    const timer = setInterval(poll, POLL_MS);
+    const timer = setInterval(poll, POLL_MS.telemetry);
 
     return () => {
       live = false;
@@ -198,7 +202,8 @@ export function useBackend(api: Api, log: Log): Backend {
       });
 
       if (!isRaw) {
-        log({ api, call: `useRigState(rig, { pollMs: ${String(POLL_MS)} })` });
+        log({ api, call: `useRigState(rig, { pollMs: ${String(POLL_MS.telemetry)} })` });
+        log({ api, call: `useRigState(rig, { pollMs: ${String(POLL_MS.meter)}, fields: ['levels'] })` });
       }
     },
     disconnect: async () => {

@@ -1,0 +1,201 @@
+---
+/**
+ * The landing page's hero, replacing Starlight's.
+ *
+ * Everything here is HTML at build time: the copy, the facts, the model list
+ * and a read-only radio panel.  Two small scripts bring it to life - the
+ * waterfall behind it, and the panel, which loads Hamlib only once a reader
+ * connects a radio.
+ */
+import { megabytes } from '../bytes';
+import { ratesFor } from '../radio/detect';
+import { RadioPanel } from '../radio/RadioPanel';
+import { SAMPLE_STATE } from '../radio/simulate';
+import '../radio/radio.css';
+
+const { data } = Astro.locals.starlightRoute.entry;
+const { title = data.title, tagline, actions = [] } = data.hero ?? {};
+const primary = actions[0];
+
+const catalogue = __CATALOGUE__;
+const { models } = catalogue;
+
+/* The emulator-tested Kenwood is the default; a returning reader's pick wins in the script. */
+const defaultId = models.find((model) => model.model === 'TS-480')?.id;
+const demo = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}demo/`;
+---
+
+<section class="hw-hero" aria-labelledby="_top">
+  <canvas class="hw-waterfall" width="960" height="540" aria-hidden="true" data-waterfall></canvas>
+  <div class="hw-wrap">
+    <div class="hw-copy">
+      <h1 id="_top" data-page-title set:html={title} />
+      {tagline && <p class="hw-lede" set:html={tagline} />}
+      <div class="hw-actions">
+        {primary && <a class="hw-btn" href={primary.link}>{primary.text}</a>}
+        <button class="hw-npm" type="button" data-copy="npm i hamlib-wasm" aria-label="Copy the install command">
+          <span aria-hidden="true">$</span> npm i hamlib-wasm
+        </button>
+      </div>
+      <dl class="hw-facts">
+        <div><dt>{catalogue.models.length}</dt><dd>serial radio models</dd></div>
+        <div><dt>{megabytes(__DEMO_DOWNLOAD__.gzip)}</dt><dd>gzip, Hamlib {catalogue.version}</dd></div>
+        <div><dt>QMX+ · FT-710</dt><dd>tested on real radios</dd></div>
+      </dl>
+    </div>
+
+    <div class="hw-side">
+      <RadioPanel
+        prerender
+        view={{ phase: 'disconnected', sample: true, name: 'No radio connected', meta: 'sample readings', pill: 'Sample', state: SAMPLE_STATE }}
+        models={models}
+        modelId={defaultId}
+        baud="auto"
+        rates={ratesFor(0, 0)}
+        serial
+        locked={false}
+        note="Read-only: this panel never writes to your radio."
+        link={{ href: demo, text: 'Full demo with controls' }}
+      />
+
+      <pre class="hw-code"><code><span class="k">const</span> rig = <span class="k">await</span> hamlib.open({'{'} modelId, baudRate: <span class="s">38400</span> {'}'});
+<span class="k">const</span> {'{'} frequency, mode {'}'} = <span class="k">await</span> rig.refresh();
+<span class="k">await</span> rig.setFrequency(<span class="s">14_074_000</span>);  <span class="c">// Hz</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { mountRadio } from '../landing/radio';
+  import { startWaterfall } from '../landing/waterfall';
+
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-waterfall]');
+  const radio = document.querySelector<HTMLElement>('[data-radio]');
+
+  if (canvas !== null) startWaterfall(canvas);
+  if (radio !== null) mountRadio(radio);
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+    button.addEventListener('click', () => {
+      void navigator.clipboard.writeText(button.dataset.copy ?? '').then(() => {
+        button.dataset.copied = '';
+        setTimeout(() => { delete button.dataset.copied; }, 1500);
+      });
+    });
+  }
+</script>
+
+<style>
+  /* The hero is a dark band in both themes: the radio is a lit display. */
+  .hw-hero {
+    --bg: #07090c; --surface: #0f141a; --raised: #141b22; --line: #1f2731;
+    --ink: #e8edf2; --muted: #a7b2bd; --faint: #6b7884;
+    --accent: #59e0c5; --accent-ink: #04211b; --tx: #ffcf5a;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: calc(100svh - var(--sl-nav-height));
+    display: grid;
+    align-items: center;
+  }
+
+  .hw-waterfall {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    mask: linear-gradient(90deg, #0000 30%, #0006 48%, #000 72%) intersect, linear-gradient(#0000, #000 14%, #000 80%, #0000);
+  }
+
+  .hw-wrap {
+    width: min(75rem, 100% - 2 * var(--sl-content-pad-x));
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 4rem;
+    align-items: center;
+    padding-block: 3rem;
+  }
+
+  h1 {
+    font-size: clamp(2.4rem, 1.2rem + 3vw, 3.9rem);
+    line-height: 1.03;
+    letter-spacing: -0.022em;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .hw-lede {
+    font-size: 1.19rem;
+    line-height: 1.55;
+    margin-top: 1.4rem;
+    max-width: 33em;
+    color: var(--muted);
+  }
+
+  .hw-actions { display: flex; gap: 0.75rem; margin-top: 2.1rem; flex-wrap: wrap; }
+
+  .hw-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.85rem 1.4rem;
+    border: 0;
+    border-radius: 8px;
+    font: 500 1rem var(--__sl-font);
+    text-decoration: none;
+    background: var(--accent);
+    color: var(--accent-ink);
+    cursor: pointer;
+    transition: transform 0.15s, background 0.15s;
+  }
+  .hw-btn:hover { background: #7deccf; transform: translateY(-1px); color: var(--accent-ink); }
+  .hw-btn:active { transform: translateY(1px); }
+  .hw-btn:disabled { background: #1d2a2f; color: var(--faint); cursor: not-allowed; transform: none; }
+
+  .hw-npm {
+    font: 0.94rem var(--__sl-font-mono);
+    padding: 0.8rem 1.1rem;
+    border-radius: 8px;
+    background: #0d1217e6;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    cursor: copy;
+    transition: border-color 0.15s;
+  }
+  .hw-npm span { color: var(--accent); }
+  .hw-npm:hover { border-color: #33404c; }
+  .hw-npm[data-copied]::after { content: '  copied'; color: var(--accent); }
+
+  .hw-facts { display: flex; flex-wrap: wrap; gap: 1rem 0; margin-top: 2.9rem; }
+  .hw-facts div { padding-right: 1.4rem; margin-right: 1.4rem; border-right: 1px solid var(--line); }
+  .hw-facts div:last-child { border: 0; }
+  .hw-facts dt { font: 500 1.35rem var(--__sl-font-mono); color: var(--ink); }
+  .hw-facts dd { margin: 0.1rem 0 0; font-size: 0.875rem; color: var(--faint); }
+
+  .hw-code {
+    margin-top: 1rem;
+    background: #0a0e12e6;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    font: 0.84rem/1.7 var(--__sl-font-mono);
+    color: #b3bec8;
+    overflow: auto;
+  }
+  .hw-code .k { color: var(--accent); }
+  .hw-code .s { color: var(--tx); }
+  .hw-code .c { color: var(--faint); }
+
+  @media (max-width: 62rem) {
+    .hw-wrap { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
+    .hw-waterfall { opacity: 0.35; mask: linear-gradient(#000 0, #0006 25%, #0000 45%); }
+  }
+
+  @media (max-width: 34rem) {
+    .hw-btn, .hw-npm { width: 100%; justify-content: center; }
+    .hw-facts div:nth-child(2) { border: 0; }
+  }
+</style>

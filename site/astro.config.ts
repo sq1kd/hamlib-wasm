@@ -4,6 +4,7 @@ import { defineConfig } from 'astro/config';
 import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
 
 import { hamlibLicensing } from './integrations/licensing';
+import { readCatalogue } from './integrations/catalogue';
 import { measureDemoDownload } from './integrations/demo-size';
 
 /*
@@ -37,7 +38,14 @@ export default defineConfig({
           social: [{ icon: 'github', label: 'GitHub', href: repositoryUrl }],
           editLink: { baseUrl: `${repositoryUrl}/edit/main/site/` },
         }),
-      customCss: ['./src/styles/site.css'],
+      logo: { src: './src/assets/logo.svg' },
+      components: { Hero: './src/components/Hero.astro' },
+      customCss: [
+        '@fontsource/ibm-plex-sans/latin-400.css',
+        '@fontsource/ibm-plex-sans/latin-600.css',
+        '@fontsource/ibm-plex-mono/latin-400.css',
+        './src/styles/site.css',
+      ],
       disable404Route: true,
       plugins: [
         starlightTypeDoc({
@@ -96,6 +104,7 @@ export default defineConfig({
     define: {
       __REPOSITORY_URL__: JSON.stringify(repositoryUrl ?? null),
       __DEMO_DOWNLOAD__: JSON.stringify(measureDemoDownload()),
+      __CATALOGUE__: JSON.stringify(await readCatalogue()),
     },
   },
   /* Bind explicitly: `localhost` resolves to ::1 on Node 17+.  `astro dev` and

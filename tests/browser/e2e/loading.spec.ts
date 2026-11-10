@@ -44,13 +44,13 @@ test('remembers the model and the call log toggle across visits', async ({ page 
   await page.goto(REACT_URL);
 
   await expect(page.getByTestId('model-select')).toBeEnabled();
-  await page.getByTestId('model-select').selectOption({ label: 'FRG-100' });
+  await page.getByTestId('model-select').selectOption({ label: 'Yaesu FRG-100' });
   await page.getByTestId('show-calls').check();
 
   await page.reload();
 
   await expect(page.getByTestId('model-select')).toBeEnabled();
-  await expect(page.getByTestId('model-select').locator('option:checked')).toHaveText('FRG-100');
+  await expect(page.getByTestId('model-select').locator('option:checked')).toHaveText('Yaesu FRG-100');
   await expect(page.getByTestId('show-calls')).toBeChecked();
   await expect(page.getByTestId('call-log')).toBeVisible();
 });

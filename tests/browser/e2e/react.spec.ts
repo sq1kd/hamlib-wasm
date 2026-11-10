@@ -28,7 +28,7 @@ import {
 const REACT_URL = 'http://127.0.0.1:4176/demo/';
 
 /** The TS-480 the emulator starts on. */
-const TS480_FREQUENCY = '14,074,000';
+const TS480_FREQUENCY = '14.074.000';
 const TS480_MODE = 'USB';
 
 test.beforeEach(async ({ page }) => {
@@ -40,9 +40,10 @@ test.beforeEach(async ({ page }) => {
   await page.getByTestId('show-calls').check();
 });
 
-/** The page preselects the TS-480, so connecting is the gesture on its own. */
+/** The page preselects the TS-480; the rate is its highest, so the open is one attempt. */
 async function connect(page: Page): Promise<void> {
   await expect(page.getByTestId('model-select')).toBeEnabled();
+  await page.getByTestId('baud-select').selectOption({ index: 1 });
   await page.getByTestId('connect-button').click();
   await runClockUntilElement(page, { testId: 'frequency-display', text: TS480_FREQUENCY });
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected');
@@ -55,8 +56,8 @@ test('drives a rig through the rig backend', async ({ page }) => {
 
   /* The panel reads through the backend poll and its own step buttons. */
   await page.getByTestId('tune-up').click();
-  await runClockUntilElement(page, { testId: 'frequency-display', text: '14,075,000' });
-  await expect(page.getByTestId('frequency-display')).toHaveText('14,075,000');
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '14.075.000' });
+  await expect(page.getByTestId('frequency-display')).toHaveText('14.075.000');
 
   await page.getByTestId('mode-CW').click();
   await runClockUntilElement(page, { testId: 'mode-display', text: 'CW' });
@@ -74,8 +75,8 @@ test('drives a rig through the rig backend', async ({ page }) => {
   /* A direct entry goes through setFrequency once, not the step size. */
   await page.getByTestId('frequency-input').fill('7074000');
   await page.getByTestId('frequency-set').click();
-  await runClockUntilElement(page, { testId: 'frequency-display', text: '7,074,000' });
-  await expect(page.getByTestId('frequency-display')).toHaveText('7,074,000');
+  await runClockUntilElement(page, { testId: 'frequency-display', text: '7.074.000' });
+  await expect(page.getByTestId('frequency-display')).toHaveText('7.074.000');
 
   /* The rig logging: the poll is a declaration, and the mode call carries no
    * width because the library fills it in from the model. */
@@ -173,11 +174,23 @@ for (const backend of ['rig', 'raw'] as const) {
   }
 }
 
+test('Auto-detect is the default: it finds the rate, connects and keeps the rate', async ({ page }) => {
+  await expect(page.getByTestId('model-select')).toBeEnabled();
+  await expect(page.getByTestId('baud-select')).toHaveValue('auto');
+
+  await page.getByTestId('connect-button').click();
+  await runClockUntilElement(page, { testId: 'frequency-display', text: TS480_FREQUENCY });
+
+  await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected');
+  await expect(page.getByTestId('call-log')).toContainText('detectBaudRate(');
+  await expect(page.getByTestId('baud-select')).not.toHaveValue('auto');
+});
+
 test('reports the backend that cannot open a rig', async ({ page }) => {
   /* The catalogue carries the recorded reason, and the page shows it before a
    * user gesture is spent on a port. */
   await expect(page.getByTestId('model-select')).toBeEnabled();
-  await page.getByTestId('model-select').selectOption({ label: 'FT-757GXII' });
+  await page.getByTestId('model-select').selectOption({ label: 'Yaesu FT-757GXII' });
 
   await expect(page.getByTestId('model-limitation')).toContainText('FT-757GXII');
 });
