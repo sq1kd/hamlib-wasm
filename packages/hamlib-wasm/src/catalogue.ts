@@ -48,7 +48,8 @@ export interface RigModel extends RigModelCapabilities {
    * the Web Serial double; `"candidate"` when only Hamlib's
    * `RIG_PORT_SERIAL` classification backs it.
    *
-   * This never claims hardware testing - see {@link VERIFIED_MODELS}.
+   * It reports emulator coverage only, not hardware runs - see
+   * {@link VERIFIED_MODELS}.
    */
   support: BrowserSupport;
   /**

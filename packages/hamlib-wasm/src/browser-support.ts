@@ -9,8 +9,8 @@
  * explicit and testable:
  *
  *   - {@link VERIFIED_MODELS} lists the models a committed browser test drives
- *     through the real Web Serial double.  It means "covered here", never
- *     "tried against hardware".
+ *     through the real Web Serial double.  It means "covered here by an
+ *     emulator"; the opt-in hardware suite (`tests/hardware`) is separate.
  *   - {@link describeLineSettingsLimitation} names the line settings a backend
  *     declares that Web Serial cannot express, so a model that would fail at
  *     open says so up front.

@@ -305,8 +305,10 @@ carries:
 
 `VERIFIED_MODELS` lists the verified models (the Kenwood TS-480, the Icom IC-703
 over CI-V and the Yaesu FT-710 over newcat) with their evidence, and
-`UNUSABLE_MODELS` the recorded reasons. "Verified" never means tested against
-hardware. The browser suite runs in both Chromium and Firefox.
+`UNUSABLE_MODELS` the recorded reasons. "Verified" is about the emulated rigs
+in CI; the browser suite runs in both Chromium and Firefox. Separately, an
+opt-in hardware suite drives real radios through the Node transport: the QRP
+Labs QMX+ and the Yaesu FT-710.
 
 A model that declares settings the serial transport cannot express fails with
 `-RIG_ECONF` before the port is opened, so a user never ends up on a silently

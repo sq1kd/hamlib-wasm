@@ -18,10 +18,19 @@ it is supported:
 `VERIFIED_MODELS` lists the verified models with the tests that cover them, and
 `UNUSABLE_MODELS` the models that cannot work in this build and why.
 
+:::note[Tested on real radios]
+Two radios on the author's desk run the opt-in hardware suite
+(`mise run test-hardware`): the **QRP Labs QMX+** and the **Yaesu FT-710**.
+It opens each one through the shipped Node transport and the real Wasm build,
+reads frequency, mode and PTT, and can round-trip a frequency write.
+:::
+
 :::caution
-"Verified" means covered by an emulator-backed test in this repository - the
-Kenwood TS-480, the Icom IC-703 over CI-V and the Yaesu FT-710 over newcat. It never means tested
-against hardware. Every other model is a candidate: worth trying, not promised.
+`support: "verified"` is narrower than "works": it means a browser test in this
+repository drives the model through an emulated serial port, in Chromium and
+Firefox, on every change - the Kenwood TS-480, the Icom IC-703 over CI-V and the
+Yaesu FT-710 over newcat. Every other model is a candidate: worth trying, not
+promised.
 :::
 
 ## Line settings
