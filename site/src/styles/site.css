@@ -15,6 +15,13 @@
 :root {
   --sl-font: 'IBM Plex Sans';
   --sl-font-mono: 'IBM Plex Mono';
+
+  /* One set of corners for the whole site: chips and tags, boxes and
+   * buttons, the radio's faceplates, and fully round pills. */
+  --hw-radius-sm: 0.25rem;
+  --hw-radius: 0.5rem;
+  --hw-radius-lg: 0.875rem;
+  --hw-radius-pill: 999rem;
 }
 
 :root,
@@ -65,6 +72,23 @@
   --sl-color-purple-high: #0b5c4d;
 }
 
+/* Starlight rounds its link cards but not its cards, asides or code blocks;
+ * here every box shares the link cards' corners, border and shadow. */
+.card,
+.sl-link-card {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: var(--hw-radius);
+  box-shadow: var(--sl-shadow-sm);
+}
+
+.starlight-aside {
+  border-radius: var(--hw-radius);
+}
+
+.sl-markdown-content :not(pre) > code {
+  border-radius: var(--hw-radius-sm);
+}
+
 /* Every card icon in the one accent, not Starlight's rotating colours. */
 .card .icon {
   color: var(--sl-color-accent-high);
@@ -100,7 +124,7 @@
   margin-top: 1.5rem;
   padding: 1.25rem;
   border: 1px dashed var(--sl-color-hairline-light);
-  border-radius: 0.5rem;
+  border-radius: var(--hw-radius);
   text-align: center;
   /* Roughly the height of the setup card, so the page does not jump. */
   min-height: 14rem;
@@ -114,7 +138,7 @@
   font-weight: 600;
   padding: 0.6rem 1.2rem;
   border: 0;
-  border-radius: 999rem;
+  border-radius: var(--hw-radius);
   color: var(--sl-color-black);
   background: var(--sl-color-accent-high);
   cursor: pointer;

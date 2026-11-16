@@ -65,7 +65,7 @@
   grid-template-rows: auto minmax(0, 1fr);
   background: linear-gradient(#0d1217, #0a0e12);
   border: 1px solid var(--c-line);
-  border-radius: 14px;
+  border-radius: var(--hw-radius-lg);
   color: var(--c-ink);
   overflow: hidden;
 }
@@ -89,7 +89,7 @@
   display: inline-flex;
   padding: 2px;
   border: 1px solid var(--c-line);
-  border-radius: 7px;
+  border-radius: var(--hw-radius);
 }
 
 .hamlib-demo .console-api label {
@@ -108,7 +108,7 @@
 .hamlib-demo .console-api span {
   display: block;
   padding: 0.15rem 0.75rem;
-  border-radius: 5px;
+  border-radius: calc(var(--hw-radius) - 2px);
   font-size: 0.8rem;
   color: var(--c-faint);
   transition: color 0.15s, background 0.15s;
@@ -137,7 +137,7 @@
   color: var(--c-ink);
   background: none;
   border: 1px solid var(--c-line);
-  border-radius: 6px;
+  border-radius: var(--hw-radius);
   padding: 0.15rem 0.65rem;
   cursor: pointer;
 }
@@ -200,6 +200,6 @@
 .hamlib-demo .console .console-empty ol {
   padding: 0.7rem 0.9rem;
   border: 1px dashed var(--c-line);
-  border-radius: 8px;
+  border-radius: var(--hw-radius);
   color: #7f8c98;
 }

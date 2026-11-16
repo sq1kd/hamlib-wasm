@@ -26,7 +26,7 @@
   line-height: 1.5;
   background: linear-gradient(var(--r-raised), var(--r-surface));
   border: 1px solid var(--r-line);
-  border-radius: 14px;
+  border-radius: var(--hw-radius-lg);
   padding: 1.5rem;
   text-align: start;
 }
@@ -53,7 +53,7 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   color: var(--r-faint);
   border: 1px solid var(--r-line);
   padding: 0.2rem 0.65rem 0.2rem 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--hw-radius-pill);
   white-space: nowrap;
 }
 .radio-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
@@ -71,7 +71,7 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   background: none;
   border: 1px solid #59e0c533;
   border-left-color: #59e0c51f;
-  border-radius: 0 999px 999px 0;
+  border-radius: 0 var(--hw-radius-pill) var(--hw-radius-pill) 0;
   margin-left: -1px;
   padding: 0.2rem 0.75rem 0.2rem 0.6rem;
   white-space: nowrap;
@@ -80,10 +80,10 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
 }
 .radio-disconnect:hover { color: var(--r-ink); background: #59e0c50f; }
 .radio[data-state='connected'] .radio-disconnect { display: inline-flex; }
-.radio[data-state='connected'] .radio-pill { border-radius: 999px 0 0 999px; }
+.radio[data-state='connected'] .radio-pill { border-radius: var(--hw-radius-pill) 0 0 var(--hw-radius-pill); }
 
 /* Display */
-.radio-lcd { margin-top: 1rem; background: #061210; border: 1px solid #12352f; border-radius: 8px; padding: 1.25rem 1.4rem 1rem; }
+.radio-lcd { margin-top: 1rem; background: #061210; border: 1px solid #12352f; border-radius: var(--hw-radius); padding: 1.25rem 1.4rem 1rem; }
 .radio-freq { display: flex; align-items: baseline; gap: 0.75rem; }
 .radio-seg { position: relative; font: min(3.9rem, 11cqi)/1 'DSEG7 Classic', monospace; color: var(--r-accent); white-space: pre; }
 .radio-ghost { color: #59e0c512; }
@@ -102,14 +102,14 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   white-space: nowrap;
 }
 .radio-readout [data-testid='mode-display'] { color: var(--r-accent); font-size: 1rem; }
-.radio-tx { font-weight: 600; color: #07090c; background: var(--r-tx); padding: 0 0.45rem; border-radius: 4px; }
+.radio-tx { font-weight: 600; color: #07090c; background: var(--r-tx); padding: 0 0.45rem; border-radius: var(--hw-radius-sm); }
 
 .radio-modes { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.9rem; }
 .radio-modes button {
   font: 500 0.75rem var(--__sl-font-mono);
   padding: 0.15rem 0.45rem;
   border: 1px solid #1d4a42;
-  border-radius: 4px;
+  border-radius: var(--hw-radius-sm);
   background: none;
   color: var(--r-accent-dim);
 }
@@ -133,7 +133,7 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   height: var(--r-control-h);
   padding: 0 1.2rem;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--hw-radius);
   font-weight: 500;
   white-space: nowrap;
   background: var(--r-accent);
@@ -153,7 +153,7 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   color: var(--r-ink);
   background: var(--r-control);
   border: 1px solid var(--r-control-line);
-  border-radius: 7px;
+  border-radius: var(--hw-radius);
   box-sizing: border-box;
   height: var(--r-control-h);
   padding: 0 0.75rem;
@@ -180,8 +180,8 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
 /* Joined groups: one control split in segments, as on a front panel. */
 .radio-joined { gap: 0; }
 .radio-joined > * { border-radius: 0; margin-left: -1px; }
-.radio-joined > :first-child { border-radius: 7px 0 0 7px; margin-left: 0; }
-.radio-joined > :last-child { border-radius: 0 7px 7px 0; }
+.radio-joined > :first-child { border-radius: var(--hw-radius) 0 0 var(--hw-radius); margin-left: 0; }
+.radio-joined > :last-child { border-radius: 0 var(--hw-radius) var(--hw-radius) 0; }
 .radio-controls .radio-joined > :hover:not(:disabled), .radio-controls .radio-joined > :focus-visible { position: relative; z-index: 1; transform: none; }
 
 /* PTT: held to transmit, amber while held and while the radio reports itself keyed. */

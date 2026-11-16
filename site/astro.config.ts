@@ -40,6 +40,8 @@ export default defineConfig({
         }),
       logo: { src: './src/assets/logo.svg' },
       components: { Hero: './src/components/Hero.astro' },
+      /* Code blocks take the site's box corners from site.css. */
+      expressiveCode: { styleOverrides: { borderRadius: 'var(--hw-radius)' } },
       customCss: [
         '@fontsource/ibm-plex-sans/latin-400.css',
         '@fontsource/ibm-plex-sans/latin-600.css',
