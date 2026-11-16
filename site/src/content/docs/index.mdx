@@ -14,7 +14,7 @@ hero:
       link: getting-started/
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 <CardGrid>
   <Card title="Same backends as rigctl" icon="approve-check">
@@ -35,3 +35,23 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     survive StrictMode double mounts and unmounts mid-call.
   </Card>
 </CardGrid>
+
+## Where to next
+
+<div class="next-steps">
+  <LinkCard
+    title="Write your first connection"
+    description="Install the package, find your radio in the catalogue and read its frequency in a dozen lines."
+    href="getting-started/"
+  />
+  <LinkCard
+    title="Try it on your radio"
+    description="Plug in over USB and drive it from the live demo, watching every Hamlib call it makes."
+    href="demo/"
+  />
+  <LinkCard
+    title="See how it works"
+    description="Why we build on Hamlib instead of starting over, and how one call reaches the radio."
+    href="how-it-works/"
+  />
+</div>

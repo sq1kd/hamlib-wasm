@@ -209,3 +209,20 @@ body:has(.hamlib-demo, .live-demo-loader) {
     contain: size;
   }
 }
+
+/* The landing page's last row: three ways on, side by side once there is room. */
+.next-steps {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Outranks Starlight's margin between sibling blocks in page content. */
+.sl-markdown-content .next-steps > * {
+  margin: 0;
+}
+
+@media (min-width: 50rem) {
+  .next-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
