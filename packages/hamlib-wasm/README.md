@@ -403,75 +403,41 @@ const rig = await hamlib.open({
 
 ## How it works
 
-```mermaid
-graph TD
-  A[TypeScript API] --> B[Embind facade + generated registrations]
-  B --> C[Hamlib backends, unmodified]
-  C --> D[iofunc.c and sleep.c, unmodified]
-  D -->|"Wl,--wrap=read/write/select/nanosleep"| E[wrapped_io.cpp: handle dispatch]
-  E --> F[web_serial.c: serial contract + fd registry]
-  F --> G[web_serial.ts: queue, waiters, signals]
-  G --> H[SerialPort: Web Serial in the browser, node-serialport in Node]
-```
+The documentation site's *How it works* page follows one call through every
+layer and walks through the build. In short:
 
-* **Synchronous C, asynchronous I/O** - Hamlib's API is blocking; Web Serial
-  and node-serialport are promise based. Emscripten's Asyncify suspends the C
-  stack while a port promise settles.
-* **The transport is replaced, not patched in** - the project's serial layer
-  stands in for upstream's `src/serial.c`, and link-time wrappers redirect the
-  `read()`/`write()`/`select()`/`nanosleep()` calls the common port layer makes
-  for a serial port to it. Upstream's own read loop, 7 data bit masking, retry
-  accounting and timeout handling stay in charge.
-* **One small upstream patch** - the pinned patch skips the Morse worker
-  start in `rig_open()`, which the single threaded build cannot support, and
-  leaves the network, parallel, device and dummy rig models unregistered so
-  the linker drops their code. Those models could never be opened over a
-  serial port; the catalogue lists exactly the same models either way.
-  Everything else `rig_open()` does still runs.
-* **Public API only** - the facade reaches Hamlib through
-  `rig_init()`/`rig_open()`/`rig_close()` and `rig_token_lookup()` +
-  `rig_set_conf()`; it never writes a `rig_state` or `hamlib_port_t` field.
-* **One port contract, two transports** - `SerialTransport`/`SerialPortLike`
-  is the seam the facade acquires ports through. A browser `SerialPort`
-  satisfies it structurally, and `hamlib-wasm/node` adapts `serialport` to it.
-  With no transport passed, the runtime picks: Web Serial where it exists, the
-  Node transport otherwise.
-* **One queue per module** - every native call runs on a single promise chain,
-  because Asyncify can only have one suspended call at a time. Several `RawRig`
+* **Hamlib, unmodified** - the rig backends and the port layer are the pinned
+  upstream release, compiled with Emscripten. Apart from our serial layer
+  standing in for upstream's `src/serial.c`, one small patch skips the Morse
+  worker (the build is single threaded) and leaves out the network, parallel,
+  device and dummy models, which could never open over a serial port.
+* **Synchronous C, asynchronous I/O** - link-time wrappers
+  (`-Wl,--wrap=read/write/select/nanosleep`) send the port layer's I/O to the
+  serial transport, and Asyncify suspends the C stack while a port promise
+  settles. Upstream's read loop, timeouts and retries stay in charge.
+* **One queue per module** - Asyncify can only have one suspended call at a
+  time, so every native call runs on a single promise chain. Several `RawRig`
   objects still work; their calls are serialized in order. This is why the
   Emscripten module is not exported.
-* **Single threaded** - the module is built without `-pthread`, with `async`,
-  `poll_interval` and `auto_power_on`/`auto_power_off` forced to zero through
-  Hamlib's public configuration, so no polling thread, async data handler or
-  Morse worker can start. `RTS`/`DTR`/`BREAK` map to `setSignals()`,
-  `CTS`/`DCD`/`DSR` to `getSignals()`.
-* **Hamlib's cache is left intact** - its setters keep the 500 ms cache
-  coherent, so a read after a write reports what was just written.
+* **One port contract, two transports** - `SerialTransport`/`SerialPortLike`
+  is the seam: a browser `SerialPort` satisfies it structurally, and
+  `hamlib-wasm/node` adapts `serialport` to it.
+* **Public API only** - the facade reaches Hamlib through `rig_init()`,
+  `rig_open()`, `rig_close()` and `rig_set_conf()`, with `async`,
+  `poll_interval` and `auto_power_on`/`auto_power_off` forced to zero, and
+  leaves Hamlib's cache intact, so a read after a write reports what was just
+  written.
 
 ### What is generated
 
-Every operation on `RawRig` comes from the pinned upstream Hamlib headers, so the
-generator classifies each declaration into a shape whose types all map, and
-*refuses* the rest with a reason in `coverage.json` rather than binding a guess.
-
-The surface is the one the reference client needs: a declaration is bound
-because the upstream `rigctl`/`rigctld` sources call it, and one they never call
-is refused with that reason. Today that is 89 generated operations plus 11 whose
-C++ body is hand-written (the caller-buffer, table-walker, extended-setting and
-PTT shapes): 100 methods on `RawRig`, against 87 refusals.
-
-`hamlib.config.yaml` declares the value objects and the operations whose C++
-body a signature cannot describe (the module lifecycle, port registration and
-open/close ownership, the `char *` buffer wrapper, the `struct confparams` table
-walkers, extended settings and PTT); their TypeScript methods are generated too,
-so adding an operation is a config edit plus a regeneration.
-
-The module's generated declaration is typed in terms of value objects and
-primitive handles only - no C pointers, no Hamlib structures, no Wasm memory
-addresses. Every project-owned file is strict TypeScript: the serial transport
-is authored in TypeScript and compiled to the Emscripten JS library, and the
-generated low-level contract types every operation as `T | Promise<T>` because
-an Asyncify-suspended call returns a promise.
+Every `RawRig` method comes from the pinned upstream headers: a declaration is
+bound when the upstream `rigctl`/`rigctld` sources call it and all its types
+map, and refused with a reason in `coverage.json` otherwise. Today that is 89
+generated operations plus 11 with a hand-written C++ body: 100 methods, against
+87 refusals. The generated declaration uses value objects and primitive handles
+only - no C pointers, Hamlib structures or Wasm addresses - and types every
+operation as `T | Promise<T>`, because an Asyncify-suspended call returns a
+promise.
 
 ## Licensing
 

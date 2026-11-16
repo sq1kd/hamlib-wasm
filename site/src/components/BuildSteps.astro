@@ -1,0 +1,228 @@
+---
+/*
+ * How the published package is made, top to bottom: one config file in, one
+ * npm package out.  A rail runs down the left; each step is a node on it,
+ * names the mise task that runs it and what it takes from outside, and the
+ * file it hands to the next step sits on the rail between the two.
+ */
+const { version } = __CATALOGUE__;
+
+interface Step {
+  title: string;
+  task?: string;
+  does: string;
+  uses?: string[];
+  out: string;
+}
+
+const steps: Step[] = [
+  {
+    title: 'Pin',
+    does: 'We name one Hamlib release, its SHA-256 and the patch it needs. Moving to a new release starts with this file.',
+    out: 'hamlib.config.yaml',
+  },
+  {
+    title: 'Fetch',
+    task: 'fetch-native',
+    does: 'Download the release, refuse it if the checksum differs, apply the patch.',
+    uses: [`Hamlib ${version} from GitHub`],
+    out: `hamlib-${version}/`,
+  },
+  {
+    title: 'Generate',
+    task: 'generate',
+    does: 'Read the headers’ AST, bind each call rigctl makes whose types map cleanly, and refuse the rest with a reason.',
+    uses: ['clang'],
+    out: 'facade + coverage.json',
+  },
+  {
+    title: 'Compile',
+    task: 'build-native',
+    does: 'Build Hamlib single-threaded with our serial.c in place, then link with the I/O wrappers and Asyncify.',
+    uses: ['Emscripten'],
+    out: 'hamlib-wasm.wasm',
+  },
+  {
+    title: 'Package',
+    task: 'build-package',
+    does: 'Compile the TypeScript API and add the licences and relink instructions Hamlib’s LGPL asks for.',
+    uses: ['TypeScript'],
+    out: 'hamlib-wasm on npm',
+  },
+];
+---
+
+<figure class="build not-content">
+  <ol>
+    {
+      steps.map((step, index) => (
+        <li>
+          <span class="node" aria-hidden="true">{index + 1}</span>
+          <div class="step">
+            <div class="head">
+              <strong>{step.title}</strong>
+              {step.task && <code class="task">mise run {step.task}</code>}
+            </div>
+            <p>{step.does}</p>
+            {step.uses && (
+              <p class="uses">
+                {step.uses.map((tool) => <span>{tool}</span>)}
+              </p>
+            )}
+          </div>
+          <span class="out">
+            <span class="sr-only">Produces </span>
+            {step.out}
+          </span>
+        </li>
+      ))
+    }
+  </ol>
+  <figcaption>
+    Each step is a mise task you can run on its own, and later builds reuse
+    the download and the compiled objects kept in <code>.cache</code>.
+  </figcaption>
+</figure>
+
+<style>
+  .build {
+    --rail: 1.25rem;
+    margin-block: 2rem;
+  }
+
+  ol {
+    position: relative;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* The rail: dashed where it runs past an output, as if the file rides it. */
+  ol::before {
+    content: '';
+    position: absolute;
+    inset-block: 1rem 1.25rem;
+    inset-inline-start: calc(var(--rail) - 1px);
+    width: 2px;
+    background: linear-gradient(
+      var(--sl-color-accent-low),
+      var(--sl-color-accent) 20%,
+      var(--sl-color-accent) 80%,
+      var(--sl-color-accent-high)
+    );
+  }
+
+  li {
+    position: relative;
+    display: grid;
+    grid-template-columns: calc(var(--rail) * 2) 1fr;
+    column-gap: 1rem;
+  }
+
+  .node {
+    grid-row: 1;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: calc(var(--rail) * 2);
+    height: calc(var(--rail) * 2);
+    border: 2px solid var(--sl-color-accent);
+    border-radius: 50%;
+    background: var(--sl-color-black);
+    color: var(--sl-color-accent-high);
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-sm);
+  }
+
+  .step {
+    grid-row: 1;
+    padding: 0.25rem 0 0;
+  }
+
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .head strong {
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-lg);
+    font-weight: 600;
+  }
+
+  .task {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-accent-high);
+    background: var(--sl-color-accent-low);
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+  }
+
+  .step p {
+    margin: 0.375rem 0 0;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-2);
+    max-width: 38rem;
+  }
+
+  .uses {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+
+  .uses span {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+    border: 1px dashed var(--sl-color-gray-4);
+    border-radius: 0.25rem;
+    padding: 0.0625rem 0.375rem;
+  }
+
+  .uses span::before {
+    content: '+ ';
+    color: var(--sl-color-gray-4);
+  }
+
+  /* The output: a file tab sitting on the rail, on its way to the next step. */
+  .out {
+    grid-column: 1 / -1;
+    justify-self: start;
+    position: relative;
+    z-index: 1;
+    margin: 0.875rem 0 0.875rem calc(var(--rail) - 0.375rem);
+    padding: 0.25rem 0.625rem 0.25rem 1.375rem;
+    border: 1px solid var(--sl-color-hairline-light);
+    border-radius: 0.25rem;
+    background: var(--sl-color-gray-6);
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-1);
+  }
+
+  .out::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0.5rem;
+    top: 50%;
+    width: 0.5rem;
+    height: 0.625rem;
+    translate: 0 -50%;
+    border: 1px solid var(--sl-color-accent);
+    border-radius: 1px;
+    clip-path: polygon(0 0, 60% 0, 100% 35%, 100% 100%, 0 100%);
+  }
+
+  li:last-child .out {
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-accent-high);
+    background: var(--sl-color-accent-low);
+  }
+
+  figcaption {
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+</style>

@@ -7,7 +7,8 @@ description: Install hamlib-wasm, pick an entry point and connect to a rig.
 with a serial transport for each runtime: the
 [Web Serial API](https://developer.mozilla.org/docs/Web/API/Web_Serial_API) in
 a browser, [`serialport`](https://serialport.io/) in Node and Electron. The CAT
-backends are upstream Hamlib code; the package adds a TypeScript API on top.
+backends are upstream Hamlib code, and we add a TypeScript API on top;
+[How it works](../how-it-works/) explains why we built it that way.
 
 ## Install
 

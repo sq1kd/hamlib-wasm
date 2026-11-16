@@ -78,6 +78,7 @@ export default defineConfig({
           items: [
             { label: 'Getting started', slug: 'getting-started' },
             { label: 'Live demo', slug: 'demo' },
+            { label: 'How it works', slug: 'how-it-works' },
           ],
         },
         {

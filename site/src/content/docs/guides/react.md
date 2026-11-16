@@ -4,7 +4,9 @@ description: HamlibProvider, useRig, useRigState, useRigError and useModels.
 ---
 
 `hamlib-wasm/react` wraps the [default surface](../rig-api/) in a provider and a few
-hooks. `react` is an optional peer dependency; no other entry imports it.
+hooks. They own the module, the rig and the polling, so your components only
+render what they get. `react` is an optional peer dependency; no other entry
+imports it.
 
 ```tsx
 import { createRoot } from 'react-dom/client';

@@ -19,7 +19,7 @@ it is supported:
 `UNUSABLE_MODELS` the models that cannot work in this build and why.
 
 :::note[Tested on real radios]
-Two radios on the author's desk run the opt-in hardware suite
+Two radios on our desk run the opt-in hardware suite
 (`mise run test-hardware`): the **QRP Labs QMX+** and the **Yaesu FT-710**.
 It opens each one through the shipped Node transport and the real Wasm build,
 reads frequency, mode and PTT, and can round-trip a frequency write.
