@@ -247,7 +247,7 @@ function App(): ReactElement {
   const note = (
     <>
       <span data-testid="hamlib-version">{hamlib?.version ?? 'Hamlib unavailable'}</span>
-      {' · '}
+      {', '}
       <span data-testid="web-serial-status" data-state={serial ? 'available' : 'unavailable'}>
         {serial
           ? 'Web Serial available'
