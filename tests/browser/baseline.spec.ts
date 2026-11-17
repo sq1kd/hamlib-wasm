@@ -26,9 +26,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { expect, test } from '@playwright/test';
-
-import { installFakeSerial, installTestHelpers, installVirtualClock } from './fixtures';
+import { expect, test } from './fixtures';
 import {
   UPSTREAM_MANIFEST,
   UPSTREAM_VERSION,
@@ -41,8 +39,6 @@ import {
 const BASELINE_PATH = fileURLToPath(
   new URL('../../packages/hamlib-wasm/baseline/baseline.json', import.meta.url),
 );
-
-const HARNESS_URL = 'http://127.0.0.1:4174/';
 
 const RECORD = process.env.HAMLIB_WASM_RECORD_BASELINE === '1';
 
@@ -99,12 +95,7 @@ test('the built package provenance matches the release manifest', () => {
   }
 });
 
-test('matches the recorded upstream baseline', async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-
+test('matches the recorded upstream baseline', async ({ harnessPage: page }) => {
   const sample = await page.evaluate(async (): Promise<Sample> => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();

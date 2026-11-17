@@ -10,36 +10,10 @@
  * knowledge: the Yaesu FRG-100 receiver (frequency only) and the Kenwood
  * TS-140S (frequency and mode, but PTT is set-only).
  */
-import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, installVirtualClock, useRig } from './fixtures';
+import { expect, expectFailure, expectOk, test, useRig } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(`expected success, got ${captured.error.code}: ${captured.error.message}`);
-  }
-
-  return captured.value;
-}
-
-function expectFailure<T>(captured: Captured<T>): string {
-  if (captured.ok) {
-    throw new Error('expected a failure');
-  }
-
-  return captured.error.code ?? 'none';
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('a frequency-only model produces a frequency-only snapshot', async ({ page }) => {
+test('a frequency-only model produces a frequency-only snapshot', async ({ harnessPage: page }) => {
   await useRig(page, 'yaesu-frg100');
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
@@ -113,8 +87,8 @@ test('a frequency-only model produces a frequency-only snapshot', async ({ page 
   /* Field-specific events are only emitted for present fields. */
   expect(result.events).toEqual(['frequency']);
 
-  expect(expectFailure(result.modeRead)).toBe('UNSUPPORTED_OPERATION');
-  expect(expectFailure(result.pttSet)).toBe('UNSUPPORTED_OPERATION');
+  expect(expectFailure(result.modeRead).code).toBe('UNSUPPORTED_OPERATION');
+  expect(expectFailure(result.pttSet).code).toBe('UNSUPPORTED_OPERATION');
 
   /* The frequency setter works, and the model stays connected throughout. */
   expect(result.afterWriteFrequency).toBe(7_100_000);
@@ -123,7 +97,7 @@ test('a frequency-only model produces a frequency-only snapshot', async ({ page 
   expect(result.closeCount).toBe(1);
 });
 
-test('a set-only PTT model takes both PTT commands and refuses the read', async ({ page }) => {
+test('a set-only PTT model takes both PTT commands and refuses the read', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-140S');
@@ -165,7 +139,7 @@ test('a set-only PTT model takes both PTT commands and refuses the read', async 
   /* PTT readback is unavailable, so the snapshot omits it - and the write
    * commands still go out, in order. */
   expect(result.keys).toEqual(['frequency', 'mode', 'passband']);
-  expect(expectFailure(result.read)).toBe('UNSUPPORTED_OPERATION');
+  expect(expectFailure(result.read).code).toBe('UNSUPPORTED_OPERATION');
   expect(result.txIndex).toBeGreaterThanOrEqual(0);
   expect(result.rxIndex).toBeGreaterThan(result.txIndex);
   expect(result.transmitting).toBe(false);

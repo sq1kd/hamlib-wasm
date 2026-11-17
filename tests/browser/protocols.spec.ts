@@ -9,48 +9,10 @@
  *   - a Yaesu FT-757GXII, whose push-to-talk is the DTR line on the CAT port
  *     and therefore never appears on the wire at all.
  */
-import { expect, test } from '@playwright/test';
 
-import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
-  readFakeSerial,
-  useRig,
-} from './fixtures';
+import { expect, expectFailure, expectOk, readFakeSerial, test, useRig } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${JSON.stringify(captured.error)}`,
-    );
-  }
-
-  return captured.value;
-}
-
-function expectFailure<T>(captured: Captured<T>): NonNullable<
-  Extract<Captured<T>, { ok: false }>['error']
-> {
-  if (captured.ok) {
-    throw new Error(
-      `expected a failure but the page succeeded: ${JSON.stringify(captured.value)}`,
-    );
-  }
-
-  return captured.error;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('drives an Icom CI-V radio, a different protocol family', async ({ page }) => {
+test('drives an Icom CI-V radio, a different protocol family', async ({ harnessPage: page }) => {
   await useRig(page, 'icom-ic703');
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
@@ -124,7 +86,7 @@ test('drives an Icom CI-V radio, a different protocol family', async ({ page }) 
   expect(transport.closedWithLockedStreams).toBe(false);
 });
 
-test('reports the upstream open failure that keeps serial DTR PTT unreachable', async ({ page }) => {
+test('reports the upstream open failure that keeps serial DTR PTT unreachable', async ({ harnessPage: page }) => {
   await useRig(page, 'yaesu-ft757gx2');
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {

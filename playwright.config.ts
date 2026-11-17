@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+import { HARNESS_ORIGIN, SITE_DEV_ORIGIN, SITE_ORIGIN } from './tests/browser/servers';
+
 /**
  * Every server the specs need serves a production build, so the artifact users
  * get is what is exercised, including the `new URL(..., import.meta.url)` wasm
@@ -7,6 +9,8 @@ import { defineConfig } from '@playwright/test';
  *
  *   4174  the package test harness      (mise run build-harness)
  *   4176  the documentation site        (mise run build-site)
+ *
+ * (tests/browser/servers.ts holds the addresses; the harness is `baseURL`.)
  *
  * The React `vite` dev server is here for the same reason in the other
  * direction: a bundler rewrites the asset the module loader looks up, and it
@@ -32,24 +36,25 @@ export default defineConfig({
   },
   timeout: 120_000,
   use: {
+    baseURL: `${HARNESS_ORIGIN}/`,
     trace: 'retain-on-failure',
   },
   webServer: [
     {
       command: 'npm run preview --workspace tests/harness',
-      url: 'http://127.0.0.1:4174/',
+      url: `${HARNESS_ORIGIN}/`,
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       command: 'npm run preview --workspace site',
-      url: 'http://127.0.0.1:4176/demo/',
+      url: `${SITE_ORIGIN}/demo/`,
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       command: 'npm run dev --workspace site',
-      url: 'http://127.0.0.1:5176/demo/',
+      url: `${SITE_DEV_ORIGIN}/demo/`,
       reuseExistingServer: false,
       timeout: 60_000,
     },

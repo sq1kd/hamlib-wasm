@@ -6,38 +6,10 @@
  * are real typed methods on `RawRig`, and an operation the model does not
  * implement is refused before the rig is touched.
  */
-import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, installVirtualClock } from './fixtures';
+import { expect, expectFailure, expectOk, test } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${JSON.stringify(captured.error)}`,
-    );
-  }
-
-  return captured.value;
-}
-
-function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
-  if (captured.ok) {
-    throw new Error(`expected a failure but the page succeeded: ${JSON.stringify(captured.value)}`);
-  }
-
-  return captured.error;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('exposes the generated capability matrix and drives a generated operation', async ({ page }) => {
+test('exposes the generated capability matrix and drives a generated operation', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();

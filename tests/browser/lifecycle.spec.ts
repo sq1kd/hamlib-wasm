@@ -6,45 +6,10 @@
  * Web Serial double is the witness - a rig that stayed open would leave the
  * fake port open or a locked stream behind.
  */
-import { expect, test } from '@playwright/test';
 
-import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
-  readFakeSerial,
-} from './fixtures';
+import { expect, expectFailure, expectOk, readFakeSerial, test } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${JSON.stringify(captured.error)}`,
-    );
-  }
-
-  return captured.value;
-}
-
-function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
-  if (captured.ok) {
-    throw new Error(
-      `expected a failure but the page succeeded: ${JSON.stringify(captured.value)}`,
-    );
-  }
-
-  return captured.error;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('disposal during an accepted open closes the rig and rejects the open', async ({ page }) => {
+test('disposal during an accepted open closes the rig and rejects the open', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -92,7 +57,7 @@ test('disposal during an accepted open closes the rig and rejects the open', asy
   expect(transport.closedWithLockedStreams).toBe(false);
 });
 
-test('disposal is idempotent and releases a port that raced with it', async ({ page }) => {
+test('disposal is idempotent and releases a port that raced with it', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -134,7 +99,7 @@ test('disposal is idempotent and releases a port that raced with it', async ({ p
   expect(transport.closedWithLockedStreams).toBe(false);
 });
 
-test('a later instance can use the same port after a raced disposal', async ({ page }) => {
+test('a later instance can use the same port after a raced disposal', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const first = await window.__hamlibHarness.createRawHamlib();
     const port = await first.requestPort();
@@ -171,7 +136,7 @@ test('a later instance can use the same port after a raced disposal', async ({ p
 });
 
 for (const action of ['close', 'dispose'] as const) {
-  test(`${action} from a state listener finishes that event but suppresses the rest`, async ({ page }) => {
+  test(`${action} from a state listener finishes that event but suppresses the rest`, async ({ harnessPage: page }) => {
     const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
       const hamlib = await window.__hamlibHarness.createHamlib({});
       const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -210,7 +175,7 @@ for (const action of ['close', 'dispose'] as const) {
     expect((await readFakeSerial(page)).isOpen).toBe(false);
   });
 
-  test(`${action} from an error listener preserves rejection and the error event`, async ({ page }) => {
+  test(`${action} from an error listener preserves rejection and the error event`, async ({ harnessPage: page }) => {
     const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
       const hamlib = await window.__hamlibHarness.createHamlib({});
       const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');

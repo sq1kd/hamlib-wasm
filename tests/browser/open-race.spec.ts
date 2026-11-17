@@ -10,34 +10,10 @@
  * itself on the virtual clock: whatever Hamlib sleeps through before it reaches
  * the port fires in order, and nothing after.
  */
-import { expect, test } from '@playwright/test';
 
-import {
-  holdNextPortOpen,
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
-  readFakeSerial,
-} from './fixtures';
+import { expect, expectOk, holdNextPortOpen, readFakeSerial, test } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(`expected success, got ${captured.error.code}: ${captured.error.message}`);
-  }
-
-  return captured.value;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('disposal during a parked open publishes nothing and releases the port', async ({ page }) => {
+test('disposal during a parked open publishes nothing and releases the port', async ({ harnessPage: page }) => {
   await holdNextPortOpen(page);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
@@ -94,7 +70,7 @@ test('disposal during a parked open publishes nothing and releases the port', as
   expect(transport.isOpen).toBe(false);
 });
 
-test('a later open after a cancelled one still works', async ({ page }) => {
+test('a later open after a cancelled one still works', async ({ harnessPage: page }) => {
   await holdNextPortOpen(page);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {

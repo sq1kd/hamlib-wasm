@@ -6,30 +6,10 @@
  * it named - so a UI that shows an S-meter does not pay for a frequency read
  * per meter tick, and a page with no meters pays nothing.
  */
-import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, installVirtualClock } from './fixtures';
+import { expect, expectOk, test } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${captured.error.code}: ${captured.error.message}`,
-    );
-  }
-
-  return captured.value;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('reads only the configured levels the model advertises', async ({ page }) => {
+test('reads only the configured levels the model advertises', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({
       levels: ['STRENGTH', 'SWR'],
@@ -74,7 +54,7 @@ test('reads only the configured levels the model advertises', async ({ page }) =
   expect(result.refusal.ok ? null : result.refusal.error.code).toBe('INVALID_ARGUMENT');
 });
 
-test('a level watch reads only the level, a frequency watch reads none', async ({ page }) => {
+test('a level watch reads only the level, a frequency watch reads none', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({ levels: ['STRENGTH'] });
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -114,7 +94,7 @@ test('a level watch reads only the level, a frequency watch reads none', async (
   expect(result.frequencyCommands).toEqual(['FA']);
 });
 
-test('watching levels on an instance with none configured is refused', async ({ page }) => {
+test('watching levels on an instance with none configured is refused', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');

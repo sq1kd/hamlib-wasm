@@ -16,47 +16,13 @@
  * *and* the radio's own rate: like the real thing, it stays silent at every
  * other rate, which is a failure no protocol-level reply can express.
  */
-import { expect, test } from '@playwright/test';
 
-import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
-  readFakeSerial,
-  useRig,
-} from './fixtures';
-
-const HARNESS_URL = 'http://127.0.0.1:4174/';
+import { expect, expectFailure, expectOk, readFakeSerial, test, useRig } from './fixtures';
 
 /** The rate the emulated FT-710's CAT menu is set to, as on the real radio. */
 const FT710_CAT_RATE = 38400;
 
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${JSON.stringify(captured.error)}`,
-    );
-  }
-
-  return captured.value;
-}
-
-function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
-  if (captured.ok) {
-    throw new Error(`expected a failure but the page succeeded: ${JSON.stringify(captured.value)}`);
-  }
-
-  return captured.error;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('an open that nothing answers fails loudly instead of reporting a rig', async ({ page }) => {
+test('an open that nothing answers fails loudly instead of reporting a rig', async ({ harnessPage: page }) => {
   await useRig(page, 'yaesu-ft710');
 
   const captured = await page.evaluate(async () => {
@@ -102,7 +68,7 @@ test('an open that nothing answers fails loudly instead of reporting a rig', asy
   expect(control.commands).toEqual([]);
 });
 
-test('detectBaudRate finds the rate the rig answers at, then the rig opens', async ({ page }) => {
+test('detectBaudRate finds the rate the rig answers at, then the rig opens', async ({ harnessPage: page }) => {
   await useRig(page, 'yaesu-ft710');
 
   const found = await page.evaluate(async () => {
@@ -158,7 +124,7 @@ test('detectBaudRate finds the rate the rig answers at, then the rig opens', asy
   expect(control.isOpen).toBe(false);
 });
 
-test('a rig whose declared maximum is right is not searched at all', async ({ page }) => {
+test('a rig whose declared maximum is right is not searched at all', async ({ harnessPage: page }) => {
   /* The QMX+ case: a CDC interface that answers whatever rate it is opened at,
    * so Hamlib's default is already correct. */
   const found = await page.evaluate(async () => {
@@ -183,7 +149,7 @@ test('a rig whose declared maximum is right is not searched at all', async ({ pa
   expect(control.closeCount).toBe(1);
 });
 
-test('a rate outside the model range is refused before the port is touched', async ({ page }) => {
+test('a rate outside the model range is refused before the port is touched', async ({ harnessPage: page }) => {
   await useRig(page, 'yaesu-ft710');
 
   const captured = await page.evaluate(async () => {

@@ -5,16 +5,8 @@
  * double, so the registry, the receive queue, the waiters, the flush and the
  * modem signal mapping are checked without involving a rig protocol.
  */
-import { expect, test } from '@playwright/test';
 
-import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
-  readFakeSerial,
-} from './fixtures';
-
-const HARNESS_URL = 'http://127.0.0.1:4174/';
+import { expect, expectOk, readFakeSerial, test } from './fixtures';
 
 interface PrimitiveResults {
   /** Error sentinels published by the transport (see web_serial.h). */
@@ -53,24 +45,7 @@ interface PrimitiveResults {
   waitAfterError: number;
 }
 
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${JSON.stringify(captured.error)}`,
-    );
-  }
-
-  return captured.value;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('drives the serial registry, queue, flush and signals', async ({ page }) => {
+test('drives the serial registry, queue, flush and signals', async ({ harnessPage: page }) => {
   const captured = await page.evaluate((): Promise<Captured<PrimitiveResults>> => {
     return window.__testHelpers.capture(async () => {
       const module = await window.__hamlibHarness.nativeModule();

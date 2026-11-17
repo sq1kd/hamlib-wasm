@@ -12,28 +12,10 @@
  * "Nothing happens afterwards" is proved the same way - by letting virtual
  * time pass, and by the page having no timer left at all.
  */
-import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, installVirtualClock } from './fixtures';
+import { expect, expectOk, test } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(`expected success, got ${captured.error.code}: ${captured.error.message}`);
-  }
-
-  return captured.value;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('two watchers coexist and removing one leaves the other polling', async ({ page }) => {
+test('two watchers coexist and removing one leaves the other polling', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -81,7 +63,7 @@ test('two watchers coexist and removing one leaves the other polling', async ({ 
   expect(result.afterRemovingA).toBe(20);
 });
 
-test('a slow read never accumulates poll work', async ({ page }) => {
+test('a slow read never accumulates poll work', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -121,7 +103,7 @@ test('a slow read never accumulates poll work', async ({ page }) => {
   expect(result.during).toEqual(['MD', 'FW', 'IF']);
 });
 
-test('disposal with an active watcher closes the port and stops polling', async ({ page }) => {
+test('disposal with an active watcher closes the port and stops polling', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -178,7 +160,7 @@ test('disposal with an active watcher closes the port and stops polling', async 
   expect(result.closedWithLockedStreams).toBe(false);
 });
 
-test('closing the raw rig behind the wrapper stops the scheduler', async ({ page }) => {
+test('closing the raw rig behind the wrapper stops the scheduler', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -216,7 +198,7 @@ test('closing the raw rig behind the wrapper stops the scheduler', async ({ page
   expect(result.isOpen).toBe(false);
 });
 
-test('a closed wrapper publishes nothing more', async ({ page }) => {
+test('a closed wrapper publishes nothing more', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -260,7 +242,7 @@ test('a closed wrapper publishes nothing more', async ({ page }) => {
   expect(result.connected).toBe(false);
 });
 
-test('a second instance can reuse the port after the first cleaned up', async ({ page }) => {
+test('a second instance can reuse the port after the first cleaned up', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const first = await window.__hamlibHarness.createHamlib({});
     const model = first.models.find((candidate) => candidate.model === 'TS-480');
@@ -298,7 +280,7 @@ test('a second instance can reuse the port after the first cleaned up', async ({
   expect(result.closedWithLockedStreams).toBe(false);
 });
 
-test('watching a closed rig is refused', async ({ page }) => {
+test('watching a closed rig is refused', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');

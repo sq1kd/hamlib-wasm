@@ -9,30 +9,15 @@
  * predicates can be checked against a real backend rather than a callback's
  * mere presence.
  */
-import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, installVirtualClock, useRig } from './fixtures';
+import { expect, expectOk, test, useRig } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(`expected success, got ${captured.error.code}: ${captured.error.message}`);
-  }
-
-  return captured.value;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
+test.beforeEach(async ({ harnessPage: page }) => {
   /* The IC-746PRO answers CI-V at 0x66. */
   await useRig(page, 'icom-ic746pro');
 });
 
-test('an IC-746PRO client discovers its extension parameters', async ({ page }) => {
+test('an IC-746PRO client discovers its extension parameters', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');
@@ -81,7 +66,7 @@ test('an IC-746PRO client discovers its extension parameters', async ({ page }) 
   expect(result.funcNames).not.toContain('ssbbass');
 });
 
-test('configuration enumeration returns parameter descriptions', async ({ page }) => {
+test('configuration enumeration returns parameter descriptions', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');
@@ -120,7 +105,7 @@ test('configuration enumeration returns parameter descriptions', async ({ page }
   expect(result.described).toBe(true);
 });
 
-test('scan and VFO suboperations are distinguishable before use', async ({ page }) => {
+test('scan and VFO suboperations are distinguishable before use', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');

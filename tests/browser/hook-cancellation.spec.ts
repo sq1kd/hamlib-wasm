@@ -16,24 +16,20 @@
  * state it waits for; React's renders are timers too, so every step returns
  * with the hooks' output committed, and is asserted directly.
  */
-import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 import {
   advanceClock,
+  expect,
   holdNextPortOpen,
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
   pendingTimers,
   readFakeSerial,
   releasePortOpen,
+  test,
   waitForPortOpenPending,
 } from './fixtures';
 import { POLL_MS } from '../harness/src/hook-harness-types';
 import type { HookSnapshot } from '../harness/src/hook-harness-types';
-
-const HOOKS_URL = 'http://127.0.0.1:4174/hooks.html';
 
 async function snapshot(page: Page): Promise<HookSnapshot> {
   return page.evaluate(() => window.__hookHarness.snapshot());
@@ -95,15 +91,13 @@ async function untilClosed(page: Page, count: number): Promise<void> {
   );
 }
 
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page, 'manual');
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HOOKS_URL);
+test.use({ clockMode: 'manual', harnessPath: '/hooks.html' });
+
+test.beforeEach(async ({ harnessPage: page }) => {
   await waitForReady(page);
 });
 
-test('disconnect during a parked connect publishes nothing and releases the port', async ({ page }) => {
+test('disconnect during a parked connect publishes nothing and releases the port', async ({ harnessPage: page }) => {
   await holdNextPortOpen(page);
   await startConnect(page);
   await waitForPortOpenPending(page);
@@ -141,7 +135,7 @@ test('disconnect during a parked connect publishes nothing and releases the port
   expect((await readFakeSerial(page)).closeCount).toBe(2);
 });
 
-test('removing the probe during a parked connect publishes nothing', async ({ page }) => {
+test('removing the probe during a parked connect publishes nothing', async ({ harnessPage: page }) => {
   await holdNextPortOpen(page);
   await startConnect(page);
   await waitForPortOpenPending(page);
@@ -174,7 +168,7 @@ test('removing the probe during a parked connect publishes nothing', async ({ pa
   expect((await readFakeSerial(page)).isOpen).toBe(false);
 });
 
-test('unmount during a parked connect leaves no owned rig', async ({ page }) => {
+test('unmount during a parked connect leaves no owned rig', async ({ harnessPage: page }) => {
   await holdNextPortOpen(page);
 
   /* The attempt may reject: unmounting also disposes the module it opened
@@ -204,7 +198,7 @@ test('unmount during a parked connect leaves no owned rig', async ({ page }) => 
   expect((await readFakeSerial(page)).isOpen).toBe(false);
 });
 
-test('a closed rig publishes no further state', async ({ page }) => {
+test('a closed rig publishes no further state', async ({ harnessPage: page }) => {
   await connectAndPoll(page);
 
   const polling = await snapshot(page);

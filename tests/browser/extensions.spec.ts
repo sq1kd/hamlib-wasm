@@ -3,30 +3,10 @@
  * configuration tokens at open, Morse through the backend's own keyer
  * command, raw CAT bytes, the power conversions, and the diagnostics report.
  */
-import { expect, test } from '@playwright/test';
 
-import { installFakeSerial, installTestHelpers, installVirtualClock, useRig } from './fixtures';
+import { expect, expectOk, test, useRig } from './fixtures';
 
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${captured.error.code}: ${captured.error.message}`,
-    );
-  }
-
-  return captured.value;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('civaddr reaches an Icom radio moved off its default address', async ({ page }) => {
+test('civaddr reaches an Icom radio moved off its default address', async ({ harnessPage: page }) => {
   /* The IC-746 emulator answers on 0x56; the IC-703 model addresses 0x68. */
   await useRig(page, 'icom-ic746');
 
@@ -54,7 +34,7 @@ test('civaddr reaches an Icom radio moved off its default address', async ({ pag
   expect(result.frequency).toBe(14_074_000);
 });
 
-test('refuses owned, unreachable and unknown tokens', async ({ page }) => {
+test('refuses owned, unreachable and unknown tokens', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -86,7 +66,7 @@ test('refuses owned, unreachable and unknown tokens', async ({ page }) => {
   expect(result.accepted).toBe(true);
 });
 
-test('sendRaw writes bytes as they are and reads up to the terminator', async ({ page }) => {
+test('sendRaw writes bytes as they are and reads up to the terminator', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -119,7 +99,7 @@ test('sendRaw writes bytes as they are and reads up to the terminator', async ({
   expect(result.frequency).toBe(7_074_000);
 });
 
-test('sendMorse keys through the backend in chunks, and only in CW', async ({ page }) => {
+test('sendMorse keys through the backend in chunks, and only in CW', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
@@ -155,7 +135,7 @@ test('sendMorse keys through the backend in chunks, and only in CW', async ({ pa
   );
 });
 
-test('converts a power level to milliwatts through the model\'s ranges', async ({ page }) => {
+test('converts a power level to milliwatts through the model\'s ranges', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -179,7 +159,7 @@ test('converts a power level to milliwatts through the model\'s ranges', async (
   expect(result.back).toBeCloseTo(1, 2);
 });
 
-test('diagnostics carry the rigs, the port traffic, errors and debug lines', async ({ page }) => {
+test('diagnostics carry the rigs, the port traffic, errors and debug lines', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const lines: string[] = [];
     const hamlib = await window.__hamlibHarness.createHamlib({
@@ -219,7 +199,7 @@ test('diagnostics carry the rigs, the port traffic, errors and debug lines', asy
   expect(hooked).toBe(report.log.length);
 });
 
-test('every generated name is one the built module parses', async ({ page }) => {
+test('every generated name is one the built module parses', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -265,7 +245,7 @@ test('every generated name is one the built module parses', async ({ page }) => 
   expect(result.checked).toBeGreaterThan(200);
 });
 
-test('Hamlib never writes to the console; its error lines stay in diagnostics', async ({ page }) => {
+test('Hamlib never writes to the console; its error lines stay in diagnostics', async ({ harnessPage: page }) => {
   const console: string[] = [];
 
   page.on('console', (message) => { console.push(message.text()); });
@@ -298,7 +278,7 @@ test('Hamlib never writes to the console; its error lines stay in diagnostics', 
   expect(report.log.every((entry: { level: string }) => entry.level === 'err' || entry.level === 'bug')).toBe(true);
 });
 
-test('diagnostics keep the reads a watch tick absorbed', async ({ page }) => {
+test('diagnostics keep the reads a watch tick absorbed', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib();
     const ts480 = hamlib.models.find((model) => model.model === 'TS-480');

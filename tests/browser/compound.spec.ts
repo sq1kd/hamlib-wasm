@@ -7,24 +7,8 @@
  * and use the emulator's own command log as the witness, because a plausible
  * final state is not proof of the order that produced it.
  */
-import { expect, test } from '@playwright/test';
 
-import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
-  setReplyDelay,
-} from './fixtures';
-
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(`expected success, got ${captured.error.code}: ${captured.error.message}`);
-  }
-
-  return captured.value;
-}
+import { expect, expectOk, setReplyDelay, test } from './fixtures';
 
 /**
  * Assert that a raw write never slipped inside the compound operation.
@@ -50,17 +34,10 @@ function expectRawWriteAfterReads(commands: readonly string[]): void {
   expect(after.filter((command) => command !== 'ID')).toEqual([]);
 }
 
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
 /* The harness page publishes the package; the fake transport is installed
  * before it loads, so `requestPort()` resolves to the emulated port. */
 
-test('a later mode change wins over an earlier one', async ({ page }) => {
+test('a later mode change wins over an earlier one', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -92,7 +69,7 @@ test('a later mode change wins over an earlier one', async ({ page }) => {
   expect(result.connected).toBe(true);
 });
 
-test('a refresh reports the values from before the write that follows it', async ({ page }) => {
+test('a refresh reports the values from before the write that follows it', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -135,7 +112,7 @@ test('a refresh reports the values from before the write that follows it', async
   expect(result.afterMode).toBe('FM');
 });
 
-test('a raw call cannot run between the steps of a Rig operation', async ({ page }) => {
+test('a raw call cannot run between the steps of a Rig operation', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -164,7 +141,7 @@ test('a raw call cannot run between the steps of a Rig operation', async ({ page
   expectRawWriteAfterReads(expectOk(captured));
 });
 
-test('a failed operation does not poison the queue', async ({ page }) => {
+test('a failed operation does not poison the queue', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
@@ -200,7 +177,7 @@ test('a failed operation does not poison the queue', async ({ page }) => {
   expect(result.connected).toBe(true);
 });
 
-test('a slow step cannot let another call overtake the operation', async ({ page }) => {
+test('a slow step cannot let another call overtake the operation', async ({ harnessPage: page }) => {
   /* The emulator answers slowly, so the compound operation really does span a
    * window a raw call could slip into. */
   await setReplyDelay(page, 250);
@@ -232,7 +209,7 @@ test('a slow step cannot let another call overtake the operation', async ({ page
   expectRawWriteAfterReads(expectOk(captured));
 });
 
-test('a pure helper cannot re-enter the module while a write is suspended', async ({ page }) => {
+test('a pure helper cannot re-enter the module while a write is suspended', async ({ harnessPage: page }) => {
   /* The emulator answers slowly, so the write really holds the Asyncify
    * suspension while the pure helper is issued. */
   await setReplyDelay(page, 250);
@@ -281,7 +258,7 @@ test('a pure helper cannot re-enter the module while a write is suspended', asyn
   expect(result.connected).toBe(true);
 });
 
-test('a passband action cannot undo a mode selected after it', async ({ page }) => {
+test('a passband action cannot undo a mode selected after it', async ({ harnessPage: page }) => {
   await setReplyDelay(page, 250);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
@@ -322,7 +299,7 @@ test('a passband action cannot undo a mode selected after it', async ({ page }) 
   expect(result.connected).toBe(true);
 });
 
-test('a write issued while a watch tick holds the queue is not nested', async ({ page }) => {
+test('a write issued while a watch tick holds the queue is not nested', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({ levels: ['STRENGTH'] });
     const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');

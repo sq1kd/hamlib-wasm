@@ -5,20 +5,18 @@
  * Serial double over the harness page.  No timing assumptions beyond the
  * emulator's immediate replies.
  */
-import { expect, test } from '@playwright/test';
 
 import {
-  TS480_LINE_SETTINGS,
+  expect,
+  expectFailure,
+  expectOk,
   failNextPortOpen,
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
   readFakeSerial,
   removeWebSerial,
+  test,
+  TS480_LINE_SETTINGS,
 } from './fixtures';
 import { UPSTREAM_VERSION } from './upstream';
-
-const HARNESS_URL = 'http://127.0.0.1:4174/';
 
 interface ModelSummary {
   id: number;
@@ -36,32 +34,7 @@ interface ModelSummary {
   canSetPtt: boolean;
 }
 
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${JSON.stringify(captured.error)}`,
-    );
-  }
-
-  return captured.value;
-}
-
-function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
-  if (captured.ok) {
-    throw new Error(`expected a failure but the page succeeded: ${JSON.stringify(captured.value)}`);
-  }
-
-  return captured.error;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('lists the serial rig catalogue sorted by manufacturer and model', async ({ page }) => {
+test('lists the serial rig catalogue sorted by manufacturer and model', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
 
@@ -128,7 +101,7 @@ test('lists the serial rig catalogue sorted by manufacturer and model', async ({
   expect(ts480?.canSetPtt).toBe(true);
 });
 
-test('reports TRANSPORT_UNAVAILABLE when the browser has no Web Serial', async ({ page }) => {
+test('reports TRANSPORT_UNAVAILABLE when the browser has no Web Serial', async ({ harnessPage: page }) => {
   await removeWebSerial(page);
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
@@ -153,7 +126,7 @@ test('reports TRANSPORT_UNAVAILABLE when the browser has no Web Serial', async (
   expect(expectFailure(open).operation).toBe('open');
 });
 
-test('rejects a device path, which only the Node transport can open', async ({ page }) => {
+test('rejects a device path, which only the Node transport can open', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
 
@@ -175,7 +148,7 @@ test('rejects a device path, which only the Node transport can open', async ({ p
   expect(byPath.message).toContain('path');
 });
 
-test('uses a caller-supplied transport instead of Web Serial', async ({ page }) => {
+test('uses a caller-supplied transport instead of Web Serial', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const transport = window.__hamlibHarness.fakeTransport(window.__fakeSerial.port);
     const hamlib = await window.__hamlibHarness.createRawHamlib({ transport });
@@ -212,7 +185,7 @@ test('uses a caller-supplied transport instead of Web Serial', async ({ page }) 
   expect(transport.commands).toContain('ID');
 });
 
-test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting input', async ({ page }) => {
+test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting input', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = window.__fakeSerial.port;
@@ -262,7 +235,7 @@ test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting inpu
   expect(badMode.operation).toBe('setMode');
 });
 
-test('opens a rig, drives it over the transport and releases the port', async ({ page }) => {
+test('opens a rig, drives it over the transport and releases the port', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -364,7 +337,7 @@ test('opens a rig, drives it over the transport and releases the port', async ({
   expect(transport.state.transmitting).toBe(false);
 });
 
-test('reports a Hamlib timeout and recovers on the next read', async ({ page }) => {
+test('reports a Hamlib timeout and recovers on the next read', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -417,7 +390,7 @@ test('reports a Hamlib timeout and recovers on the next read', async ({ page }) 
   expect(transport.closedWithLockedStreams).toBe(false);
 });
 
-test('surfaces a Hamlib error when the port cannot be opened', async ({ page }) => {
+test('surfaces a Hamlib error when the port cannot be opened', async ({ harnessPage: page }) => {
   await failNextPortOpen(page, 'TypeError');
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {

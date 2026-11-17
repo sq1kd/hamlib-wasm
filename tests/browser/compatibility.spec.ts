@@ -11,7 +11,6 @@
  *     half working, and that a device which disappears mid-session is reported
  *     as a transport failure instead of wedging the rig.
  */
-import { expect, test } from '@playwright/test';
 
 import {
   UNUSABLE_MODELS,
@@ -19,14 +18,7 @@ import {
   describeLineSettingsLimitation,
 } from 'hamlib-wasm';
 
-import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
-  readFakeSerial,
-} from './fixtures';
-
-const HARNESS_URL = 'http://127.0.0.1:4174/';
+import { expect, expectFailure, expectOk, readFakeSerial, test } from './fixtures';
 
 interface CatalogueModel {
   id: number;
@@ -40,34 +32,7 @@ interface CatalogueModel {
   limitation: string | null;
 }
 
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${JSON.stringify(captured.error)}`,
-    );
-  }
-
-  return captured.value;
-}
-
-function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
-  if (captured.ok) {
-    throw new Error(
-      `expected a failure but the page succeeded: ${JSON.stringify(captured.value)}`,
-    );
-  }
-
-  return captured.error;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
-
-test('labels verified models and explains the unusable ones', async ({ page }) => {
+test('labels verified models and explains the unusable ones', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(
     (): Promise<Captured<CatalogueModel[]>> => window.__testHelpers.capture(
       async () => {
@@ -168,7 +133,7 @@ test('labels verified models and explains the unusable ones', async ({ page }) =
   }
 });
 
-test('refuses a model whose line settings Web Serial cannot express', async ({ page }) => {
+test('refuses a model whose line settings Web Serial cannot express', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -217,7 +182,7 @@ test('refuses a model whose line settings Web Serial cannot express', async ({ p
   expect(transport.closedWithLockedStreams).toBe(false);
 });
 
-test('fails predictably for a backend that needs a worker thread', async ({ page }) => {
+test('fails predictably for a backend that needs a worker thread', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
@@ -264,7 +229,7 @@ test('fails predictably for a backend that needs a worker thread', async ({ page
   expect(transport.closedWithLockedStreams).toBe(false);
 });
 
-test('reports a device that disappears mid-session', async ({ page }) => {
+test('reports a device that disappears mid-session', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();

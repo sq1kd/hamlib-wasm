@@ -5,36 +5,16 @@
  * Hamlib's job together; these specs drive one rig of each framing family
  * through them.
  */
-import { expect, test } from '@playwright/test';
 
 import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
+  expect,
+  expectOk,
   setEcho,
   setEmulatorSilent,
   setReplyFragments,
+  test,
   useRig,
 } from './fixtures';
-
-const HARNESS_URL = 'http://127.0.0.1:4174/';
-
-function expectOk<T>(captured: Captured<T>): T {
-  if (!captured.ok) {
-    throw new Error(
-      `expected success but the page reported ${captured.error.code}: ${captured.error.message}`,
-    );
-  }
-
-  return captured.value;
-}
-
-test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page);
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(HARNESS_URL);
-});
 
 /** One rig per framing: `;`-terminated ASCII, CI-V binary, newcat ASCII, fixed-length binary. */
 const FAMILIES: readonly { rig: FakeRigName; manufacturer: string; model: string; baudRate?: number }[] = [
@@ -76,7 +56,7 @@ async function readOnce(
 }
 
 for (const family of FAMILIES) {
-  test(`${family.model}: a reply split into pieces reads the same as a whole one`, async ({ page }) => {
+  test(`${family.model}: a reply split into pieces reads the same as a whole one`, async ({ harnessPage: page }) => {
     await useRig(page, family.rig);
 
     const whole = await readOnce(page, family);
@@ -93,7 +73,7 @@ for (const family of FAMILIES) {
   });
 }
 
-test('an echoing CI-V line still reads the radio', async ({ page }) => {
+test('an echoing CI-V line still reads the radio', async ({ harnessPage: page }) => {
   await useRig(page, 'icom-ic703');
   await setEcho(page, true);
 
@@ -103,7 +83,7 @@ test('an echoing CI-V line still reads the radio', async ({ page }) => {
   expect(result.mode).toBe('USB');
 });
 
-test('an echo alone is not a rig answering the open', async ({ page }) => {
+test('an echo alone is not a rig answering the open', async ({ harnessPage: page }) => {
   /* The interface echoes, the radio behind it is switched off. */
   await useRig(page, 'icom-ic703');
   await setEcho(page, true);
@@ -132,7 +112,7 @@ test('an echo alone is not a rig answering the open', async ({ page }) => {
   expect(opened.ok ? null : opened.error.hamlibCode).toBe(-5); /* -RIG_ETIMEOUT */
 });
 
-test('stale bytes in the receive queue do not become the next reply', async ({ page }) => {
+test('stale bytes in the receive queue do not become the next reply', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();

@@ -14,7 +14,9 @@
  */
 import { expect, test } from '@playwright/test';
 
-const REACT_DEV_URL = 'http://127.0.0.1:5176/demo/';
+import { SITE_DEV_ORIGIN } from './servers';
+
+const REACT_DEV_URL = `${SITE_DEV_ORIGIN}/demo/`;
 
 test('the documentation site demo instantiates the module in dev mode', async ({ page }) => {
   /* A cold dev server settles on its first page: it finishes bundling and

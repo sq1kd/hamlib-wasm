@@ -7,10 +7,12 @@
  * The compiled text is what gets injected, so nothing transpiles it in the page
  * and no bundler helper can leak into it.
  *
- * These helpers give the specs a typed view of the double's control surface.
+ * These helpers give the specs a typed view of the double's control surface,
+ * and `test` gives a harness spec its page already set up.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { test as base } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 const CLOCK_SOURCE = readFileSync(
@@ -331,3 +333,50 @@ export const TS480_LINE_SETTINGS = {
   parity: 'none',
   flowControl: 'none',
 } as const;
+
+/**
+ * The value of an in-page action that succeeded, or a failure naming the error
+ * the page reported.
+ */
+export function expectOk<T>(captured: Captured<T>): T {
+  if (!captured.ok) {
+    throw new Error(`expected success but the page reported ${JSON.stringify(captured.error)}`);
+  }
+
+  return captured.value;
+}
+
+/** The error an in-page action failed with, or a failure naming its value. */
+export function expectFailure<T>(captured: Captured<T>): HamlibErrorView {
+  if (captured.ok) {
+    throw new Error(`expected a failure but the page succeeded: ${JSON.stringify(captured.value)}`);
+  }
+
+  return captured.error;
+}
+
+export interface HarnessOptions {
+  /** How the page's virtual clock moves; `auto` unless a spec says otherwise. */
+  clockMode: VirtualClockMode;
+  /** The harness page to open, relative to `baseURL`. */
+  harnessPath: string;
+}
+
+/**
+ * Playwright's `test`, with `harnessPage`: the harness page on the virtual
+ * clock, with the fake Web Serial and the in-page helpers installed before
+ * any of its scripts ran.
+ */
+export const test = base.extend<HarnessOptions & { harnessPage: Page }>({
+  clockMode: ['auto', { option: true }],
+  harnessPath: ['/', { option: true }],
+  harnessPage: async ({ page, clockMode, harnessPath }, use) => {
+    await installVirtualClock(page, clockMode);
+    await installFakeSerial(page);
+    await installTestHelpers(page);
+    await page.goto(harnessPath);
+    await use(page);
+  },
+});
+
+export { expect } from '@playwright/test';
