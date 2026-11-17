@@ -56,9 +56,9 @@ export interface TypeBinding {
   readonly valuePredicate?: string;
   /**
    * For a `value_t` binding with no name-space predicate, the union member to
-   * read or write unconditionally.  `rig_get_ant`/`rig_set_ant` and
-   * `rig_valueagclevel` store their value in `.i` (Hamlib's own `rigctl`
-   * makes the same assumption), so no runtime type is needed.
+   * read or write unconditionally.  `rig_get_ant`/`rig_set_ant` store their
+   * option in `.i` (Hamlib's own `rigctl` makes the same assumption), so no
+   * runtime type is needed.
    */
   readonly valueAccess?: 'i' | 'f';
   /** For a `struct` binding, the generated projection this value crosses as. */
@@ -232,7 +232,7 @@ function enumBinding(enumName: string, native: string, namespace?: SettingNamesp
   };
 }
 
-/** How many call sites need this shared conversion; inline it is not. */
+/** A clang type spelling with its whitespace collapsed. */
 export function normalizeType(qualType: string): string {
   return qualType.replace(/\s+/g, ' ').trim();
 }

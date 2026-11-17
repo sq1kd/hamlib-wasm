@@ -42,9 +42,7 @@ export type GeneratedShape = 'get' | 'set' | 'pure';
 export type FlatResult = 'NumberResult' | 'TextResult' | 'BoolResult' | 'CodeResult';
 
 export interface OperationArgument {
-  /** JavaScript-facing argument name. */
-  readonly name: string;
-  /** Result field name, for getter outputs. */
+  /** The public name: the C parameter in camelCase, or an override. */
   readonly field: string;
   readonly binding: TypeBinding;
   /** The parameter this value came from, for the emitted call. */
@@ -280,9 +278,8 @@ const NOT_IN_REFERENCE_SURFACE: ReadonlySet<string> = new Set([
 const TOKEN_SYMBOLS: readonly RegExp[] = [/^rig_str/, /^rig_parse_/, /^rig_ext_/];
 
 /**
- * Value-returning helpers whose `value_t` result is always stored in `.i`.
- * Hamlib's own `rigctl` assumes the `rig_get_ant`/`rig_set_ant` option is an
- * integer, and `src/misc.c` stores every value the same way.
+ * Operations whose `value_t` is always stored in `.i`: Hamlib's own `rigctl`
+ * assumes the `rig_get_ant`/`rig_set_ant` option is an integer.
  */
 const VALUE_T_INT_SYMBOLS: ReadonlySet<string> = new Set([
   'rig_get_ant',
@@ -559,7 +556,6 @@ export function classifyFunction(
 
       plan.push({ kind: 'value', argument: args.length });
       args.push({
-        name: `arg${args.length}`,
         field: fieldName(param.name, args.length),
         binding,
         parameter: index,
@@ -655,7 +651,6 @@ export function classifyFunction(
       const param = fn.params[index] as { name: string; qualType: string };
 
       return {
-        name: `arg${position}`,
         field: fieldName(param.name, position),
         binding: bindings.get(index) as TypeBinding,
         parameter: index,
@@ -666,7 +661,6 @@ export function classifyFunction(
       const param = fn.params[index] as { name: string; qualType: string };
 
       return {
-        name: 'value',
         field: fieldName(param.name, position),
         binding: bindings.get(index) as TypeBinding,
         parameter: index,
@@ -723,7 +717,6 @@ export function classifyFunction(
       const param = fn.params[index] as { name: string; qualType: string };
 
       arguments_.push({
-        name: `arg${arguments_.length}`,
         field: fieldName(param.name, arguments_.length),
         binding: bindings.get(index) as TypeBinding,
         parameter: index,

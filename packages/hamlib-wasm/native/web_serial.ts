@@ -550,14 +550,6 @@ addToLibrary({
     },
 
     /*
-     * Bytes the rig has sent on this handle since the port was opened.
-     *
-     * Unlike the RX queue this is never drained, so it answers "did the rig
-     * ever speak" - the question the facade has to ask before it can believe
-     * that rig_open() really reached a radio.  A port that has received
-     * nothing has not been talked to by anything.
-     */
-    /*
      * Whether the port opened at `path` stopped delivering: its reader failed,
      * as an unplugged device makes it.  The TypeScript layer reads this to
      * report a rig as no longer connected.
@@ -566,6 +558,14 @@ addToLibrary({
       return this.ports.get(path)?.state?.failure != null;
     },
 
+    /*
+     * Bytes the rig has sent on this handle since the port was opened.
+     *
+     * Unlike the RX queue this is never drained, so it answers "did the rig
+     * ever speak" - the question the facade has to ask before it can believe
+     * that rig_open() really reached a radio.  A port that has received
+     * nothing has not been talked to by anything.
+     */
     bytesReceived(handle: number): number {
       const entry = this.handles.get(handle);
 

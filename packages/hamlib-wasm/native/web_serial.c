@@ -13,7 +13,7 @@
  *
  * Nothing else upstream is touched for the transport: the read()/write()/
  * select() calls src/iofunc.c makes for a serial port are redirected here by
- * the link-time wrapper in native/wrapped_io.c, so upstream's own read loop
+ * the link-time wrapper in native/wrapped_io.cpp, so upstream's own read loop
  * (including its 7 data bit masking) stays in charge.
  *
  * hamlib_port_t.fd keeps holding an integer, but it is an opaque handle owned
