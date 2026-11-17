@@ -18,7 +18,7 @@
  * file must stay erasable (no enums, namespaces or parameter properties).
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -381,9 +381,4 @@ export function loadAst(includeDir: string, projectHeaders: readonly string[] = 
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
-}
-
-/** Read a source file the AST refers to, for drift reporting. */
-export function readHeader(includeDir: string, relative: string): string {
-  return readFileSync(path.join(includeDir, relative), 'utf8');
 }

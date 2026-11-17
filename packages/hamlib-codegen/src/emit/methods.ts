@@ -37,7 +37,6 @@ const METHOD_IMPORTS: Readonly<Record<ImportModule, string>> = {
   names: '../names.js',
   confparams: '../../confparams.js',
   operations: '../operations.js',
-  base: './base.js',
 };
 
 /**
@@ -69,10 +68,6 @@ function familyMatch(symbol: string): { readonly family: string; readonly patter
   }
 
   return { family: FALLBACK_FAMILY, pattern: null };
-}
-
-export function familyOf(symbol: string): string {
-  return familyMatch(symbol).family;
 }
 
 /** The generated method body: the queue slot, the capability gate, the result check. */

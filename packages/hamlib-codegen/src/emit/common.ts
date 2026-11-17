@@ -363,7 +363,7 @@ export function bespokeOperations(model: Model): readonly ModelOperation[] {
 /* ------------------------------------------------------------------ */
 
 /** The modules generated TypeScript imports types and helpers from. */
-export type ImportModule = 'embind' | 'names' | 'confparams' | 'operations' | 'base';
+export type ImportModule = 'embind' | 'names' | 'confparams' | 'operations';
 
 /**
  * The imports of one generated file, collected as the code that needs them
