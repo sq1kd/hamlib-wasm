@@ -13,6 +13,8 @@
  */
 
 import { HamlibError } from './errors.js';
+import { OWNED_CONF } from './native/generated/names.js';
+import type { OwnedConfToken } from './native/generated/names.js';
 
 /**
  * Hamlib's frontend tokens (upstream `src/conf.c`) that work here, typed with
@@ -62,13 +64,7 @@ export interface FrontendConf {
 
 /** Tokens hamlib-wasm sets itself or cannot honour; see {@link encodeConf}. */
 type RefusedToken =
-  | 'rig_pathname'
-  | 'serial_speed'
-  | 'async'
-  | 'poll_interval'
-  | 'cache_timeout'
-  | 'auto_power_on'
-  | 'auto_power_off'
+  | OwnedConfToken
   | 'ptt_pathname'
   | 'dcd_pathname'
   | 'ptt_share'
@@ -97,17 +93,6 @@ type RefusedToken =
 export type RigConf = FrontendConf
   & { readonly [token in RefusedToken]?: never }
   & { readonly [backendToken: string]: string | number | boolean | undefined };
-
-/** Tokens the facade sets itself, with what to use instead. */
-const OWNED: Readonly<Record<string, string>> = {
-  rig_pathname: 'the port is the one passed to open()',
-  serial_speed: 'pass baudRate instead',
-  async: 'this build has no asynchronous data path',
-  poll_interval: 'this build has no polling thread; use watch()',
-  cache_timeout: 'the facade keeps Hamlib\'s default so a read after a write stays coherent',
-  auto_power_on: 'switch the rig on with setPowerstat()',
-  auto_power_off: 'switch the rig off with setPowerstat()',
-};
 
 /** Tokens that need a device or a thread this build cannot reach. */
 const UNREACHABLE: Readonly<Record<string, string>> = {
@@ -163,10 +148,8 @@ export function encodeConf(conf: RigConf | undefined, operation: string): string
       refuse(`conf token "${name}" has a value with a line break`, operation);
     }
 
-    const owned = OWNED[name];
-
-    if (owned !== undefined) {
-      refuse(`conf token "${name}" is set by hamlib-wasm itself: ${owned}`, operation);
+    if (Object.hasOwn(OWNED_CONF, name)) {
+      refuse(`conf token "${name}" is set by hamlib-wasm itself: ${OWNED_CONF[name as OwnedConfToken]}`, operation);
     }
 
     const unreachable = UNREACHABLE[name];

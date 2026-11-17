@@ -36,6 +36,18 @@ lineSettings:
   parity: [ none, even, odd ]
   handshake: [ none, hardware ]
 
+# Configuration tokens the facade sets on every open (native/facade.cpp
+# openOn), with what a caller should do instead.  open() refuses them before
+# the port is touched, and the facade refuses them again when it applies conf.
+ownedConf:
+  rig_pathname: the port is the one passed to open()
+  serial_speed: pass baudRate instead
+  async: this build has no asynchronous data path
+  poll_interval: this build has no polling thread; use watch()
+  cache_timeout: the facade keeps Hamlib's default so a read after a write stays coherent
+  auto_power_on: switch the rig on with setPowerstat()
+  auto_power_off: switch the rig off with setPowerstat()
+
 # Value objects the Embind boundary returns whose C++ structs are declared in
 # native/facade.cpp.  The generator registers them; it never defines them.
 # The generated single-output results (NumberResult, TextResult and the
@@ -143,6 +155,7 @@ operations:
       - rig_get_caps
       - rig_init
       - rig_token_lookup
+      - rig_get_conf2
       - rig_set_conf
       - rig_open
       - rig_close
@@ -163,6 +176,7 @@ operations:
       - rig_get_caps
       - rig_init
       - rig_token_lookup
+      - rig_get_conf2
       - rig_set_conf
       - rig_open
       - rig_close

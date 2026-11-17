@@ -36,6 +36,7 @@
 #include "hamlib/rig.h"
 
 #include "generated/codecs.h"
+#include "generated/policy.h"
 #include "web_serial.h"
 
 /* --------------------------------------------------------------------- */
@@ -79,24 +80,18 @@ struct PttResult
     std::string error;
 };
 
+/* A C string Hamlib may leave NULL, as a std::string. */
+static std::string textOrEmpty(const char *text)
+{
+    return text ? std::string(text) : std::string();
+}
+
 /*
- * Result value objects for the mechanically generated getters.  Regenerated
- * from hamlib.config.yaml and the upstream AST; see packages/hamlib-codegen.
+ * Value objects for the generated results and projections, and the packing of
+ * a projection a bespoke body returns.  Regenerated from hamlib.config.yaml
+ * and the upstream AST; see packages/hamlib-codegen.
  */
 #include "generated/results.inc"
-
-/* --------------------------------------------------------------------- */
-/* JavaScript registry access                                            */
-/* --------------------------------------------------------------------- */
-
-/*
- * The SerialPort object itself is stored by the JavaScript transport, which
- * is the only layer able to hold a real JavaScript value (an Embind `val`
- * cannot be handed to JavaScript library code).  The bridge therefore
- * exchanges an opaque token: the TypeScript layer stores the object and the
- * facade binds the token to a logical path (hamlibWsRegisterPort in
- * web_serial.h).
- */
 
 namespace
 {
@@ -127,12 +122,6 @@ std::string takeTransportError()
     if (!why) { return std::string(); }
 
     return std::string(why);
-}
-
-/* A C string Hamlib may leave NULL, as a std::string. */
-std::string textOrEmpty(const char *text)
-{
-    return text ? std::string(text) : std::string();
 }
 
 /* A serial RTS/DTR PTT line and a serial DSR/CTS/CAR DCD line are driven by
@@ -244,9 +233,6 @@ const int kDefaultMorseChunk = 20;
 /* The largest reply rig_send_raw() reads: its own stack buffer. */
 const int kMaxRawReply = 200;
 
-/* Hamlib's own default for the level cache (rig_init: cachep->timeout_ms). */
-const char *kDefaultCacheTimeoutMs = "500";
-
 /*
  * What a single command gets while probing a baud rate.
  *
@@ -288,23 +274,17 @@ public:
 
             int rc = rig_load_all_backends();
 
-            if (rc != RIG_OK)
-            {
-                return failure<CodeResult>(rc);
-            }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
             backendsLoaded_ = true;
         }
 
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+        return ok<CodeResult>();
     }
 
     std::string version()
     {
-        const char *value = rig_version();
-        return value ? std::string(value) : std::string();
+        return textOrEmpty(rig_version());
     }
 
     std::vector<ModelInfo> listModels()
@@ -331,6 +311,13 @@ public:
         return models;
     }
 
+    /*
+     * The SerialPort object itself is stored by the JavaScript transport, which
+     * is the only layer able to hold a real JavaScript value (an Embind `val`
+     * cannot be handed to JavaScript library code).  The bridge therefore
+     * exchanges an opaque token: the TypeScript layer stores the object and the
+     * facade binds the token to a logical path.
+     */
     CodeResult registerPort(const std::string &logicalPath, int portToken)
     {
         webserial_clear_error();
@@ -340,13 +327,7 @@ public:
             return failure<CodeResult>(-RIG_EINVAL);
         }
 
-        int rc = hamlibWsRegisterPort(logicalPath.c_str(), portToken);
-
-        if (rc != WS_OK) { return failure<CodeResult>(webserial_map_error(rc)); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+        return status<CodeResult>(webserial_map_error(hamlibWsRegisterPort(logicalPath.c_str(), portToken)));
     }
 
     CodeResult unregisterPort(const std::string &logicalPath)
@@ -355,13 +336,7 @@ public:
 
         if (logicalPath.empty()) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        int rc = hamlibWsUnregisterPort(logicalPath.c_str());
-
-        if (rc != WS_OK) { return failure<CodeResult>(webserial_map_error(rc)); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+        return status<CodeResult>(webserial_map_error(hamlibWsUnregisterPort(logicalPath.c_str())));
     }
 
     OpenResult openRig(int modelId, const std::string &logicalPath,
@@ -369,9 +344,7 @@ public:
     {
         webserial_clear_error();
 
-        OpenResult result;
-        result.code = RIG_OK;
-        result.handle = 0;
+        OpenResult result = ok<OpenResult>();
 
         int rc = RIG_OK;
         std::string message;
@@ -394,7 +367,6 @@ public:
 
         if (nextHandle_ >= kMaxHandle) { nextHandle_ = 1; }
 
-        result.code = RIG_OK;
         result.handle = nextHandle_++;
         rigs_[result.handle] = rig;
         return result;
@@ -445,9 +417,7 @@ public:
         rig_close(rig);
         rig_cleanup(rig);
 
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+        return ok<CodeResult>();
     }
 
     CodeResult closeRig(int handle)
@@ -459,9 +429,7 @@ public:
         if (!rig)
         {
             /* Idempotent: closing an unknown handle is not an error. */
-            CodeResult result;
-            result.code = RIG_OK;
-            return result;
+            return ok<CodeResult>();
         }
 
         int rc = rig_close(rig);
@@ -469,13 +437,7 @@ public:
         /* rig_cleanup also closes the rig when necessary. */
         int rc2 = rig_cleanup(rig);
 
-        if (rc == RIG_OK) { rc = rc2; }
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+        return status<CodeResult>(rc == RIG_OK ? rc2 : rc);
     }
 
     /*
@@ -504,9 +466,7 @@ public:
          * instance is being discarded. */
         hamlibWsForceCloseAll();
 
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+        return ok<CodeResult>();
     }
 
     /* RIG handles currently registered: a probe for the lifecycle tests. */
@@ -527,9 +487,7 @@ public:
         rig_set_debug_callback(forwardDebug, NULL);
         rig_set_debug((enum rig_debug_level_e) level);
 
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+        return ok<CodeResult>();
     }
 
     /*
@@ -541,69 +499,56 @@ public:
      */
     NumberResult sendMorse(int handle, const std::string &text, bool checkMode)
     {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
-
-        if (!rig->caps->send_morse) { return failure<NumberResult>(-RIG_ENAVAIL); }
-
-        if (checkMode)
+        return withRig<NumberResult>(handle, [&](RIG *rig)
         {
-            rmode_t mode = RIG_MODE_NONE;
-            pbwidth_t width = 0;
-            int rc = rig_get_mode(rig, RIG_VFO_CURR, &mode, &width);
+            if (!rig->caps->send_morse) { return failure<NumberResult>(-RIG_ENAVAIL); }
+
+            if (checkMode)
+            {
+                rmode_t mode = RIG_MODE_NONE;
+                pbwidth_t width = 0;
+                int rc = rig_get_mode(rig, RIG_VFO_CURR, &mode, &width);
+
+                if (rc != RIG_OK) { return failure<NumberResult>(rc); }
+
+                if ((mode & (RIG_MODE_CW | RIG_MODE_CWR)) == 0)
+                {
+                    return failure<NumberResult>(
+                               -RIG_EINVAL,
+                               std::string("the rig is in ") + rig_strrmode(mode)
+                               + " mode; Morse needs CW or CWR");
+                }
+            }
+
+            int size = rig->caps->morse_qsize > 0 ? rig->caps->morse_qsize : kDefaultMorseChunk;
+            std::string chunk = text.substr(0, (size_t) size);
+            int rc = RIG_OK;
+
+            for (int attempt = 0; attempt < 10; ++attempt)
+            {
+                rc = rig->caps->send_morse(rig, RIG_VFO_CURR, chunk.c_str());
+
+                if (rc == RIG_OK || rc == -RIG_EINVAL) { break; }
+
+                hl_usleep(100 * 1000);
+            }
 
             if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-            if ((mode & (RIG_MODE_CW | RIG_MODE_CWR)) == 0)
-            {
-                return failure<NumberResult>(
-                           -RIG_EINVAL,
-                           std::string("the rig is in ") + rig_strrmode(mode)
-                           + " mode; Morse needs CW or CWR");
-            }
-        }
-
-        int size = rig->caps->morse_qsize > 0 ? rig->caps->morse_qsize : kDefaultMorseChunk;
-        std::string chunk = text.substr(0, (size_t) size);
-        int rc = RIG_OK;
-
-        for (int attempt = 0; attempt < 10; ++attempt)
-        {
-            rc = rig->caps->send_morse(rig, RIG_VFO_CURR, chunk.c_str());
-
-            if (rc == RIG_OK || rc == -RIG_EINVAL) { break; }
-
-            hl_usleep(100 * 1000);
-        }
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) chunk.size();
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) chunk.size();
+            return result;
+        });
     }
 
     CodeResult stopMorse(int handle)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            if (!rig->caps->stop_morse) { return failure<CodeResult>(-RIG_ENAVAIL); }
 
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        if (!rig->caps->stop_morse) { return failure<CodeResult>(-RIG_ENAVAIL); }
-
-        int rc = rig->caps->stop_morse(rig, RIG_VFO_CURR);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            return status<CodeResult>(rig->caps->stop_morse(rig, RIG_VFO_CURR));
+        });
     }
 
     /*
@@ -614,85 +559,73 @@ public:
      */
     TextResult sendRaw(int handle, const std::string &data, int terminator, int replyLength)
     {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<TextResult>(-RIG_EINVAL); }
-
-        std::vector<unsigned char> bytes;
-
-        if (!hexToBytes(data, &bytes) || bytes.empty()
-                || terminator > 0xff || replyLength < 0 || replyLength > kMaxRawReply)
+        return withRig<TextResult>(handle, [&](RIG *rig)
         {
-            return failure<TextResult>(-RIG_EINVAL);
-        }
+            std::vector<unsigned char> bytes;
 
-        unsigned char term = (unsigned char) (terminator < 0 ? 0 : terminator);
-        bool reads = terminator >= 0 || replyLength > 0;
-        int length = terminator >= 0 ? kMaxRawReply + 1 : replyLength + 1;
-        std::vector<unsigned char> reply((size_t) length, 0);
+            if (!hexToBytes(data, &bytes) || bytes.empty()
+                    || terminator > 0xff || replyLength < 0 || replyLength > kMaxRawReply)
+            {
+                return failure<TextResult>(-RIG_EINVAL);
+            }
 
-        int rc = rig_send_raw(rig, bytes.data(), (int) bytes.size(),
-                              reads ? reply.data() : NULL, length,
-                              terminator >= 0 ? &term : NULL);
+            unsigned char term = (unsigned char) (terminator < 0 ? 0 : terminator);
+            bool reads = terminator >= 0 || replyLength > 0;
+            int length = terminator >= 0 ? kMaxRawReply + 1 : replyLength + 1;
+            std::vector<unsigned char> reply((size_t) length, 0);
 
-        if (rc < 0) { return failure<TextResult>(rc); }
+            int rc = rig_send_raw(rig, bytes.data(), (int) bytes.size(),
+                                  reads ? reply.data() : NULL, length,
+                                  terminator >= 0 ? &term : NULL);
 
-        TextResult result;
-        result.code = RIG_OK;
-        result.value = reads ? bytesToHex(reply.data(), rc) : std::string();
-        return result;
+            if (rc < 0) { return failure<TextResult>(rc); }
+
+            TextResult result = ok<TextResult>();
+            result.value = reads ? bytesToHex(reply.data(), rc) : std::string();
+            return result;
+        });
     }
 
     PttResult getPtt(int handle)
     {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<PttResult>(-RIG_EINVAL); }
-
-        ptt_t ptt = RIG_PTT_OFF;
-        int rc = rig_get_ptt(rig, RIG_VFO_CURR, &ptt);
-
-        if (rc != RIG_OK) { return failure<PttResult>(rc); }
-
-        const char *name = strPttState(ptt);
-
-        if (!name)
+        return withRig<PttResult>(handle, [&](RIG *rig)
         {
-            return failure<PttResult>(-RIG_EPROTO,
-                                      "the rig reported PTT state " + std::to_string((int) ptt)
-                                      + ", which Hamlib does not define");
-        }
+            ptt_t ptt = RIG_PTT_OFF;
+            int rc = rig_get_ptt(rig, RIG_VFO_CURR, &ptt);
 
-        PttResult result;
-        result.code = RIG_OK;
-        result.ptt = name;
-        return result;
+            if (rc != RIG_OK) { return failure<PttResult>(rc); }
+
+            const char *name = strPttState(ptt);
+
+            if (!name)
+            {
+                return failure<PttResult>(-RIG_EPROTO,
+                                          "the rig reported PTT state " + std::to_string((int) ptt)
+                                          + ", which Hamlib does not define");
+            }
+
+            PttResult result = ok<PttResult>();
+            result.ptt = name;
+            return result;
+        });
     }
 
     PttResult setPtt(int handle, const std::string &state)
     {
-        webserial_clear_error();
+        return withRig<PttResult>(handle, [&](RIG *rig)
+        {
+            ptt_t ptt = parsePttState(state.c_str());
 
-        RIG *rig = lookupRig(handle);
+            if (ptt == (ptt_t) -1) { return failure<PttResult>(-RIG_EINVAL); }
 
-        if (!rig) { return failure<PttResult>(-RIG_EINVAL); }
+            int rc = rig_set_ptt(rig, RIG_VFO_CURR, ptt);
 
-        ptt_t ptt = parsePttState(state.c_str());
+            if (rc != RIG_OK) { return failure<PttResult>(rc); }
 
-        if (ptt == (ptt_t) -1) { return failure<PttResult>(-RIG_EINVAL); }
-
-        int rc = rig_set_ptt(rig, RIG_VFO_CURR, ptt);
-
-        if (rc != RIG_OK) { return failure<PttResult>(rc); }
-
-        PttResult result;
-        result.code = RIG_OK;
-        result.ptt = state;
-        return result;
+            PttResult result = ok<PttResult>();
+            result.ptt = state;
+            return result;
+        });
     }
 
     /*
@@ -702,137 +635,43 @@ public:
      */
     TextResult getRigInfo(int handle)
     {
-        webserial_clear_error();
+        return withRig<TextResult>(handle, [&](RIG *rig)
+        {
+            std::vector<char> buffer(kRigInfoBufferSize, '\0');
+            int rc = rig_get_rig_info(rig, buffer.data(), (int) buffer.size());
 
-        RIG *rig = lookupRig(handle);
+            if (rc != RIG_OK) { return failure<TextResult>(rc); }
 
-        if (!rig) { return failure<TextResult>(-RIG_EINVAL); }
-
-        std::vector<char> buffer(kRigInfoBufferSize, '\0');
-        int rc = rig_get_rig_info(rig, buffer.data(), (int) buffer.size());
-
-        if (rc != RIG_OK) { return failure<TextResult>(rc); }
-
-        TextResult result;
-        result.code = RIG_OK;
-        result.value = std::string(buffer.data());
-        return result;
+            TextResult result = ok<TextResult>();
+            result.value = std::string(buffer.data());
+            return result;
+        });
     }
 
-    /*
-     * Extended levels and parameters carry a `value_t` whose union member
-     * follows the token's `confparams.type` at runtime, not a compile-time
-     * predicate: numeric tokens are floats, everything else is an integer.
-     * This is the same rule Hamlib's own `rigctl` uses.
-     */
     NumberResult getExtLevel(int handle, double token)
     {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
-
-        hamlib_token_t tok;
-
-        if (!tokenFromDouble(token, &tok))
+        return getExt(handle, token, [](RIG *rig, hamlib_token_t tok, value_t *value)
         {
-            return failure<NumberResult>(-RIG_EINVAL);
-        }
-
-        value_t value{};
-        int rc = rig_get_ext_level(rig, RIG_VFO_CURR, tok, &value);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = extValueIsFloat(rig, tok) ? (double) value.f : (double) value.i;
-        return result;
+            return rig_get_ext_level(rig, RIG_VFO_CURR, tok, value);
+        });
     }
 
     CodeResult setExtLevel(int handle, double token, double value)
     {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        hamlib_token_t tok;
-
-        if (!tokenFromDouble(token, &tok))
+        return setExt(handle, token, value, [](RIG *rig, hamlib_token_t tok, value_t packed)
         {
-            return failure<CodeResult>(-RIG_EINVAL);
-        }
-
-        value_t packed{};
-
-        if (extValueIsFloat(rig, tok)) { packed.f = (float) value; }
-        else { packed.i = (int) value; }
-
-        int rc = rig_set_ext_level(rig, RIG_VFO_CURR, tok, packed);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            return rig_set_ext_level(rig, RIG_VFO_CURR, tok, packed);
+        });
     }
 
     NumberResult getExtParm(int handle, double token)
     {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
-
-        hamlib_token_t tok;
-
-        if (!tokenFromDouble(token, &tok))
-        {
-            return failure<NumberResult>(-RIG_EINVAL);
-        }
-
-        value_t value{};
-        int rc = rig_get_ext_parm(rig, tok, &value);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = extValueIsFloat(rig, tok) ? (double) value.f : (double) value.i;
-        return result;
+        return getExt(handle, token, rig_get_ext_parm);
     }
 
     CodeResult setExtParm(int handle, double token, double value)
     {
-        webserial_clear_error();
-
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        hamlib_token_t tok;
-
-        if (!tokenFromDouble(token, &tok))
-        {
-            return failure<CodeResult>(-RIG_EINVAL);
-        }
-
-        value_t packed{};
-
-        if (extValueIsFloat(rig, tok)) { packed.f = (float) value; }
-        else { packed.i = (int) value; }
-
-        int rc = rig_set_ext_parm(rig, tok, packed);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+        return setExt(handle, token, value, rig_set_ext_parm);
     }
 
     /*
@@ -842,87 +681,97 @@ public:
      */
     std::vector<RigConfparams> tokenForeach(int handle)
     {
-        webserial_clear_error();
-
-        std::vector<RigConfparams> entries;
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return entries; }
-
-        rig_token_foreach(rig, collectTokenConfparam, &entries);
-        return entries;
+        return walkTable(handle, rig_token_foreach);
     }
 
     std::vector<RigConfparams> extLevelForeach(int handle)
     {
-        webserial_clear_error();
-
-        std::vector<RigConfparams> entries;
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return entries; }
-
-        rig_ext_level_foreach(rig, collectExtConfparam, &entries);
-        return entries;
+        return walkTable(handle, rig_ext_level_foreach);
     }
 
     std::vector<RigConfparams> extFuncForeach(int handle)
     {
-        webserial_clear_error();
-
-        std::vector<RigConfparams> entries;
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return entries; }
-
-        rig_ext_func_foreach(rig, collectExtConfparam, &entries);
-        return entries;
+        return walkTable(handle, rig_ext_func_foreach);
     }
 
     std::vector<RigConfparams> extParmForeach(int handle)
     {
+        return walkTable(handle, rig_ext_parm_foreach);
+    }
+
+private:
+    /* Foreach callbacks return a positive value to keep iterating. */
+    static int collectConfparam(const struct confparams *cfp, rig_ptr_t data)
+    {
+        static_cast<std::vector<RigConfparams> *>(data)->push_back(projectRigConfparams(*cfp));
+        return 1;
+    }
+
+    static int collectConfparam(RIG *, const struct confparams *cfp, rig_ptr_t data)
+    {
+        return collectConfparam(cfp, data);
+    }
+
+    /*
+     * Walk one of Hamlib's parameter tables into a vector.  A vector cannot
+     * carry a result code, so an unknown handle walks nothing; the TypeScript
+     * layer never calls a walker on a closed rig.
+     */
+    template <typename Callback>
+    std::vector<RigConfparams> walkTable(int handle, int (*foreach)(RIG *, Callback, rig_ptr_t))
+    {
         webserial_clear_error();
 
         std::vector<RigConfparams> entries;
         RIG *rig = lookupRig(handle);
 
-        if (!rig) { return entries; }
+        if (rig) { foreach(rig, collectConfparam, &entries); }
 
-        rig_ext_parm_foreach(rig, collectExtConfparam, &entries);
         return entries;
     }
 
-private:
-    /* The same projection the generated `extLookup`/`extLookupTok` bodies
-     * apply, so a walked entry and a looked-up one have the same shape. */
-    static RigConfparams projectConfparam(const struct confparams *cfp)
+    /*
+     * Extended levels and parameters carry a `value_t` whose union member
+     * follows the token's `confparams.type` at runtime, not a compile-time
+     * predicate: numeric tokens are floats, everything else is an integer.
+     * This is the same rule Hamlib's own `rigctl` uses.
+     */
+    template <typename Get>
+    NumberResult getExt(int handle, double token, Get get)
     {
-        RigConfparams entry{};
-        entry.token = (double) cfp->token;
-        entry.name = cfp->name ? cfp->name : "";
-        entry.label = cfp->label ? cfp->label : "";
-        entry.tooltip = cfp->tooltip ? cfp->tooltip : "";
-        entry.dflt = cfp->dflt ? cfp->dflt : "";
-        entry.type = (double) cfp->type;
-        return entry;
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            hamlib_token_t tok;
+
+            if (!tokenFromDouble(token, &tok)) { return failure<NumberResult>(-RIG_EINVAL); }
+
+            value_t value{};
+            int rc = get(rig, tok, &value);
+
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
+
+            NumberResult result = ok<NumberResult>();
+            result.value = extValueIsFloat(rig, tok) ? (double) value.f : (double) value.i;
+            return result;
+        });
     }
 
-    /* Foreach callbacks return a positive value to keep iterating. */
-    static int collectTokenConfparam(const struct confparams *cfp, rig_ptr_t data)
+    template <typename Set>
+    CodeResult setExt(int handle, double token, double value, Set set)
     {
-        std::vector<RigConfparams> *entries = static_cast<std::vector<RigConfparams> *>(data);
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            hamlib_token_t tok;
 
-        entries->push_back(projectConfparam(cfp));
-        return 1;
-    }
+            if (!tokenFromDouble(token, &tok)) { return failure<CodeResult>(-RIG_EINVAL); }
 
-    static int collectExtConfparam(RIG *rig, const struct confparams *cfp, rig_ptr_t data)
-    {
-        (void) rig;
-        std::vector<RigConfparams> *entries = static_cast<std::vector<RigConfparams> *>(data);
+            value_t packed{};
 
-        entries->push_back(projectConfparam(cfp));
-        return 1;
+            if (extValueIsFloat(rig, tok)) { packed.f = (float) value; }
+            else { packed.i = (int) value; }
+
+            return status<CodeResult>(set(rig, tok, packed));
+        });
     }
 
     /* Fixed size for the caller-buffer operation, sized to hold the largest
@@ -948,6 +797,31 @@ private:
         return rig_set_conf(rig, token, value.c_str());
     }
 
+    /* Read one named Hamlib configuration value through the public API. */
+    static int getConf(RIG *rig, const char *name, std::string *value)
+    {
+        hamlib_token_t token = rig_token_lookup(rig, name);
+
+        if (token == RIG_CONF_END) { return -RIG_EINVAL; }
+
+        char text[64] = "";
+        int rc = rig_get_conf2(rig, token, text, (int) sizeof(text));
+
+        *value = text;
+        return rc;
+    }
+
+    /* Whether the facade sets `name` itself (ownedConf in hamlib.config.yaml). */
+    static bool facadeOwnsConf(const std::string &name)
+    {
+        for (const char *owned : kOwnedConf)
+        {
+            if (name == owned) { return true; }
+        }
+
+        return false;
+    }
+
     /*
      * Apply `name=value` lines, one token per line.  An unknown name, or a
      * value the backend refuses, fails the open with a message naming it.
@@ -970,6 +844,12 @@ private:
             size_t equals = line.find('=');
             std::string name = line.substr(0, equals);
             std::string value = equals == std::string::npos ? "" : line.substr(equals + 1);
+
+            if (facadeOwnsConf(name))
+            {
+                *message = "config token \"" + name + "\" is set by hamlib-wasm itself";
+                return -RIG_EINVAL;
+            }
 
             if (rig_token_lookup(rig, name.c_str()) == RIG_CONF_END)
             {
@@ -1040,13 +920,17 @@ private:
         /*
          * poll_interval has to be zero: rig_open() would otherwise try to
          * start the polling thread, which cannot exist here.  Hamlib makes
-         * that token also set the level cache timeout, so the cache is
-         * restored to its default right away - the setters rely on it to keep
-         * a read-after-write coherent.
+         * that token also set the level cache timeout, so the timeout
+         * rig_init() chose is read first and restored right after - the
+         * setters rely on it to keep a read-after-write coherent.
          */
+        std::string cacheTimeout;
+
+        if (rc == RIG_OK) { rc = getConf(rig, "cache_timeout", &cacheTimeout); }
+
         if (rc == RIG_OK) { rc = setConf(rig, "poll_interval", "0"); }
 
-        if (rc == RIG_OK) { rc = setConf(rig, "cache_timeout", kDefaultCacheTimeoutMs); }
+        if (rc == RIG_OK) { rc = setConf(rig, "cache_timeout", cacheTimeout); }
 
         if (rc == RIG_OK) { rc = setConf(rig, "auto_power_on", "0"); }
 
@@ -1143,6 +1027,13 @@ private:
      * error, resolve the handle, and fail with -RIG_EINVAL when it names no
      * open rig.  `body` runs with the rig and returns the result.
      */
+    /* The result of a call that only reports a Hamlib code. */
+    template <typename T>
+    T status(int code) const
+    {
+        return code == RIG_OK ? ok<T>() : failure<T>(code);
+    }
+
     template <typename T, typename Body>
     T withRig(int handle, Body body)
     {

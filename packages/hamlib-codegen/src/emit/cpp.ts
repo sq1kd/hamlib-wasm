@@ -106,6 +106,27 @@ export function emitResults(model: Model, facts: readonly OperationFacts[]): str
     lines.push(...emitValueObjectStruct(object));
   }
 
+  /* A projection a bespoke body returns in a vector gets the same packing as
+   * a generated result, so a walked entry and a looked-up one agree. */
+  for (const spec of usedProjections(facts).filter((candidate) =>
+    model.vectors.some((vector) => vector.type === candidate.cpp))) {
+    const context: Context = { result: spec.cpp, symbol: `project${spec.cpp}`, setting: null };
+
+    lines.push(`static inline ${spec.cpp} project${spec.cpp}(const ${spec.type} &source)`, '{');
+    lines.push(`    ${spec.cpp} result{};`);
+
+    for (const field of spec.fields) {
+      if (field.binding.strictNames) {
+        throw new Error(`${spec.cpp}.${field.name}: a vector element cannot fail on an unnamed value`);
+      }
+
+      lines.push(...convertOut(field.binding, `source.${field.member}`, `result.${field.name}`, context, field.charArray)
+        .map((line) => `    ${line}`));
+    }
+
+    lines.push('    return result;', '}', '');
+  }
+
   return `${lines.join('\n')}\n`;
 }
 

@@ -95,6 +95,8 @@ export interface Model {
    */
   readonly flags: readonly string[];
   readonly lineSettings: LineSettings;
+  /** Configuration tokens the facade sets itself, with what to use instead. */
+  readonly ownedConf: Readonly<Record<string, string>>;
   /** Declarative renames for the mechanically generated surface. */
   readonly overrides?: {
     /** Per-symbol method/field renames for generated operations. */
@@ -353,6 +355,8 @@ export function loadConfig(file: string): CodegenConfig {
       operations: readOperations(file, root.operations, flags),
       flags,
       lineSettings: readLineSettings(file, root.lineSettings),
+      ownedConf: Object.fromEntries(Object.entries(asObject(file, root.ownedConf, 'ownedConf'))
+        .map(([token, why]) => [token, asString(file, why, `ownedConf.${token}`)])),
       overrides: readOverrides(file, root.overrides ?? {}),
     },
   };

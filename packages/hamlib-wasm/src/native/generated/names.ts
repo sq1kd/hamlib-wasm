@@ -408,3 +408,17 @@ export const LINE_PARITIES = ['none', 'even', 'odd'] as const satisfies readonly
 
 /** The flow controls every transport accepts, from hamlib.config.yaml. */
 export const LINE_HANDSHAKES = ['none', 'hardware'] as const satisfies readonly SerialHandshake[];
+
+/** The configuration tokens the facade sets itself, with what to use instead, from hamlib.config.yaml. */
+export const OWNED_CONF = {
+  rig_pathname: 'the port is the one passed to open()',
+  serial_speed: 'pass baudRate instead',
+  async: 'this build has no asynchronous data path',
+  poll_interval: 'this build has no polling thread; use watch()',
+  cache_timeout: 'the facade keeps Hamlib\'s default so a read after a write stays coherent',
+  auto_power_on: 'switch the rig on with setPowerstat()',
+  auto_power_off: 'switch the rig off with setPowerstat()',
+} as const;
+
+/** One of the tokens of {@link OWNED_CONF}. */
+export type OwnedConfToken = keyof typeof OWNED_CONF;

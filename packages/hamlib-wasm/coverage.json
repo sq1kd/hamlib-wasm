@@ -4,7 +4,7 @@
   "summary": {
     "bespoke": 25,
     "generated": 94,
-    "refused": 80
+    "refused": 79
   },
   "signatures": {
     "rig_cleanup": [
@@ -24,6 +24,9 @@
     ],
     "rig_get_caps": [
       "struct rig_caps * rig_get_caps(rig_model_t)"
+    ],
+    "rig_get_conf2": [
+      "int rig_get_conf2(RIG *, hamlib_token_t, char *, int)"
     ],
     "rig_get_ext_level": [
       "int rig_get_ext_level(RIG *, vfo_t, hamlib_token_t, value_t *)"
@@ -823,10 +826,6 @@
     },
     {
       "symbol": "rig_get_conf",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
-    },
-    {
-      "symbol": "rig_get_conf2",
       "reason": "excluded by policy (threads, transport or unsafe surface)"
     },
     {

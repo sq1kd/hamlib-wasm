@@ -202,3 +202,15 @@ struct TextResult
     std::string error;
 };
 
+static inline RigConfparams projectRigConfparams(const confparams &source)
+{
+    RigConfparams result{};
+    result.token = (double) source.token;
+    result.name = textOrEmpty(source.name);
+    result.label = textOrEmpty(source.label);
+    result.tooltip = textOrEmpty(source.tooltip);
+    result.dflt = textOrEmpty(source.dflt);
+    result.type = (double) source.type;
+    return result;
+}
+

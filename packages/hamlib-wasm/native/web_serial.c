@@ -43,7 +43,7 @@
 #include "misc.h"
 #include "serial.h"
 #include "generated/codecs.h"
-#include "generated/line_settings.h"
+#include "generated/policy.h"
 #include "web_serial.h"
 
 /* A C string the transport or a codec may leave NULL, or `fallback`. */
