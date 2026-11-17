@@ -63,7 +63,6 @@ import type {
   RigModel,
   RigOperationCapabilities,
 } from './catalogue.js';
-import { PTT_STATES } from './native/generated/names.js';
 import type { Level } from './native/generated/names.js';
 import { compoundHostOf } from './native/seam.js';
 import type { CompoundHost, CompoundOperations } from './native/seam.js';
@@ -174,24 +173,6 @@ const DEFAULT_WATCH_FIELDS: readonly RigField[] = ['frequency', 'mode', 'ptt'];
  * retrying forever is the model's port timeout on every poll.
  */
 const LEVEL_FAILURE_LIMIT = 2;
-
-/**
- * Narrow a Hamlib PTT string to the public union.  A state this layer does not
- * know fails the read: reporting it as `'off'` would show a transmitting rig
- * as receiving.
- */
-function toPttState(value: string): PttState {
-  const state = PTT_STATES.find((known) => known === value);
-
-  if (state === undefined) {
-    throw new HamlibError(`getPtt reported an unknown state ${JSON.stringify(value)}`, {
-      code: 'HAMLIB_ERROR',
-      operation: 'getPtt',
-    });
-  }
-
-  return state;
-}
 
 /**
  * A snapshot of what the rig reported, not of what was asked of it.
@@ -969,7 +950,7 @@ class RigHandle implements Rig {
 
     if (fields.has('ptt') && this.#operations.getPtt) {
       await attempt('getPtt', async () => {
-        partial.ptt = toPttState(await operations.getPtt());
+        partial.ptt = await operations.getPtt();
       });
     }
 
