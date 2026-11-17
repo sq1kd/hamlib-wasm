@@ -69,6 +69,7 @@ import { compoundHostOf } from './native/seam.js';
 import type { CompoundHost, CompoundOperations } from './native/seam.js';
 
 export {
+  RIG_ERRCODES,
   RIG_MODES,
   UNUSABLE_MODELS,
   VERIFIED_MODELS,
@@ -122,6 +123,9 @@ export type {
  */
 export type { PttState } from './native/generated/names.js';
 import type { PttState } from './native/generated/names.js';
+
+/** One of the values of `RIG_ERRCODES`; `HamlibError.hamlibCode` carries it negated. */
+export type { RigErrcode } from './native/generated/names.js';
 
 /** One of Hamlib's own passband helpers, selected by name. */
 export type PassbandSelector = 'normal' | 'narrow' | 'wide';

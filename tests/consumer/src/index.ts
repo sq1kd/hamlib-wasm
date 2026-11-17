@@ -10,7 +10,7 @@
  * `hamlib-wasm/raw`, the raw Hamlib surface, and `hamlib-wasm/node`, the Node
  * transport.
  */
-import { HamlibError, createHamlib } from 'hamlib-wasm';
+import { HamlibError, RIG_ERRCODES, createHamlib } from 'hamlib-wasm';
 import type {
   RigCapabilities,
   Hamlib,
@@ -150,11 +150,13 @@ export async function runConsumerFlow(
       const hamlibCode: number | undefined = error.hamlibCode;
       const hamlibMessage: string | undefined = error.hamlibMessage;
       const cause: unknown = error.cause;
+      const timedOut: boolean = hamlibCode === -RIG_ERRCODES.ETIMEOUT;
 
       throw new Error(
         `${operation} failed with ${code}`
         + (hamlibCode === undefined ? '' : ` (#${hamlibCode} ${hamlibMessage})`)
-        + (cause === undefined ? '' : ` caused by ${String(cause)}`),
+        + (cause === undefined ? '' : ` caused by ${String(cause)}`)
+        + (timedOut ? ' - is the rig switched on?' : ''),
         { cause: error },
       );
     }

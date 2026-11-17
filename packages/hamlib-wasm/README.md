@@ -364,7 +364,7 @@ Every failure is a `HamlibError` with:
 | --- | --- |
 | `code` | Stable code: `TRANSPORT_UNAVAILABLE`, `PORT_PERMISSION_DENIED`, `TRANSPORT_FAILURE`, `HAMLIB_ERROR`, `RIG_UNRESPONSIVE`, `INVALID_ARGUMENT`, `UNSUPPORTED_OPERATION`, `RIG_CLOSED`, `RIG_TIMEOUT`, `RIG_HUNG`, `DISPOSED` |
 | `operation` | Stable operation name, e.g. `"open"` or `"getFrequency"` |
-| `hamlibCode` / `hamlibMessage` | Hamlib's own error code and text |
+| `hamlibCode` / `hamlibMessage` | Hamlib's own error code, negated (`-RIG_ERRCODES.EIO`), and its text |
 | `cause` | The underlying error, when a transport raised one |
 
 ## Loading

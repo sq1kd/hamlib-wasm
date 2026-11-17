@@ -104,7 +104,10 @@ export class HamlibError extends Error {
   readonly code: HamlibErrorCode;
   /** The operation that failed, e.g. `"open"` or `"getFrequency"`. */
   readonly operation: string;
-  /** Hamlib's negative error code, when `code` is `"HAMLIB_ERROR"`. */
+  /**
+   * Hamlib's negative error code, when `code` is `"HAMLIB_ERROR"`: the negated
+   * value of one of `RIG_ERRCODES`, so `-RIG_ERRCODES.ETIMEOUT` for a timeout.
+   */
   readonly hamlibCode?: number;
   /** Hamlib's text for `hamlibCode`, e.g. `"communication timed out"`. */
   readonly hamlibMessage?: string;

@@ -190,7 +190,7 @@ underlying `cause` when a transport raised it. The ones a first session meets:
 | `open()` got no answer - usually the wrong baud rate | `HAMLIB_ERROR` |
 | `detectBaudRate()` found no rate that answers | `RIG_UNRESPONSIVE` |
 | The model cannot do what was asked | `UNSUPPORTED_OPERATION` |
-| The device was unplugged mid-session | `HAMLIB_ERROR`, `hamlibCode` -6 (I/O error) |
+| The device was unplugged mid-session | `HAMLIB_ERROR`, `hamlibCode` -6 (`-RIG_ERRCODES.EIO`, I/O error) |
 | The rig or the instance was closed | `RIG_CLOSED`, `DISPOSED` |
 
 The [`HamlibErrorCode`](../../api/hamlib-wasm/type-aliases/hamliberrorcode/)
