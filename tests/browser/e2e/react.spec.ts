@@ -59,6 +59,15 @@ test('drives a rig through the rig backend', async ({ page }) => {
   await runClockUntilElement(page, { testId: 'mode-display', text: 'CW' });
   await expect(page.getByTestId('mode-display')).toHaveText('CW');
 
+  /* The reported name lights its own chip rather than adding a second one. */
+  const modeChips = page.locator('[data-radio-modes] button');
+  const chipCount = await modeChips.count();
+  await page.getByTestId('mode-CWR').click();
+  await runClockUntilElement(page, { testId: 'mode-display', text: 'CWR' });
+  await expect(page.getByTestId('mode-display')).toHaveText('CWR');
+  await expect(page.getByTestId('mode-CWR')).toHaveAttribute('aria-pressed', 'true');
+  await expect(modeChips).toHaveCount(chipCount);
+
   /* Held, then let go: the rig answers with what it did. */
   await pressPtt(page);
   await runClockUntilElement(page, { testId: 'ptt-state', state: 'on' });

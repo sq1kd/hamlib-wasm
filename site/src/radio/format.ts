@@ -78,8 +78,12 @@ export function limitationText(model: PanelModel | undefined): string | undefine
   return model?.limitation === undefined ? undefined : `${model.manufacturer} ${model.model}: ${model.limitation}`;
 }
 
-/** The modes the panel lists; the current mode is added when it is not one of them. */
-export const MODES: readonly RigMode[] = ['LSB', 'USB', 'CW', 'CW-R', 'AM', 'FM', 'RTTY', 'PKTUSB'];
+/**
+ * The modes the panel lists; the current mode is added when it is not one of them.
+ * Each must be the name Hamlib reports (the first `mode_str[]` entry for the
+ * mode), not an alias such as `CW-R`, or its chip never lights.
+ */
+export const MODES: readonly RigMode[] = ['LSB', 'USB', 'CW', 'CWR', 'AM', 'FM', 'RTTY', 'PKTUSB'];
 
 /** Hamlib's passband helpers, in the order the panel offers them. */
 export const PASSBANDS: readonly PassbandSelector[] = ['narrow', 'normal', 'wide'];
