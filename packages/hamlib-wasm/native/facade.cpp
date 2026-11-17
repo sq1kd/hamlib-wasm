@@ -323,26 +323,13 @@ public:
     {
         webserial_clear_error();
 
-        OpenResult result = ok<OpenResult>();
-
         int rc = RIG_OK;
         std::string message;
         RIG *rig = openOn(modelId, logicalPath, baudRate, conf, false, &rc, &message);
 
-        if (!rig)
-        {
-            return message.empty() ? failure<OpenResult>(rc) : failure<OpenResult>(rc, message);
-        }
+        if (!rig) { return failure<OpenResult>(rc, message); }
 
-        const struct rig_caps *caps = rig_get_caps((rig_model_t) modelId);
-
-        if (!rigAnswered(caps, logicalPath))
-        {
-            rig_close(rig);
-            rig_cleanup(rig);
-            return failure<OpenResult>(-RIG_ETIMEOUT,
-                                       unreachableMessage(caps, logicalPath, baudRate));
-        }
+        OpenResult result = ok<OpenResult>();
 
         if (nextHandle_ >= kMaxHandle) { nextHandle_ = 1; }
 
@@ -368,29 +355,11 @@ public:
     {
         webserial_clear_error();
 
-        if (logicalPath.empty() || baudRate <= 0)
-        {
-            return failure<CodeResult>(-RIG_EINVAL);
-        }
-
         int rc = RIG_OK;
         std::string message;
         RIG *rig = openOn(modelId, logicalPath, baudRate, conf, true, &rc, &message);
 
-        if (!rig)
-        {
-            return message.empty() ? failure<CodeResult>(rc) : failure<CodeResult>(rc, message);
-        }
-
-        const struct rig_caps *caps = rig_get_caps((rig_model_t) modelId);
-
-        if (!rigAnswered(caps, logicalPath))
-        {
-            rig_close(rig);
-            rig_cleanup(rig);
-            return failure<CodeResult>(-RIG_ETIMEOUT,
-                                       unreachableMessage(caps, logicalPath, baudRate));
-        }
+        if (!rig) { return failure<CodeResult>(rc, message); }
 
         /* The probe owns nothing: whatever opened here closes here. */
         rig_close(rig);
@@ -851,10 +820,13 @@ private:
     }
 
     /*
-     * rig_init() -> configure through the public token interface -> rig_open().
+     * rig_init() -> configure through the public token interface -> rig_open()
+     * -> make sure the rig answered.
      *
-     * Returns the open rig, or NULL with `*code` set.  `probe` shortens the port
-     * budget for the baud-rate search; see probeBaudRate().
+     * Returns the open rig, or NULL with `*code` set, and `*message` when the
+     * failure needs more words than the transport has; whatever was opened is
+     * closed again.  `probe` shortens the port budget for the baud-rate
+     * search; see probeBaudRate().
      */
     static RIG *openOn(int modelId, const std::string &logicalPath, int baudRate,
                        const std::string &conf, bool probe, int *code,
@@ -954,6 +926,15 @@ private:
             return NULL;
         }
 
+        if (!rigAnswered(caps, logicalPath))
+        {
+            rig_close(rig);
+            rig_cleanup(rig);
+            *code = -RIG_ETIMEOUT;
+            *message = unreachableMessage(caps, logicalPath, baudRate);
+            return NULL;
+        }
+
         return rig;
     }
 
@@ -1038,10 +1019,12 @@ private:
     }
 
     /* Failure with a message the transport cannot supply, such as a rig that
-     * never answered at all. */
+     * never answered at all; without one, the transport's own. */
     template <typename T>
     T failure(int code, const std::string &message) const
     {
+        if (message.empty()) { return failure<T>(code); }
+
         T result{};
         result.code = code;
         result.error = message;
