@@ -198,17 +198,17 @@ async function loadSerialPortModule(
 /* the port adapter                                                    */
 /* ------------------------------------------------------------------ */
 
-/** An error a callback reports, before it is mapped to a `HamlibError`. */
+/** An error a `serialport` callback reports, with its errno `code`. */
 type NodeError = Error & { readonly code?: unknown };
 
-function toHamlibError(error: NodeError, context: string): Error {
+/**
+ * Rename a `serialport` failure to the Web Serial error name that carries its
+ * meaning: a port rejects with errors classified by `name` (see
+ * {@link SerialPortLike}), and an errno code is not one.
+ */
+function toPortError(error: NodeError, context: string): Error {
   const message = error.message || String(error);
   const code = typeof error.code === 'string' ? error.code : undefined;
-
-  /* `$HamlibWs.fail()` classifies failures by `name` and turns them into
-   * Hamlib codes, so the name is what has to carry the meaning here:
-   * NotFoundError → -RIG_EINVAL, SecurityError → -RIG_EACCESS,
-   * TypeError → -RIG_ECONF, anything else → -RIG_EIO. */
   let name = error.name;
 
   if (code === 'ENOENT' || code === 'ENXIO') {
@@ -226,6 +226,12 @@ function toHamlibError(error: NodeError, context: string): Error {
     cause: error,
   });
 }
+
+/**
+ * The output lines `serialport`'s bindings assert as they open a port: DTR
+ * and RTS raised.
+ */
+const OPENED_OUTPUT: Readonly<NodeSetOptions> = { brk: false, cts: false, dtr: true, rts: true };
 
 /** The port's event listeners, kept so they can be removed again. */
 interface PortListeners {
@@ -267,7 +273,7 @@ class NodeSerialPortAdapter implements SerialPortLike {
   /** The complete output state `set()` applies; `serialport` resets the flags a
    * call leaves out, so every flag is always sent.  These are also what the
    * adapter asserts on open, which is what `initialSignals()` reports. */
-  #output: NodeSetOptions = { brk: false, cts: false, dtr: true, rts: true };
+  #output: NodeSetOptions = { ...OPENED_OUTPUT };
 
   readonly #info: SerialPortInfo;
 
@@ -317,7 +323,7 @@ class NodeSerialPortAdapter implements SerialPortLike {
 
     const opening = this.#call<void>((callback) => port.open(callback), 'open').then(() => {
       this.#port = port;
-      this.#output = { brk: false, cts: false, dtr: true, rts: true };
+      this.#output = { ...OPENED_OUTPUT };
       this.#attach(port);
     });
 
@@ -553,7 +559,7 @@ class NodeSerialPortAdapter implements SerialPortLike {
     return new Promise<T>((resolve, reject) => {
       invoke((error, value) => {
         if (error) {
-          reject(toHamlibError(error, context));
+          reject(toPortError(error, context));
           return;
         }
 

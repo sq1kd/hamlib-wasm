@@ -45,6 +45,12 @@ export interface SerialPortInfo {
 /**
  * One device, as this package drives it.  A Web Serial `SerialPort` satisfies
  * this structurally; so does the Node adapter in `src/node.ts`.
+ *
+ * A failure is classified by the rejected error's `name`, Web Serial's
+ * vocabulary: `TypeError` or `NotSupportedError` is a setting the port cannot
+ * take (Hamlib's invalid configuration), `SecurityError` and
+ * `InvalidStateError` are access denied, `NotFoundError` is an invalid
+ * parameter, and any other name is an I/O error.
  */
 export interface SerialPortLike {
   open(settings: SerialLineSettings): Promise<void>;
