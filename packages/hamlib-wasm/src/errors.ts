@@ -178,3 +178,22 @@ export function hungError(operation: string): HamlibError {
     { code: 'RIG_HUNG', operation },
   );
 }
+
+/**
+ * Attribute a failure inside a compound operation to the operation the caller
+ * made.  A compound such as `Rig.setMode` runs several generated steps; the
+ * step that failed stays in the message and as the `cause`.
+ */
+export function compoundError(error: unknown, operation: string): unknown {
+  if (!(error instanceof HamlibError) || error.operation === operation) {
+    return error;
+  }
+
+  return new HamlibError(`${operation}: ${error.message}`, {
+    code: error.code,
+    operation,
+    cause: error,
+    hamlibCode: error.hamlibCode,
+    hamlibMessage: error.hamlibMessage,
+  });
+}

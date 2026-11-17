@@ -46,6 +46,7 @@ import {
   HAMLIB_ERROR_MESSAGES,
   asHamlibError,
   closedError,
+  compoundError,
   disposedError,
   hungError,
 } from './errors.js';
@@ -829,6 +830,8 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
 
       try {
         return await body(this.#scope);
+      } catch (error) {
+        throw compoundError(error, operation);
       } finally {
         this.#scope.deactivate();
       }
