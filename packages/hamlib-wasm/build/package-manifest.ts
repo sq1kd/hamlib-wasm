@@ -20,6 +20,7 @@ import path from 'node:path';
 import { readJson } from './files.ts';
 import { kitCommandFiles } from './native-flags.ts';
 import {
+  CORRESPONDING_SOURCE,
   DIST_MODULE_JS,
   DIST_MODULE_TSD,
   DIST_DIR,
@@ -27,9 +28,13 @@ import {
   DIST_NATIVE_DIR,
   FINISH_MODULE_SCRIPT,
   LIBRARY_JS,
+  LINK_INPUTS_JSON,
   PACKAGE_DIR,
   PACKAGE_JSON,
+  PACKAGE_LICENSING_MANIFEST,
   PACKAGE_REBUILDING,
+  SOURCE_JSON,
+  THIRD_PARTY_DIR,
   TSD_SOURCE_PATH,
   bridgeInputs,
   packageRelative,
@@ -156,12 +161,10 @@ export const UPSTREAM_BASE_FILES: readonly string[] = [
 /** Upstream and provenance files that ship under `dist/third_party/hamlib`. */
 export function thirdPartyFiles(upstream: Upstream): readonly string[] {
   return [
-    ...UPSTREAM_BASE_FILES.map((file) => `dist/third_party/hamlib/${file}`),
-    ...upstream.patches.map((patch) => `dist/third_party/hamlib/${patch.file}`),
-    'dist/third_party/hamlib/SOURCE.json',
-    'dist/third_party/hamlib/LINK_INPUTS.json',
-    'dist/third_party/hamlib/PACKAGE-LICENSING.json',
-    'dist/third_party/hamlib/corresponding-source.tar.gz',
+    ...[...UPSTREAM_BASE_FILES, ...upstream.patches.map((patch) => patch.file)]
+      .map((file) => packageRelative(path.join(THIRD_PARTY_DIR, file))),
+    ...[SOURCE_JSON, LINK_INPUTS_JSON, PACKAGE_LICENSING_MANIFEST, CORRESPONDING_SOURCE]
+      .map(packageRelative),
   ];
 }
 
@@ -272,7 +275,10 @@ export function packageLicensingEntries(
   }
 
   for (const relative of thirdPartyFiles(upstream)) {
-    entries.push({ from: relative, to: relative.slice('dist/'.length) });
+    entries.push({
+      from: relative,
+      to: path.posix.relative(packageRelative(DIST_DIR), relative),
+    });
   }
 
   return entries;

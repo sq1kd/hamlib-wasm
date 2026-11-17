@@ -39,7 +39,18 @@ import {
   requiredPackageFiles,
   scannedPackageFiles,
 } from './package-manifest.ts';
-import { REPO_ROOT, releaseSourceDirName } from './paths.ts';
+import {
+  DIST_MODULE_JS,
+  DIST_MODULE_TSD,
+  LINK_INPUTS_JSON,
+  PACKAGE_LICENSING_MANIFEST,
+  REPO_ROOT,
+  SOURCE_JSON,
+  THIRD_PARTY_DIR,
+  packageRelative,
+  releaseSourceDirName,
+} from './paths.ts';
+import { type SourcePatch, readSourceManifest } from './provenance.ts';
 import { type Upstream, loadUpstream } from './upstream.ts';
 import { runRelink } from './verify-relink.ts';
 
@@ -91,29 +102,24 @@ function assertRequiredEntry(packageRoot: string, relative: string, kind: string
   assertFile(absolute, `required package file ${relative}`);
 }
 
-interface PatchRecord {
-  readonly file?: unknown;
-  readonly sha256?: unknown;
-}
-
 /** SOURCE.json lists every configured patch, in order, with its shipped hash. */
 function verifyPatchRecords(
   upstream: Upstream,
-  records: unknown,
+  records: readonly SourcePatch[],
   patchDir: string,
   what: string,
 ): void {
   assert(Array.isArray(records), `${what} has no patches list`);
   assert(
-    JSON.stringify((records as PatchRecord[]).map((record) => record.file))
+    JSON.stringify(records.map((record) => record.file))
     === JSON.stringify(upstream.patches.map((patch) => patch.file)),
     `${what} patches do not match the config`,
   );
 
-  for (const record of records as PatchRecord[]) {
+  for (const record of records) {
     assert(
-      record.sha256 === sha256File(path.join(patchDir, String(record.file))),
-      `${what} hash for ${String(record.file)} does not match the patch in ${patchDir}`,
+      record.sha256 === sha256File(path.join(patchDir, record.file)),
+      `${what} hash for ${record.file} does not match the patch in ${patchDir}`,
     );
   }
 }
@@ -183,7 +189,7 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
   }
 
   const loader = readFileSync(
-    path.join(packageRoot, 'dist/native/hamlib-wasm.mjs'),
+    path.join(packageRoot, packageRelative(DIST_MODULE_JS)),
     'utf8',
   );
   assert(loader.startsWith('// SPDX-License-Identifier:'), 'the loader has no SPDX banner');
@@ -193,7 +199,7 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
   );
 
   const declaration = readFileSync(
-    path.join(packageRoot, 'dist/native/hamlib-wasm.d.mts'),
+    path.join(packageRoot, packageRelative(DIST_MODULE_TSD)),
     'utf8',
   );
   assert(
@@ -201,17 +207,16 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
     'the generated declaration has no SPDX banner',
   );
 
-  const source = readJson<Record<string, unknown>>(
-    path.join(packageRoot, 'dist/third_party/hamlib/SOURCE.json'),
-  );
+  const thirdPartyDir = path.join(packageRoot, packageRelative(THIRD_PARTY_DIR));
+  const source = readSourceManifest(path.join(packageRoot, packageRelative(SOURCE_JSON)));
   assert(source.component === 'Hamlib', 'SOURCE.json component is not Hamlib');
   assert(source.version === upstream.version, 'SOURCE.json version does not match config');
   assert(source.upstreamCommit === upstream.commit, 'SOURCE.json commit does not match config');
   assert(source.upstreamTagObject === upstream.tagObject, 'SOURCE.json tag object does not match config');
   assert(source.upstreamRepository === upstream.repository, 'SOURCE.json repository does not match config');
   assert(
-    source.sourceArchiveSha256 === upstream.archive.sha256,
-    'SOURCE.json archive hash does not match config',
+    source.url === upstream.archive.url && source.sha256 === upstream.archive.sha256,
+    'SOURCE.json archive URL or hash does not match config',
   );
   assert(
     source.sourceArchiveFile === `source/${upstream.archive.name}`,
@@ -220,11 +225,11 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
   verifyPatchRecords(
     upstream,
     source.patches,
-    path.join(packageRoot, 'dist/third_party/hamlib'),
+    thirdPartyDir,
     'SOURCE.json',
   );
   assert(
-    source.emscriptenVersion !== null && String(source.emscriptenVersion).length > 0,
+    typeof source.emscriptenVersion === 'string' && source.emscriptenVersion.length > 0,
     'SOURCE.json has no Emscripten version',
   );
   assert(
@@ -232,7 +237,7 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
     'SOURCE.json rebuildInstructions does not point at REBUILDING.md',
   );
 
-  const sourceFileHashes = source.licenseFileSha256 as Record<string, string>;
+  const sourceFileHashes = source.licenseFileSha256;
   assert(sourceFileHashes && typeof sourceFileHashes === 'object', 'SOURCE.json has no license hashes');
   for (const [relative, hash] of Object.entries(sourceFileHashes)) {
     assertFile(path.join(packageRoot, relative), `hashed license file ${relative}`);
@@ -246,7 +251,7 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
     included?: { object?: string; license?: string }[];
     linkedLicenses?: string[];
     bridgeInputs?: { source?: string; license?: string }[];
-  }>(path.join(packageRoot, 'dist/third_party/hamlib/LINK_INPUTS.json'));
+  }>(path.join(packageRoot, packageRelative(LINK_INPUTS_JSON)));
   const included = linkInputs.included ?? [];
   assert(included.length > 0, 'LINK_INPUTS.json has no included objects');
 
@@ -292,7 +297,7 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
   const kitArchiveFile = path.join(kitArtifact.kit, 'source', upstream.archive.name);
   const kitPatchDir = path.join(kitArtifact.kit, 'patches');
   assert(
-    sha256File(kitArchiveFile) === source.sourceArchiveSha256,
+    sha256File(kitArchiveFile) === source.sha256,
     'the kit embedded archive hash does not match SOURCE.json',
   );
   verifyPatchRecords(upstream, source.patches, kitPatchDir, 'SOURCE.json (kit patches)');
@@ -312,7 +317,7 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
   }
 
   const packageLicensing = readJson<{ copy?: unknown[] }>(
-    path.join(packageRoot, 'dist/third_party/hamlib/PACKAGE-LICENSING.json'),
+    path.join(packageRoot, packageRelative(PACKAGE_LICENSING_MANIFEST)),
   );
   assert(
     Array.isArray(packageLicensing.copy) && packageLicensing.copy.length > 0,

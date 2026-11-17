@@ -20,7 +20,7 @@ import path from 'node:path';
 
 import { runCodegen } from './codegen.ts';
 import { assert, runMain } from './errors.ts';
-import { capture, jobs, log, requireTool, run } from './exec.ts';
+import { jobs, log, requireTool, run } from './exec.ts';
 import { directoryFiles, fileDigest, readJson, writeJson } from './files.ts';
 import { finishModule } from './finish-module.mts';
 import { writeThirdPartyData } from './licensing.ts';
@@ -29,6 +29,7 @@ import {
   type NativeLayout,
   compileCommand,
   configureCommand,
+  emccVersion,
   kitCommandFiles,
   libraryPath,
   linkCommand,
@@ -79,10 +80,6 @@ interface BuildStamp {
   readonly key: string;
   readonly emcc: string;
   readonly version: string;
-}
-
-function emccVersion(): string {
-  return capture(SCOPE, 'emcc', ['--version']).split('\n')[0]?.trim() ?? '';
 }
 
 function buildKey(upstream: Upstream): string {

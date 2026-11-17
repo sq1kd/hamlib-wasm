@@ -8,7 +8,17 @@
  */
 import path from 'node:path';
 
+import { assert } from './errors.ts';
+import { capture } from './exec.ts';
 import { MODULE_JS, MODULE_TSD } from './paths.ts';
+
+/** The first line of `emcc --version`: the release and its revision. */
+export function emccVersion(): string {
+  const banner = capture('emcc', 'emcc', ['--version']).split('\n')[0]?.trim();
+
+  assert(banner, 'emcc --version printed nothing');
+  return banner;
+}
 
 export const CONFIGURE_ARGS: readonly string[] = [
   '--disable-shared',

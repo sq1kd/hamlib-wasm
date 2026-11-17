@@ -14,13 +14,16 @@ import process from 'node:process';
 
 import { assert } from './errors.ts';
 import { log } from './exec.ts';
-import { assertFile, readJson, sha256File, walk } from './files.ts';
+import { assertFile, sha256File, walk } from './files.ts';
 import {
   NATIVE_DIR,
   REPO_ROOT,
+  SOURCE_JSON,
+  packageRelative,
   releaseArchivePath,
   releaseSourceDirName,
 } from './paths.ts';
+import { type SourceManifest, readSourceManifest } from './provenance.ts';
 import type { Upstream } from './upstream.ts';
 
 /** Pack the workspace package and return the absolute tarball path. */
@@ -62,18 +65,18 @@ export function extractTarball(tarball: string, destination: string): string {
 export interface KitArtifact {
   readonly kit: string;
   readonly kitArchive: string;
-  readonly source: Record<string, unknown>;
+  readonly source: SourceManifest;
 }
 
 /** Extract `corresponding-source.tar.gz` from an unpacked package. */
 export function extractKit(packageRoot: string, destination: string): KitArtifact {
-  const source = readJson<Record<string, unknown>>(
-    path.join(packageRoot, 'dist/third_party/hamlib/SOURCE.json'),
-  );
-  const corresponding = source.correspondingSource;
+  const source = readSourceManifest(path.join(packageRoot, packageRelative(SOURCE_JSON)));
 
-  assert(typeof corresponding === 'string', 'SOURCE.json has no correspondingSource path');
-  const kitArchive = path.join(packageRoot, corresponding);
+  assert(
+    typeof source.correspondingSource === 'string',
+    'SOURCE.json has no correspondingSource path',
+  );
+  const kitArchive = path.join(packageRoot, source.correspondingSource);
 
   assertFile(kitArchive, 'corresponding-source archive');
   mkdirSync(destination, { recursive: true });

@@ -17,7 +17,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { assert } from './errors.ts';
-import { assertFile, readJson, sha256File, walk, writeJson } from './files.ts';
+import { assertFile, sha256File, walk, writeJson } from './files.ts';
 import { log } from './exec.ts';
 import {
   LICENSE_FILES,
@@ -26,7 +26,7 @@ import {
   UPSTREAM_LICENSE_FILES,
   kitBridgePath,
 } from './package-manifest.ts';
-import { kitCommandFiles } from './native-flags.ts';
+import { emccVersion, kitCommandFiles } from './native-flags.ts';
 import {
   packageLicensingManifest,
   patchesSha256,
@@ -47,11 +47,13 @@ import {
   SOURCE_JSON,
   THIRD_PARTY_DIR,
   bridgeInputs,
+  packageRelative,
   releaseArchivePath,
   releaseKitStaging,
   releaseSourceDir,
   releaseSourceDirName,
 } from './paths.ts';
+import { type SourceManifest, readSourceManifest } from './provenance.ts';
 import { loadUpstream, type Upstream } from './upstream.ts';
 
 export interface LinkInput {
@@ -246,15 +248,6 @@ export function readLinkInputs(mapFile: string): LinkInputs {
   };
 }
 
-function emscriptenVersion(): string | null {
-  try {
-    const output = execFileSync('emcc', ['--version'], { encoding: 'utf8' });
-    return output.split('\n')[0]?.trim() ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /** Copy the root licensing files into the package. */
 export function syncPackageLicenseFiles(): void {
   rmSync(PACKAGE_LICENSES_DIR, { recursive: true, force: true });
@@ -277,14 +270,11 @@ export function syncPackageLicenseFiles(): void {
  */
 export function writeRebuildingGuide(): void {
   const upstream = loadUpstream();
-  const source = readJson<{
-    emscriptenVersion?: string | null;
-    patches?: readonly { file: string; sha256: string }[];
-  }>(SOURCE_JSON);
+  const source = readSourceManifest();
 
   assert(source.patches && source.patches.length > 0, 'SOURCE.json lists no patches');
 
-  const emscripten = /(\d+\.\d+\.\d+)/.exec(String(source.emscriptenVersion ?? ''));
+  const emscripten = /(\d+\.\d+\.\d+)/.exec(source.emscriptenVersion);
 
   assert(emscripten, 'SOURCE.json has no Emscripten version');
 
@@ -350,48 +340,37 @@ export function writeThirdPartyData(linkMapFile: string): void {
   const linkInputs = readLinkInputs(linkMapFile);
   writeJson(LINK_INPUTS_JSON, linkInputs);
 
-  const patchHashes = Object.fromEntries(
-    upstream.patches.map((patch) => [
-      patch.file,
-      sha256File(path.join(THIRD_PARTY_DIR, patch.file)),
-    ]),
-  );
-
   const licenseHashes = Object.fromEntries(
     [
       ...LICENSE_FILES,
       ...UPSTREAM_LICENSE_FILES.map(
-        (file) => `dist/third_party/hamlib/${file}`,
+        (file) => packageRelative(path.join(THIRD_PARTY_DIR, file)),
       ),
     ].map((relative) => [relative, sha256File(path.join(PACKAGE_DIR, relative))]),
   );
 
-  const source = {
+  const source: SourceManifest = {
     component: 'Hamlib',
-    package: 'Hamlib',
     version: upstream.version,
     series: upstream.series,
     license: upstream.license,
     upstreamRepository: upstream.repository,
     upstreamCommit: upstream.commit,
     upstreamTagObject: upstream.tagObject,
-    upstreamTag: upstream.version,
-    sourceArchive: upstream.archive.url,
-    sourceArchiveFile: `source/${upstream.archive.name}`,
-    sourceArchiveSha256: upstream.archive.sha256,
     url: upstream.archive.url,
     sha256: upstream.archive.sha256,
+    sourceArchiveFile: `source/${upstream.archive.name}`,
     patches: upstream.patches.map((patch) => ({
       file: patch.file,
       purpose: patch.purpose,
-      sha256: patchHashes[patch.file],
+      sha256: sha256File(path.join(THIRD_PARTY_DIR, patch.file)),
     })),
-    correspondingSource: 'dist/third_party/hamlib/corresponding-source.tar.gz',
+    correspondingSource: packageRelative(CORRESPONDING_SOURCE),
     correspondingSourceSha256: existsSync(CORRESPONDING_SOURCE)
       ? sha256File(CORRESPONDING_SOURCE)
       : null,
     rebuildInstructions: 'REBUILDING.md',
-    emscriptenVersion: emscriptenVersion(),
+    emscriptenVersion: emccVersion(),
     nodeVersion: process.version,
     linkedLicenses: linkInputs.linkedLicenses,
     bundledSourceLicenses: [
@@ -404,7 +383,7 @@ export function writeThirdPartyData(linkMapFile: string): void {
     ],
     licenseFiles: LICENSE_FILES,
     licenseFileSha256: licenseHashes,
-    linkInputs: 'dist/third_party/hamlib/LINK_INPUTS.json',
+    linkInputs: packageRelative(LINK_INPUTS_JSON),
     linkInputsSha256: sha256File(LINK_INPUTS_JSON),
     note:
       'Built into WebAssembly with the browser serial transport in '
@@ -520,10 +499,10 @@ export function buildCorrespondingSourceKit(): void {
     stdio: 'inherit',
   });
 
-  const source = readJson<Record<string, unknown>>(SOURCE_JSON);
-  source.correspondingSource = 'dist/third_party/hamlib/corresponding-source.tar.gz';
-  source.correspondingSourceSha256 = sha256File(CORRESPONDING_SOURCE);
-  writeJson(SOURCE_JSON, source);
+  writeJson(SOURCE_JSON, {
+    ...readSourceManifest(),
+    correspondingSourceSha256: sha256File(CORRESPONDING_SOURCE),
+  } satisfies SourceManifest);
 
   log('licensing', `built corresponding-source kit (${sha256File(CORRESPONDING_SOURCE)})`);
 }
