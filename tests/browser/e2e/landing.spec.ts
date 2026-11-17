@@ -11,6 +11,9 @@
  *  - Auto-detect, the default, finds the rate and connects;
  *  - once open, its polls only read: no command they send sets frequency,
  *    mode or transmit; each control writes only when pressed.
+ *
+ * The clock is manual: the page keeps a waterfall and a sample meter on
+ * intervals, which an auto clock would fire without end.
  */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -22,6 +25,7 @@ import {
   releasePtt,
   removeWebSerial,
   runClockUntilElement,
+  runClockUntilPortClosed,
   useRig,
 } from '../fixtures';
 import { SITE_ORIGIN } from '../servers';
@@ -50,11 +54,11 @@ async function connectTs480(page: Page, baud: string): Promise<void> {
   await page.getByTestId('model-select').selectOption({ label: 'Kenwood TS-480' });
   await page.getByTestId('baud-select').selectOption(baud);
   await page.getByTestId('connect-button').click();
-  await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'connected', { timeout: 30_000 });
+  await runClockUntilElement(page, { testId: 'connection-state', state: 'connected' });
 }
 
 test('the panel is HTML until asked: sample readings, the catalogue, and no Wasm', async ({ page }) => {
-  await installSerialDoubles(page, 'auto');
+  await installSerialDoubles(page, 'manual');
 
   const wasm = wasmRequests(page);
 
@@ -75,7 +79,7 @@ test('the panel is HTML until asked: sample readings, the catalogue, and no Wasm
 });
 
 test('connects the emulated TS-480, shows what it reports, polls only reads and writes on request', async ({ page }) => {
-  await installSerialDoubles(page, 'auto');
+  await installSerialDoubles(page, 'manual');
   await connectTs480(page, '9600');
 
   await expect(page.getByTestId('frequency-display')).toHaveText('14.074.000');
@@ -100,20 +104,22 @@ test('connects the emulated TS-480, shows what it reports, polls only reads and 
   await runClockUntilElement(page, { testId: 'frequency-display', text: '14.075.000' });
 
   await pressPtt(page);
+  await runClockUntilElement(page, { testId: 'ptt-state', state: 'on' });
   await expect(page.getByTestId('ptt-state')).toBeVisible();
   await expect(page.getByTestId('ptt-button')).toHaveAttribute('aria-pressed', 'true');
   await releasePtt(page);
+  await runClockUntilElement(page, { testId: 'ptt-state', state: 'off' });
   await expect(page.getByTestId('ptt-state')).toBeHidden();
   expect((await readFakeSerial(page)).state.transmitting).toBe(false);
 
   await page.getByTestId('disconnect-button').click();
+  await runClockUntilPortClosed(page);
   await expect(page.getByTestId('connection-state')).toHaveAttribute('data-state', 'disconnected');
   await expect(page.getByTestId('connection-state')).toHaveText('Sample');
-  await expect.poll(async () => (await readFakeSerial(page)).isOpen).toBe(false);
 });
 
 test('Auto-detect finds the rate, connects, and says which rate it used', async ({ page }) => {
-  await installSerialDoubles(page, 'auto');
+  await installSerialDoubles(page, 'manual');
   await connectTs480(page, 'auto');
 
   await expect(page.getByTestId('frequency-display')).toHaveText('14.074.000');

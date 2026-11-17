@@ -23,6 +23,9 @@
  *    fires.  A scenario that runs inside one `page.evaluate()` just awaits;
  *    `advance(ms)` lets a stated span of virtual time pass, firing everything
  *    due within it in deadline order.
+ *    A page that re-arms timers on its own - an animation or a meter on an
+ *    interval - never lets it rest, and a busy Firefox then starves its own
+ *    timers; drive such a page on `manual`.
  *  - `manual`: time does not move unless the spec asks - `advance(ms)` runs a
  *    span, `settle(promise)` and `until(predicate)` run timers in order until
  *    the condition holds.  Work due at the current instant (a zero-delay
