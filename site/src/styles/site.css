@@ -255,7 +255,7 @@
 }
 
 /*
- * The demo page, whose content demo.mdx wraps in `.demo-page`.  One column of
+ * The demo page, whose content src/pages/demo.astro wraps in `.demo-page`.  One column of
  * Starlight's reading width carries the title, the text, the radio and its
  * call console, so every block shares two edges.  Wide enough, the column
  * widens and splits in two tracks: the intro, the radio and the notes on the

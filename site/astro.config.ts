@@ -1,6 +1,7 @@
 import react from '@astrojs/react';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
+import starlightLlmsTxt from 'starlight-llms-txt';
 import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
 
 import { hamlibLicensing } from './integrations/licensing';
@@ -61,6 +62,12 @@ export default defineConfig({
       ],
       disable404Route: true,
       plugins: [
+        /* llms.txt, llms-full.txt and llms-small.txt, rendered from the pages. */
+        starlightLlmsTxt({
+          demote: ['api/**'],
+          exclude: ['api/**'],
+          customSelectors: { all: ['.sl-anchor-link'] },
+        }),
         starlightTypeDoc({
           entryPoints: ENTRIES.map((entry) => entry.source),
           tsconfig: TSCONFIG,
@@ -85,7 +92,7 @@ export default defineConfig({
           label: 'Start here',
           items: [
             { label: 'Getting started', slug: 'getting-started' },
-            { label: 'Live demo', slug: 'demo' },
+            { label: 'Live demo', link: '/demo/' },
             { label: 'How it works', slug: 'how-it-works' },
           ],
         },

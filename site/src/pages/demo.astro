@@ -1,0 +1,57 @@
+---
+/* A page, not a docs entry: the demo is a React app, and docs entries are also
+ * rendered to markdown for llms.txt, where a live radio panel has no meaning. */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+import { megabytes } from '../bytes';
+import LiveDemo from '../components/LiveDemo';
+import { DEMO_DOWNLOAD, WEB_SERIAL_BROWSERS } from '../facts';
+import { repositoryPage } from '../links';
+
+const frontmatter = {
+  title: 'Live demo',
+  description: 'Drive a real radio from this page over Web Serial.',
+  tableOfContents: false as const,
+  editUrl: repositoryPage('/edit/main/site/src/pages/demo.astro') ?? (false as const),
+};
+---
+
+<StarlightPage frontmatter={frontmatter}>
+  <div class="demo-page">
+    <p>
+      Connect a radio over USB, pick its model and press <strong>Connect your radio</strong>. It
+      needs {WEB_SERIAL_BROWSERS}. Until a radio is connected, the panel plays sample readings.
+    </p>
+
+    <LiveDemo client:only="react" />
+
+    <div class="demo-notes">
+      <p>
+        <strong>Auto-detect</strong> tries the rates the model supports, highest first, and
+        remembers the one that answered, so the next connect tries it first. Picking the rate set
+        in the radio’s menu skips the search.
+      </p>
+      <p>
+        <strong>Library calls</strong>, with the radio, logs every call the panel makes. Its switch
+        picks, before connecting, which of two ways drives the <strong>same</strong> rig and the
+        same Hamlib module:
+      </p>
+      <ul>
+        <li>
+          <strong>Rig</strong> - <code>rig.setMode(mode)</code>, <code>rig.setPassband('narrow')</code> and
+          two <code>useRigState</code> polls: frequency, mode and PTT once a second, and the S-meter
+          every 250 ms;
+        </li>
+        <li>
+          <strong>Raw</strong> - <code>rig.raw</code>, the underlying <code>RawRig</code>: <code>getFrequency()</code>, <code>getMode()</code> and <code>getPtt()</code> polled by
+          hand, and <code>setMode(mode, width)</code> with an explicit width from <code>passbandNormal()</code>.
+        </li>
+      </ul>
+      <p>
+        The demo loads with this page only: it fetches the Hamlib WebAssembly module and its
+        loader, {megabytes(DEMO_DOWNLOAD.gzip)} gzip, which no other page of this site does. If
+        your browser asks to save data, it waits for a click instead.
+      </p>
+    </div>
+  </div>
+</StarlightPage>
