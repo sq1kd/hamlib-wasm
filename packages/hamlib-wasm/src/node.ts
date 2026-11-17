@@ -40,6 +40,7 @@
  */
 
 import { HamlibError } from './errors.js';
+import { parseUsbId } from './hex.js';
 import { runsInNode } from './runtime.js';
 import type {
   PortRequest,
@@ -235,10 +236,8 @@ interface PortListeners {
 
 /** `listPorts()`' hex strings as Web Serial's numeric ids; absent ones stay absent. */
 function usbInfo(listed: NodeSerialPortListEntry | undefined): SerialPortInfo {
-  const id = (hex: string | undefined): number | undefined =>
-    hex !== undefined && /^[0-9a-f]{1,4}$/i.test(hex) ? Number.parseInt(hex, 16) : undefined;
-  const usbVendorId = id(listed?.vendorId);
-  const usbProductId = id(listed?.productId);
+  const usbVendorId = parseUsbId(listed?.vendorId);
+  const usbProductId = parseUsbId(listed?.productId);
 
   return {
     ...(usbVendorId === undefined ? {} : { usbVendorId }),

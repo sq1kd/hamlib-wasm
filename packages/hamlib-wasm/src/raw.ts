@@ -48,6 +48,7 @@ import {
   disposedError,
   hungError,
 } from './errors.js';
+import { bytesToHex, formatUsbId, hexToBytes } from './hex.js';
 import { selectTransport } from './transport-select.js';
 import type {
   PortRequest,
@@ -789,12 +790,8 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
       throw invalid(`replyLength must be an integer from 0 to ${MAX_RAW_REPLY}, got ${String(replyLength)}`);
     }
 
-    let hex = '';
-
-    for (const byte of bytes) {
-      hex += byte.toString(16).padStart(2, '0');
-    }
-
+    /* Encoded now: the caller may reuse the buffer while the call queues. */
+    const hex = bytesToHex(bytes);
     const reply = await this.#call('sendRaw', async () => {
       const result = await this.#context.native.sendRaw(
         this.#handle,
@@ -808,13 +805,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
       return String(result.value);
     });
 
-    const out = new Uint8Array(reply.length / 2);
-
-    for (let index = 0; index < out.length; index++) {
-      out[index] = Number.parseInt(reply.slice(index * 2, index * 2 + 2), 16);
-    }
-
-    return out;
+    return hexToBytes(reply);
   }
 
   protected failed(result: { code: number; error: unknown }, operation: string): Error {
@@ -1393,7 +1384,6 @@ class RawHamlibInstance implements RawHamlib, RigContext {
   diagnostics(): Diagnostics {
     const rigs: DiagnosticsRig[] = [...this.#rigs].map((rig) => {
       const info = rig.portInfo();
-      const hex = (id: number): string => id.toString(16).padStart(4, '0');
 
       return {
         path: rig.path,
@@ -1404,7 +1394,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
         baudRate: rig.baudRate,
         connected: rig.connected,
         ...(info?.usbVendorId !== undefined && info.usbProductId !== undefined
-          ? { usb: { vendorId: hex(info.usbVendorId), productId: hex(info.usbProductId) } }
+          ? { usb: { vendorId: formatUsbId(info.usbVendorId), productId: formatUsbId(info.usbProductId) } }
           : {}),
       };
     });

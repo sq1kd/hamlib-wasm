@@ -10,6 +10,7 @@
  */
 
 import { HamlibError } from './errors.js';
+import { bytesToHex } from './hex.js';
 import { describeRuntime } from './runtime.js';
 
 /** Hamlib's `rig_debug_level_e`, quietest first. */
@@ -120,16 +121,6 @@ function push<T>(buffer: T[], entry: T, limit: number): void {
   }
 }
 
-function toHex(bytes: Uint8Array): string {
-  let hex = '';
-
-  for (const byte of bytes) {
-    hex += byte.toString(16).padStart(2, '0');
-  }
-
-  return hex;
-}
-
 /** The three buffers of one instance. */
 export class DiagnosticsRecorder {
   readonly #log: LogEntry[] = [];
@@ -156,7 +147,7 @@ export class DiagnosticsRecorder {
   }
 
   trace(direction: 'tx' | 'rx', path: string, bytes: Uint8Array): void {
-    push(this.#trace, { time: Date.now(), direction, path, hex: toHex(bytes) }, TRACE_LIMIT);
+    push(this.#trace, { time: Date.now(), direction, path, hex: bytesToHex(bytes) }, TRACE_LIMIT);
   }
 
   error(operation: string, error: unknown): void {
