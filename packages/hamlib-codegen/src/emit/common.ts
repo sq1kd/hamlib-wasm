@@ -14,7 +14,7 @@
 import type { GeneratedOperation } from '../classify.ts';
 import type { ConfigPair, Model, ModelOperation } from '../config.ts';
 import { VOCABULARY_TYPES } from '../enums.ts';
-import type { BoundaryType, ProjectionSpec, TypeBinding } from '../types.ts';
+import type { ProjectionSpec, TypeBinding } from '../types.ts';
 
 export const CONFIG_PATH = 'packages/hamlib-wasm/hamlib.config.yaml';
 
@@ -29,20 +29,12 @@ export interface ValueObjectField {
 }
 
 export interface ValueObject {
+  /** The C++ struct. */
   readonly name: string;
+  /** The Embind name the TypeScript declaration carries. */
+  readonly binding: string;
   readonly fields: readonly ValueObjectField[];
 }
-
-function valueObject(name: string, fields: readonly (readonly [string, BoundaryType])[]): ValueObject {
-  return { name, fields: fields.map(([field, boundary]) => ({ name: field, boundary })) };
-}
-
-/** The single-value results generated operations share with the bespoke ones. */
-const FLAT_RESULTS: readonly ValueObject[] = [
-  valueObject('NumberResult', [['code', 'int'], ['value', 'double'], ['error', 'string']]),
-  valueObject('TextResult', [['code', 'int'], ['value', 'string'], ['error', 'string']]),
-  valueObject('BoolResult', [['code', 'int'], ['value', 'bool'], ['error', 'string']]),
-];
 
 const CPP_ARGUMENT: Readonly<Record<string, string>> = {
   int: 'int',
@@ -295,30 +287,40 @@ export function fieldCpp(boundary: string): string {
   return boundary === 'string' ? 'std::string' : boundary;
 }
 
-/** The generated value objects: the shared flat results and every per-operation one. */
-export function resultObjects(model: Model, facts: readonly OperationFacts[]): ValueObject[] {
-  const objects = new Map<string, ValueObject>();
-  const used = new Set([...facts.map((fact) => fact.result), ...model.operations.map((operation) => operation.result)]);
+function shapeOf(object: ValueObject): string {
+  return object.fields.map((field) => `${field.name}: ${field.boundary}`).join(', ');
+}
 
-  for (const flat of FLAT_RESULTS) {
-    if (used.has(flat.name)) {
-      objects.set(flat.name, flat);
-    }
-  }
+/**
+ * Every result value object: the ones the config declares, and one per
+ * result name the generated operations use besides those.  A generated
+ * operation may share a result with others, or with a config entry, only
+ * when the fields agree.
+ */
+export function resultObjects(model: Model, facts: readonly OperationFacts[]): ValueObject[] {
+  const objects = new Map<string, ValueObject>(Object.entries(model.results).map(([name, result]) => [name, {
+    name,
+    binding: result.binding ?? name,
+    fields: result.fields.map(([field, boundary]) => ({ name: field, boundary })),
+  }]));
 
   for (const fact of facts) {
-    if (objects.has(fact.result) || fact.result in model.results) {
-      continue;
-    }
-
-    objects.set(fact.result, {
+    const object: ValueObject = {
       name: fact.result,
+      binding: fact.result,
       fields: [
         { name: 'code', boundary: 'int' },
         ...fact.fields.map((field) => ({ name: field.name, boundary: field.binding.boundary })),
         { name: 'error', boundary: 'string' },
       ],
-    });
+    };
+    const known = objects.get(fact.result);
+
+    if (known && shapeOf(known) !== shapeOf(object)) {
+      throw new Error(`${fact.operation.symbol}: ${fact.result} is { ${shapeOf(known)} }, the operation returns { ${shapeOf(object)} }`);
+    }
+
+    objects.set(fact.result, known ?? object);
   }
 
   return [...objects.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -328,17 +330,11 @@ export function resultObjects(model: Model, facts: readonly OperationFacts[]): V
 export function bespokeResultFields(model: Model, result: string): readonly ConfigPair[] {
   const declared = model.results[result]?.fields;
 
-  if (declared) {
-    return declared;
+  if (!declared) {
+    throw new Error(`no value object ${result} in the config's results`);
   }
 
-  const flat = FLAT_RESULTS.find((candidate) => candidate.name === result);
-
-  if (!flat) {
-    throw new Error(`no value object ${result}`);
-  }
-
-  return flat.fields.map((field) => [field.name, field.boundary] as const);
+  return declared;
 }
 
 /** The vector binding a `T[]` config result crosses as. */

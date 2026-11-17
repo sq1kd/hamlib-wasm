@@ -4,7 +4,7 @@
  * The generated C++ the facade includes:
  *
  *   native/generated/codecs.h          name codecs for enums Hamlib has none for
- *   native/generated/results.inc       value objects for generated results
+ *   native/generated/results.inc       every value object the boundary returns
  *   native/generated/operations.inc    generated Facade method bodies
  *   native/generated/capabilities.inc  the rig_caps capability matrix
  *   native/generated/embind.inc        Embind registrations (bespoke + generated)
@@ -98,6 +98,7 @@ export function emitResults(model: Model, facts: readonly OperationFacts[]): str
   for (const spec of usedProjections(facts)) {
     lines.push(...emitValueObjectStruct({
       name: spec.cpp,
+      binding: spec.cpp,
       fields: spec.fields.map((field) => ({ name: field.name, boundary: field.binding.boundary })),
     }));
   }
@@ -453,12 +454,8 @@ function emitFunction(name: string, parameters: readonly string[], call: string)
 export function emitEmbind(model: Model, facts: readonly OperationFacts[]): string {
   const lines: string[] = [GENERATED_HEADER];
 
-  for (const [name, result] of Object.entries(model.results)) {
-    lines.push('', ...emitValueObject(name, result.binding ?? name, result.fields.map(([field]) => field)));
-  }
-
   for (const object of resultObjects(model, facts)) {
-    lines.push('', ...emitValueObject(object.name, object.name, object.fields.map((field) => field.name)));
+    lines.push('', ...emitValueObject(object.name, object.binding, object.fields.map((field) => field.name)));
   }
 
   for (const spec of usedProjections(facts)) {

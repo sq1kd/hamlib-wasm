@@ -48,10 +48,11 @@ ownedConf:
   auto_power_on: switch the rig on with setPowerstat()
   auto_power_off: switch the rig off with setPowerstat()
 
-# Value objects the Embind boundary returns whose C++ structs are declared in
-# native/facade.cpp.  The generator registers them; it never defines them.
-# The generated single-output results (NumberResult, TextResult and the
-# per-operation Get*Result structs) are derived from the AST instead.
+# The value objects the bespoke operations return, and the code-only and
+# single-value results the generated operations share with them.  The
+# generator defines each struct in native/generated/results.inc and registers
+# it with Embind.  A generated result of any other shape (one struct, or
+# several outputs) is derived from the AST.
 results:
   ModelInfo:
     binding: RigModelInfo
@@ -78,6 +79,21 @@ results:
     fields:
       - [ code, int ]
       - [ error, string ]
+  NumberResult:
+    fields:
+      - [ code, int ]
+      - [ value, double ]
+      - [ error, string ]
+  TextResult:
+    fields:
+      - [ code, int ]
+      - [ value, string ]
+      - [ error, string ]
+  BoolResult:
+    fields:
+      - [ code, int ]
+      - [ value, bool ]
+      - [ error, string ]
   OpenResult:
     fields:
       - [ code, int ]
@@ -89,10 +105,8 @@ results:
       - [ ptt, string, PttState ]
       - [ error, string ]
 
-# Embind vector registrations.  `ModelInfo` is a C++ struct declared in
-# native/facade.cpp; `RigConfparams` is the projection the generator derives
-# from upstream `struct confparams`.  Neither element type can be named from
-# the config alone, so both are listed here.
+# Embind vector registrations.  `ModelInfo` is a result above; `RigConfparams`
+# is the projection the generator derives from upstream `struct confparams`.
 vectors:
   - type: ModelInfo
     binding: RigModelList

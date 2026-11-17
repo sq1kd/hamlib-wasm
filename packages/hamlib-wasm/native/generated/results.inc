@@ -55,6 +55,12 @@ struct BoolResult
     std::string error;
 };
 
+struct CodeResult
+{
+    int code;
+    std::string error;
+};
+
 struct ExtLookupResult
 {
     int code;
@@ -188,10 +194,41 @@ struct LookupMemCapsResult
     std::string error;
 };
 
+struct ModelInfo
+{
+    int id;
+    std::string manufacturer;
+    std::string model;
+    std::string backendVersion;
+    int status;
+    int serialRateMin;
+    int serialRateMax;
+    int serialDataBits;
+    int serialStopBits;
+    std::string serialParity;
+    std::string serialHandshake;
+    bool canGetPtt;
+    bool canSetPtt;
+};
+
 struct NumberResult
 {
     int code;
     double value;
+    std::string error;
+};
+
+struct OpenResult
+{
+    int code;
+    int handle;
+    std::string error;
+};
+
+struct PttResult
+{
+    int code;
+    std::string ptt;
     std::string error;
 };
 

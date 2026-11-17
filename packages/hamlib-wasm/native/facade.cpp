@@ -46,43 +46,6 @@
 /* value objects                                                         */
 /* --------------------------------------------------------------------- */
 
-struct ModelInfo
-{
-    int id;
-    std::string manufacturer;
-    std::string model;
-    std::string backendVersion;
-    int status;
-    int serialRateMin;
-    int serialRateMax;
-    int serialDataBits;
-    int serialStopBits;
-    std::string serialParity;
-    std::string serialHandshake;
-    bool canGetPtt;
-    bool canSetPtt;
-};
-
-struct CodeResult
-{
-    int code;
-    std::string error;
-};
-
-struct OpenResult
-{
-    int code;
-    int handle;
-    std::string error;
-};
-
-struct PttResult
-{
-    int code;
-    std::string ptt;
-    std::string error;
-};
-
 /* A C string Hamlib may leave NULL, as a std::string. */
 static std::string textOrEmpty(const char *text)
 {
@@ -90,9 +53,9 @@ static std::string textOrEmpty(const char *text)
 }
 
 /*
- * Value objects for the generated results and projections, and the packing of
- * a projection a bespoke body returns.  Regenerated from hamlib.config.yaml
- * and the upstream AST; see packages/hamlib-codegen.
+ * Every value object the boundary returns, and the packing of a projection a
+ * bespoke body returns.  Regenerated from hamlib.config.yaml and the upstream
+ * AST; see packages/hamlib-codegen.
  */
 #include "generated/results.inc"
 
