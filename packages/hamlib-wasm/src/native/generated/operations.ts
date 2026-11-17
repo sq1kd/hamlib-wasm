@@ -52,9 +52,17 @@ export interface NativeOperations {
   /** Bound to the bespoke facade body in native/facade.cpp. */
   unregisterPort(logicalPath: string): Asyncify<CodeResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
-  openRig(modelId: number, logicalPath: string, baudRate: number): Asyncify<OpenResult>;
+  openRig(modelId: number, logicalPath: string, baudRate: number, conf: string): Asyncify<OpenResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
-  probeBaudRate(modelId: number, logicalPath: string, baudRate: number): Asyncify<CodeResult>;
+  probeBaudRate(modelId: number, logicalPath: string, baudRate: number, conf: string): Asyncify<CodeResult>;
+  /** Bound to the bespoke facade body in native/facade.cpp. */
+  setDebug(level: number): Asyncify<CodeResult>;
+  /** Bound to the bespoke facade body in native/facade.cpp. */
+  sendMorse(handle: number, text: string, checkMode: boolean): Asyncify<NumberResult>;
+  /** Bound to the bespoke facade body in native/facade.cpp. */
+  stopMorse(handle: number): Asyncify<CodeResult>;
+  /** Bound to the bespoke facade body in native/facade.cpp. */
+  sendRaw(handle: number, data: string, terminator: number, replyLength: number): Asyncify<TextResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
   closeRig(handle: number): Asyncify<CodeResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
@@ -152,6 +160,10 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   getTs(handle: number): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
+  powerToMilliwatts(handle: number, arg0: number, arg1: number, arg2: string): Asyncify<NumberResult>;
+  /** Can suspend: the result is a promise when the transport has to wait. */
+  milliwattsToPower(handle: number, arg0: number, arg1: number, arg2: string): Asyncify<NumberResult>;
+  /** Can suspend: the result is a promise when the transport has to wait. */
   setLevel(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getLevel(handle: number, arg0: string): Asyncify<NumberResult>;
@@ -193,6 +205,12 @@ export interface NativeOperations {
   setFunc(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getFunc(handle: number, arg0: string): Asyncify<NumberResult>;
+  /** Can suspend: the result is a promise when the transport has to wait. */
+  sendDtmf(handle: number, arg0: string): Asyncify<CodeResult>;
+  /** Can suspend: the result is a promise when the transport has to wait. */
+  sendVoiceMem(handle: number, arg0: number): Asyncify<CodeResult>;
+  /** Can suspend: the result is a promise when the transport has to wait. */
+  stopVoiceMem(handle: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setBank(handle: number, arg0: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -284,7 +302,7 @@ type Expect<T extends true> = T;
  * push-to-talk over the serial RTS/DTR line declares no `get_ptt`/`set_ptt`
  * function pointer, yet PTT works through the port.
  */
-export type RigFlag = 'canGetPtt' | 'canSetPtt';
+export type RigFlag = 'canGetPtt' | 'canSetPtt' | 'canSendMorse' | 'canStopMorse';
 
 /**
  * Operations gated on one of those flags, so `src/raw.ts` can fold them
@@ -788,6 +806,46 @@ export interface GeneratedPublicOperations {
    */
   getTs(): Promise<number>;
   /**
+   * Conversion utility from relative range to absolute in mW.
+   *
+   * Converts a power value expressed in a range on a [0.0 .. 1.0] relative scale
+   * to the real transmit power in milli Watts the radio would emit. The `freq`
+   * and `mode` where the conversion should take place must be also provided
+   * since the relative power is peculiar to a specific freq and mode range of
+   * the radio.
+   *
+   * From Hamlib's documentation of `rig_power2mW()`.
+   *
+   * @param power - The relative power.
+   * @param freq - The frequency where the conversion should take place. In
+   *   hertz.
+   * @param mode - The mode where the conversion should take place. Named as
+   *   {@link RawRig.strRmode} spells it: `RIG_MODE_USB` is `"USB"`.
+   * @returns The converted power in mW.
+   * @see {@link RawRig.milliwattsToPower}
+   */
+  powerToMilliwatts(power: number, freq: number, mode: string): Promise<number>;
+  /**
+   * Conversion utility from absolute in mW to relative range.
+   *
+   * Converts a power value expressed in the real transmit power in milli Watts
+   * the radio would emit to a range on a [0.0 .. 1.0] relative scale. The `freq`
+   * and `mode` where the conversion should take place must be also provided
+   * since the relative power is peculiar to a specific freq and mode range of
+   * the radio.
+   *
+   * From Hamlib's documentation of `rig_mW2power()`.
+   *
+   * @param milliwatts - The power in mW.
+   * @param freq - The frequency where the conversion should take place. In
+   *   hertz.
+   * @param mode - The mode where the conversion should take place. Named as
+   *   {@link RawRig.strRmode} spells it: `RIG_MODE_USB` is `"USB"`.
+   * @returns The converted relative power.
+   * @see {@link RawRig.powerToMilliwatts}
+   */
+  milliwattsToPower(milliwatts: number, freq: number, mode: string): Promise<number>;
+  /**
    * Set a radio level setting.
    *
    * Sets the level of a setting. The level value `val` can be a float or an
@@ -1081,6 +1139,34 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.setFunc}
    */
   getFunc(func: string): Promise<number>;
+  /**
+   * Send DTMF digits.
+   *
+   * Sends DTMF digits. See DTMF change speed, etc. (TODO).
+   *
+   * From Hamlib's documentation of `rig_send_dtmf()`.
+   *
+   * @param digits - Digits to be send.
+   */
+  sendDtmf(digits: string): Promise<void>;
+  /**
+   * Send voice memory content.
+   *
+   * Sends voice memory content.
+   *
+   * From Hamlib's documentation of `rig_send_voice_mem()`.
+   *
+   * @param ch - Voice memory number to be sent.
+   */
+  sendVoiceMem(ch: number): Promise<void>;
+  /**
+   * Stop sending voice memory.
+   *
+   * Stops sending voice memory content.
+   *
+   * From Hamlib's documentation of `rig_stop_voice_mem()`.
+   */
+  stopVoiceMem(): Promise<void>;
   /**
    * Set the current memory bank.
    *

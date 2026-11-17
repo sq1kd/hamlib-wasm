@@ -155,6 +155,13 @@ interface HamlibWsApi {
   nextHandle: number;
   lastError: ErrorRecord | null;
 
+  /** Set by the TypeScript layer: every Hamlib debug line, once `setDebug` registered the callback. */
+  onLog: ((level: number, message: string) => void) | null;
+  /** Set by the TypeScript layer: every chunk written to or read from a port. */
+  onTrace: ((direction: 'tx' | 'rx', path: string, bytes: Uint8Array) => void) | null;
+  log(level: number, message: string): void;
+  trace(direction: 'tx' | 'rx', path: string, bytes: Uint8Array): void;
+
   /**
    * Release every port from JavaScript without crossing the Wasm boundary.
    * Only used when a native call is stuck and the module cannot be re-entered.
@@ -171,7 +178,7 @@ interface HamlibWsApi {
   queueRead(queue: ByteQueue, heap: Uint8Array, ptr: number, max: number): number;
   queueClear(queue: ByteQueue): void;
   wake(state: PortState, reason: WakeReason): void;
-  startPump(state: PortState): Promise<void>;
+  startPump(state: PortState, path: string): Promise<void>;
   makeState(options: SerialLineSettings, rts: number, dtr: number): PortState;
   allocHandle(record: PortRecord): number;
   teardown(record: PortRecord, state: PortState): Promise<number>;

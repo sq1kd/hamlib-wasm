@@ -46,10 +46,12 @@
 
 import { HamlibError, createRawHamlib } from './raw.js';
 import type {
+  Diagnostics,
   RawHamlib,
   RawHamlibOptions,
   PortRequest,
   RawRig,
+  RigConf,
   SerialPortLike,
 } from './raw.js';
 import type { DetectBaudRateOptions, RigMode, RigModeState, RigModel } from './catalogue.js';
@@ -73,7 +75,15 @@ export type {
 } from './catalogue.js';
 export type {
   BrowserSupport,
+  DebugLevel,
+  DebugOptions,
+  Diagnostics,
+  DiagnosticsRig,
+  ErrorEntry,
   HamlibErrorCode,
+  LogEntry,
+  RigConf,
+  TraceEntry,
   PortFilter,
   PortRequest,
   RigConfparam,
@@ -186,6 +196,10 @@ export interface RigOperationCapabilities {
   getPtt: boolean;
   /** {@link Rig.setPtt} is available. */
   setPtt: boolean;
+  /** {@link Rig.sendMorse} is available: the backend has a keyer command. */
+  sendMorse: boolean;
+  /** {@link Rig.stopMorse} can also stop the rig mid-message, not only drop the unsent rest. */
+  stopMorse: boolean;
 }
 
 /** {@link RigOperationCapabilities} plus the levels this rig will read. */
@@ -285,6 +299,14 @@ export interface OpenRigOptions {
    * `listPorts()`; without it the open rejects with `INVALID_ARGUMENT`.
    */
   port?: SerialPortLike;
+  /**
+   * Hamlib configuration tokens to set before the rig opens - an Icom
+   * `civaddr`, `ptt_type: 'RTS'` for PTT on the port's RTS line, a
+   * `post_write_delay` for a slow rig.  See {@link RawRig.tokenForeach} for
+   * the tokens a model knows; the tokens hamlib-wasm sets itself are refused
+   * with `INVALID_ARGUMENT`.
+   */
+  conf?: RigConf;
 }
 
 /** Options for {@link Rig.watch}. */
@@ -367,6 +389,18 @@ export interface Rig {
    * This transmits for real: have a dummy load or an antenna connected.
    */
   setPtt(on: boolean): Promise<void>;
+  /**
+   * Send `text` as Morse through the rig's keyer; the rig must be in CW or
+   * CWR mode.  Long text goes in chunks, so other calls - polling included -
+   * keep running while it is sent.  Resolves once the rig has accepted the
+   * last chunk.  This transmits.
+   */
+  sendMorse(text: string): Promise<void>;
+  /**
+   * Drop what {@link Rig.sendMorse} has not sent yet, and stop the rig
+   * keying when the backend can ({@link RigOperationCapabilities.stopMorse}).
+   */
+  stopMorse(): Promise<void>;
   /**
    * Read one level as configured for this instance.
    *
@@ -452,6 +486,12 @@ export interface Hamlib {
    * Rejects with `RIG_UNRESPONSIVE` when no rate answered.
    */
   detectBaudRate(options: DetectBaudRateOptions): Promise<number>;
+  /**
+   * A snapshot for a bug report: versions, runtime, the open rigs, recent
+   * errors and port traffic, and Hamlib's debug lines when `debug` was
+   * passed to {@link createHamlib}.  Plain JSON; nothing is sent anywhere.
+   */
+  diagnostics(): Diagnostics;
   /** Close every open rig and reject further work.  Idempotent. */
   dispose(): Promise<void>;
 }
@@ -472,6 +512,8 @@ export function capabilitiesOf(model: RigModel): RigOperationCapabilities {
     setMode: model.capabilities.has('setMode'),
     getPtt: model.capabilities.has('getPtt'),
     setPtt: model.capabilities.has('setPtt'),
+    sendMorse: model.capabilities.has('sendMorse'),
+    stopMorse: model.capabilities.has('stopMorse'),
   };
 }
 
@@ -544,7 +586,13 @@ class RigHandle implements Rig {
     onClose: (rig: RigHandle) => void,
   ) {
     this.#rig = rig as CompoundRig;
-    this.#operations = capabilitiesOf(rig.model);
+    /* The rig's own view, which counts what its `conf` added: PTT moved onto
+     * the RTS/DTR line works whatever the model declares. */
+    this.#operations = {
+      ...capabilitiesOf(rig.model),
+      getPtt: this.#rig.can('getPtt'),
+      setPtt: this.#rig.can('setPtt'),
+    };
     this.#configuredLevels = configuredLevels;
     this.#advertisedLevels = advertisedLevels;
     this.#onClose = onClose;
@@ -592,6 +640,14 @@ class RigHandle implements Rig {
     return this.#call('setPtt', () => this.#rig.runCompound('setPtt', async (operations) => {
       await operations.setPtt(on ? 'on' : 'off');
     }));
+  }
+
+  async sendMorse(text: string): Promise<void> {
+    return this.#call('sendMorse', () => this.#rig.sendMorse(text));
+  }
+
+  async stopMorse(): Promise<void> {
+    return this.#call('stopMorse', () => this.#rig.stopMorse());
   }
 
   async setPassband(kind: PassbandSelector): Promise<void> {
@@ -1091,6 +1147,7 @@ class HamlibInstance implements Hamlib {
       modelId: options.modelId,
       port,
       baudRate: options.baudRate,
+      conf: options.conf,
     });
     let advertised: readonly LevelName[];
 
@@ -1119,6 +1176,10 @@ class HamlibInstance implements Hamlib {
 
     this.#rigs.add(handle);
     return handle;
+  }
+
+  diagnostics(): Diagnostics {
+    return this.#hamlib.diagnostics();
   }
 
   dispose(): Promise<void> {

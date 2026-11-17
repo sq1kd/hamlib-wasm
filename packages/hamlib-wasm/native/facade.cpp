@@ -24,6 +24,8 @@
  */
 
 #include <algorithm>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <map>
 #include <string>
@@ -54,6 +56,8 @@ struct ModelInfo
     std::string serialHandshake;
     bool canGetPtt;
     bool canSetPtt;
+    bool canSendMorse;
+    bool canStopMorse;
 };
 
 struct CodeResult
@@ -100,6 +104,8 @@ extern "C"
     /* Release every registered port from JavaScript; used by destroy() and by
      * the TypeScript layer when a native call is stuck. */
     int hamlibWsForceCloseAll(void);
+    /* One formatted Hamlib debug line, handed to the JavaScript log hook. */
+    void hamlibWsLog(int level, const char *message);
 }
 
 namespace
@@ -258,10 +264,74 @@ int collectModel(const struct rig_caps *caps, void *data)
      * and TypeScript derives the booleans from it. */
     info.canGetPtt = caps->get_ptt != NULL || serialPttCapable(caps->ptt_type);
     info.canSetPtt = caps->set_ptt != NULL || serialPttCapable(caps->ptt_type);
+    info.canSendMorse = caps->send_morse != NULL;
+    info.canStopMorse = caps->stop_morse != NULL;
 
     models->push_back(info);
     return 1;
 }
+
+/*
+ * rig_debug() hands every line to this callback instead of stderr once it is
+ * registered.  The line is formatted here, because a va_list cannot cross into
+ * JavaScript, and forwarded whole; Hamlib's own lines end in a newline, which
+ * the log hook trims.
+ */
+int forwardDebug(enum rig_debug_level_e level, rig_ptr_t, const char *format, va_list args)
+{
+    va_list measure;
+    va_copy(measure, args);
+    int length = vsnprintf(NULL, 0, format, measure);
+    va_end(measure);
+
+    if (length < 0) { return RIG_OK; }
+
+    std::vector<char> line((size_t) length + 1, '\0');
+    vsnprintf(line.data(), line.size(), format, args);
+    hamlibWsLog((int) level, line.data());
+    return RIG_OK;
+}
+
+/* Bytes cross the Embind boundary as hex: a std::string from JavaScript is
+ * UTF-8, which would mangle every byte above 0x7f. */
+bool hexToBytes(const std::string &hex, std::vector<unsigned char> *bytes)
+{
+    if (hex.size() % 2 != 0) { return false; }
+
+    bytes->clear();
+
+    for (size_t index = 0; index < hex.size(); index += 2)
+    {
+        unsigned int value = 0;
+
+        if (sscanf(hex.c_str() + index, "%2x", &value) != 1) { return false; }
+
+        bytes->push_back((unsigned char) value);
+    }
+
+    return true;
+}
+
+std::string bytesToHex(const unsigned char *bytes, int count)
+{
+    static const char digits[] = "0123456789abcdef";
+    std::string hex;
+
+    for (int index = 0; index < count; ++index)
+    {
+        hex.push_back(digits[bytes[index] >> 4]);
+        hex.push_back(digits[bytes[index] & 0x0f]);
+    }
+
+    return hex;
+}
+
+/* Upstream's Morse worker sends at most this many characters per command when
+ * a backend declares no morse_qsize: the shortest any rig accepts. */
+const int kDefaultMorseChunk = 20;
+
+/* The largest reply rig_send_raw() reads: its own stack buffer. */
+const int kMaxRawReply = 200;
 
 /* Hamlib's own default for the level cache (rig_init: cachep->timeout_ms). */
 const char *kDefaultCacheTimeoutMs = "500";
@@ -384,7 +454,7 @@ public:
     }
 
     OpenResult openRig(int modelId, const std::string &logicalPath,
-                       int baudRate)
+                       int baudRate, const std::string &conf)
     {
         webserial_clear_error();
 
@@ -393,9 +463,13 @@ public:
         result.handle = 0;
 
         int rc = RIG_OK;
-        RIG *rig = openOn(modelId, logicalPath, baudRate, false, &rc);
+        std::string message;
+        RIG *rig = openOn(modelId, logicalPath, baudRate, conf, false, &rc, &message);
 
-        if (!rig) { return failure<OpenResult>(rc); }
+        if (!rig)
+        {
+            return message.empty() ? failure<OpenResult>(rc) : failure<OpenResult>(rc, message);
+        }
 
         const struct rig_caps *caps = rig_get_caps((rig_model_t) modelId);
 
@@ -428,7 +502,7 @@ public:
      * under the model's declared timeout and retries.
      */
     CodeResult probeBaudRate(int modelId, const std::string &logicalPath,
-                             int baudRate)
+                             int baudRate, const std::string &conf)
     {
         webserial_clear_error();
 
@@ -438,9 +512,13 @@ public:
         }
 
         int rc = RIG_OK;
-        RIG *rig = openOn(modelId, logicalPath, baudRate, true, &rc);
+        std::string message;
+        RIG *rig = openOn(modelId, logicalPath, baudRate, conf, true, &rc, &message);
 
-        if (!rig) { return failure<CodeResult>(rc); }
+        if (!rig)
+        {
+            return message.empty() ? failure<CodeResult>(rc) : failure<CodeResult>(rc, message);
+        }
 
         const struct rig_caps *caps = rig_get_caps((rig_model_t) modelId);
 
@@ -524,6 +602,136 @@ public:
     int liveHandles() const
     {
         return (int) rigs_.size();
+    }
+
+    CodeResult setDebug(int level)
+    {
+        webserial_clear_error();
+
+        if (level < RIG_DEBUG_NONE || level > RIG_DEBUG_CACHE)
+        {
+            return failure<CodeResult>(-RIG_EINVAL);
+        }
+
+        rig_set_debug_callback(forwardDebug, NULL);
+        rig_set_debug((enum rig_debug_level_e) level);
+
+        CodeResult result;
+        result.code = RIG_OK;
+        return result;
+    }
+
+    /*
+     * What upstream's Morse worker does with one chunk: hand at most
+     * morse_qsize characters to the backend's send_morse, and retry a refusal
+     * that is not a bad argument (a rig whose keyer buffer is full) for up to
+     * a second.  `checkMode` repeats rig_send_morse()'s own CW/CWR check, once
+     * per message rather than once per chunk.
+     */
+    NumberResult sendMorse(int handle, const std::string &text, bool checkMode)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+
+        if (!rig->caps->send_morse) { return failure<NumberResult>(-RIG_ENAVAIL); }
+
+        if (checkMode)
+        {
+            rmode_t mode = RIG_MODE_NONE;
+            pbwidth_t width = 0;
+            int rc = rig_get_mode(rig, RIG_VFO_CURR, &mode, &width);
+
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
+
+            if ((mode & (RIG_MODE_CW | RIG_MODE_CWR)) == 0)
+            {
+                return failure<NumberResult>(
+                           -RIG_EINVAL,
+                           std::string("the rig is in ") + rig_strrmode(mode)
+                           + " mode; Morse needs CW or CWR");
+            }
+        }
+
+        int size = rig->caps->morse_qsize > 0 ? rig->caps->morse_qsize : kDefaultMorseChunk;
+        std::string chunk = text.substr(0, (size_t) size);
+        int rc = RIG_OK;
+
+        for (int attempt = 0; attempt < 10; ++attempt)
+        {
+            rc = rig->caps->send_morse(rig, RIG_VFO_CURR, chunk.c_str());
+
+            if (rc == RIG_OK || rc == -RIG_EINVAL) { break; }
+
+            hl_usleep(100 * 1000);
+        }
+
+        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
+
+        NumberResult result;
+        result.code = RIG_OK;
+        result.value = (double) chunk.size();
+        return result;
+    }
+
+    CodeResult stopMorse(int handle)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+
+        if (!rig->caps->stop_morse) { return failure<CodeResult>(-RIG_ENAVAIL); }
+
+        int rc = rig->caps->stop_morse(rig, RIG_VFO_CURR);
+
+        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
+
+        CodeResult result;
+        result.code = RIG_OK;
+        return result;
+    }
+
+    /*
+     * rig_send_raw() with hex on both sides.  A terminator reads up to it
+     * (0xfd reads one Icom frame); otherwise `replyLength` bytes are read
+     * exactly.  Upstream refuses a reply that fills `reply_len`, so the
+     * buffer handed in is always one byte longer than the reply wanted.
+     */
+    TextResult sendRaw(int handle, const std::string &data, int terminator, int replyLength)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<TextResult>(-RIG_EINVAL); }
+
+        std::vector<unsigned char> bytes;
+
+        if (!hexToBytes(data, &bytes) || bytes.empty()
+                || terminator > 0xff || replyLength < 0 || replyLength > kMaxRawReply)
+        {
+            return failure<TextResult>(-RIG_EINVAL);
+        }
+
+        unsigned char term = (unsigned char) (terminator < 0 ? 0 : terminator);
+        bool reads = terminator >= 0 || replyLength > 0;
+        int length = terminator >= 0 ? kMaxRawReply + 1 : replyLength + 1;
+        std::vector<unsigned char> reply((size_t) length, 0);
+
+        int rc = rig_send_raw(rig, bytes.data(), (int) bytes.size(),
+                              reads ? reply.data() : NULL, length,
+                              terminator >= 0 ? &term : NULL);
+
+        if (rc < 0) { return failure<TextResult>(rc); }
+
+        TextResult result;
+        result.code = RIG_OK;
+        result.value = reads ? bytesToHex(reply.data(), rc) : std::string();
+        return result;
     }
 
     PttResult getPtt(int handle)
@@ -821,13 +1029,57 @@ private:
     }
 
     /*
+     * Apply `name=value` lines, one token per line.  An unknown name, or a
+     * value the backend refuses, fails the open with a message naming it.
+     */
+    static int applyConf(RIG *rig, const std::string &conf, std::string *message)
+    {
+        size_t start = 0;
+
+        while (start < conf.size())
+        {
+            size_t end = conf.find('\n', start);
+
+            if (end == std::string::npos) { end = conf.size(); }
+
+            std::string line = conf.substr(start, end - start);
+            start = end + 1;
+
+            if (line.empty()) { continue; }
+
+            size_t equals = line.find('=');
+            std::string name = line.substr(0, equals);
+            std::string value = equals == std::string::npos ? "" : line.substr(equals + 1);
+
+            if (rig_token_lookup(rig, name.c_str()) == RIG_CONF_END)
+            {
+                *message = "unknown config token \"" + name + "\" for "
+                           + rig->caps->mfg_name + " " + rig->caps->model_name;
+                return -RIG_EINVAL;
+            }
+
+            int rc = setConf(rig, name.c_str(), value);
+
+            if (rc != RIG_OK)
+            {
+                *message = "config token \"" + name + "\" refused the value \""
+                           + value + "\"";
+                return rc;
+            }
+        }
+
+        return RIG_OK;
+    }
+
+    /*
      * rig_init() -> configure through the public token interface -> rig_open().
      *
      * Returns the open rig, or NULL with `*code` set.  `probe` shortens the port
      * budget for the baud-rate search; see probeBaudRate().
      */
     static RIG *openOn(int modelId, const std::string &logicalPath, int baudRate,
-                       bool probe, int *code)
+                       const std::string &conf, bool probe, int *code,
+                       std::string *message)
     {
         *code = RIG_OK;
 
@@ -884,6 +1136,11 @@ private:
         {
             rc = setConf(rig, "serial_speed", std::to_string(baudRate));
         }
+
+        /* The caller's tokens, after the facade's own so none of those can be
+         * undone, and before the probe budget so a search stays short.  The
+         * TypeScript layer has already refused the tokens the facade owns. */
+        if (rc == RIG_OK) { rc = applyConf(rig, conf, message); }
 
         if (probe)
         {

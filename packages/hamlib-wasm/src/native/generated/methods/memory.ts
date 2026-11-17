@@ -9,6 +9,22 @@ import { SettingsMethods } from './settings.js';
 /** Generated operations in the memory family. */
 export abstract class MemoryMethods extends SettingsMethods {
 
+  async sendVoiceMem(ch: number): Promise<void> {
+    this.available('sendVoiceMem');
+    return this.serialized('sendVoiceMem', async () => {
+      const result = await this.native().sendVoiceMem(this.handle(), ch);
+      if (result.code !== 0) { throw this.failed(result, 'sendVoiceMem'); }
+    });
+  }
+
+  async stopVoiceMem(): Promise<void> {
+    this.available('stopVoiceMem');
+    return this.serialized('stopVoiceMem', async () => {
+      const result = await this.native().stopVoiceMem(this.handle());
+      if (result.code !== 0) { throw this.failed(result, 'stopVoiceMem'); }
+    });
+  }
+
   async setBank(bank: number): Promise<void> {
     this.available('setBank');
     return this.serialized('setBank', async () => {

@@ -9,6 +9,7 @@
  */
 
 import type { BrowserSupport, VERIFIED_MODELS } from './browser-support.js';
+import type { RigConf } from './conf.js';
 import type { SerialPortLike } from './transport.js';
 
 /** What a rig model can do over a serial transport. */
@@ -108,4 +109,10 @@ export interface DetectBaudRateOptions {
    * first - the order Hamlib's own default already prefers.
    */
   rates?: readonly number[];
+  /**
+   * Hamlib configuration tokens for each probe, as for `open()`.  A token the
+   * link depends on - an Icom `civaddr` the rig was changed to - has to be
+   * here too, or no rate will answer.
+   */
+  conf?: RigConf;
 }

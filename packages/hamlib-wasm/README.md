@@ -314,9 +314,9 @@ A model that declares settings the serial transport cannot express fails with
 `-RIG_ECONF` before the port is opened, so a user never ends up on a silently
 downgraded port.  This build accepts one set of line settings for both
 transports - 7 or 8 data bits, 1 or 2 stop bits, none/even/odd parity, no flow
-control or hardware handshake - so the answer does not depend on which one
-acquired the port.  5/6 data bits, mark/space parity and XON/XOFF flow control
-are therefore out.
+control or RTS/CTS hardware flow control - so the answer does not depend on
+which one acquired the port.  5/6 data bits, mark/space parity and XON/XOFF
+flow control are therefore out.
 
 Three further limitations are worth knowing:
 

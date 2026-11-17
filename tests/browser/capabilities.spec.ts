@@ -101,6 +101,8 @@ test('a frequency-only model produces a frequency-only snapshot', async ({ page 
     setMode: true,
     getPtt: false,
     setPtt: false,
+    sendMorse: false,
+    stopMorse: false,
   });
 
   /* Only the advertised field, and the same shape on every refresh. */

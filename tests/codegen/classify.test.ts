@@ -104,8 +104,13 @@ describe('classifyFunction pointer direction', () => {
 
 describe('classifyFunction exclusions', () => {
   it('refuses an EXCLUDED_EXACT symbol with its reason', () => {
-    expect(rejectionReason('rig_send_raw'))
+    expect(rejectionReason('rig_password'))
       .toBe('excluded: machine-local, raw-bus or credential surface');
+  });
+
+  it('refuses the Morse queue calls, which need the worker thread', () => {
+    expect(rejectionReason('rig_send_morse'))
+      .toBe('excluded: queued for the Morse worker thread this build does not start');
   });
 
   it('refuses a symbol matching EXCLUDED_PATTERNS', () => {

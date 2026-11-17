@@ -16,6 +16,8 @@ export const NO_CAPABILITIES: RigCapabilities = {
   setMode: false,
   getPtt: false,
   setPtt: false,
+  sendMorse: false,
+  stopMorse: false,
   levels: [],
 };
 

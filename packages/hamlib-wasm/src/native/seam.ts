@@ -33,4 +33,6 @@ export interface CompoundHost {
     operation: string,
     body: (operations: CompoundOperations) => Promise<T>,
   ): Promise<T>;
+  /** Whether the rig can run `operation`, counting what its open `conf` added. */
+  can(operation: string): boolean;
 }

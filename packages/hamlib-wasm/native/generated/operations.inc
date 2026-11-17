@@ -697,6 +697,58 @@
         return result;
     }
 
+    NumberResult powerToMilliwatts(int handle, double arg0, double arg1, const std::string & arg2)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+
+        float value0 = static_cast<float>(arg0);
+        freq_t value1 = static_cast<freq_t>(arg1);
+        rmode_t value2 = rig_parse_mode(arg2.c_str());
+
+        if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+
+        unsigned int out0{};
+
+        int rc = rig_power2mW(rig, &out0, value0, value1, value2);
+
+        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
+
+        NumberResult result;
+        result.code = RIG_OK;
+        result.value = (double) out0;
+        return result;
+    }
+
+    NumberResult milliwattsToPower(int handle, double arg0, double arg1, const std::string & arg2)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+
+        unsigned int value0 = static_cast<unsigned int>(arg0);
+        freq_t value1 = static_cast<freq_t>(arg1);
+        rmode_t value2 = rig_parse_mode(arg2.c_str());
+
+        if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+
+        float out0{};
+
+        int rc = rig_mW2power(rig, &out0, value0, value1, value2);
+
+        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
+
+        NumberResult result;
+        result.code = RIG_OK;
+        result.value = (double) out0;
+        return result;
+    }
+
     CodeResult setLevel(int handle, const std::string & arg0, double arg1)
     {
         webserial_clear_error();
@@ -1083,6 +1135,59 @@
         NumberResult result;
         result.code = RIG_OK;
         result.value = (double) out0;
+        return result;
+    }
+
+    CodeResult sendDtmf(int handle, const std::string & arg0)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+
+        const char *value0 = arg0.c_str();
+        int rc = rig_send_dtmf(rig, RIG_VFO_CURR, value0);
+
+        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
+
+        CodeResult result;
+        result.code = RIG_OK;
+        return result;
+    }
+
+    CodeResult sendVoiceMem(int handle, double arg0)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+
+        int value0 = static_cast<int>(arg0);
+        int rc = rig_send_voice_mem(rig, RIG_VFO_CURR, value0);
+
+        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
+
+        CodeResult result;
+        result.code = RIG_OK;
+        return result;
+    }
+
+    CodeResult stopVoiceMem(int handle)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+
+        int rc = rig_stop_voice_mem(rig, RIG_VFO_CURR);
+
+        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
+
+        CodeResult result;
+        result.code = RIG_OK;
         return result;
     }
 

@@ -131,7 +131,6 @@ const EXCLUDED_EXACT: ReadonlySet<string> = new Set([
   'rig_make_md5',
   'rig_password',
   'rig_password_generate_secret',
-  'rig_send_raw',
   'rig_flush',
   'rig_flush_force',
   'rig_band_changed',
@@ -179,14 +178,27 @@ const EXCLUDED_PATTERNS: readonly RegExp[] = [
   /^rig_get_cache/,
   /^rig_set_cache/,
   /^rig_(get|set|need)_debug/,
-  /^rig_send_/,
-  /^rig_recv_/,
-  /^rig_wait_/,
-  /^rig_stop_/,
   /^rig_date_/,
-  /^rig_mW2power/,
-  /^rig_power2mW/,
 ];
+
+/**
+ * Operations whose only parameter besides the rig is the VFO they act on, so
+ * the generated method takes no arguments and targets the current VFO.
+ */
+const VFO_ACTIONS: ReadonlySet<string> = new Set(['rig_stop_voice_mem']);
+
+/**
+ * The Morse calls.  `rig_send_morse` only pushes the text onto a queue that a
+ * worker thread drains, `rig_stop_morse` resets that queue, and
+ * `rig_wait_morse` waits on it; this build starts no such thread, so binding
+ * them would queue text nobody sends.  The bespoke `sendMorse`/`stopMorse`
+ * facade bodies call the backend's own `send_morse`/`stop_morse` instead.
+ */
+const MORSE_QUEUE: ReadonlySet<string> = new Set([
+  'rig_send_morse',
+  'rig_stop_morse',
+  'rig_wait_morse',
+]);
 
 /**
  * Declarations that are bindable, but that the reference client never calls:
@@ -325,6 +337,10 @@ function exclusionReason(symbol: string): string | null {
 
   if (EXCLUDED_EXACT.has(symbol)) {
     return 'excluded: machine-local, raw-bus or credential surface';
+  }
+
+  if (MORSE_QUEUE.has(symbol)) {
+    return 'excluded: queued for the Morse worker thread this build does not start';
   }
 
   if (/_callback$/.test(symbol)) {
@@ -662,11 +678,13 @@ export function classifyFunction(
   if (outputs.length === 0 && scalarInputs.length + vfoInputs.length >= 1) {
     const valueParams = [...scalarInputs, ...vfoInputs].sort((a, b) => a - b);
 
-    /* A lone vfo_t parameter is the value itself (`rig_set_vfo`); otherwise the
-     * first vfo_t is the target and any further vfo_t is a value. */
-    const targetIndex = valueParams.length === 1 && vfoInputs.length === 1
-      ? -1
-      : vfoInputs[0] ?? -1;
+    /* A lone vfo_t parameter is the value itself (`rig_set_vfo`) unless the
+     * operation is an action on the current VFO (`rig_stop_voice_mem`);
+     * otherwise the first vfo_t is the target and any further vfo_t is a
+     * value. */
+    const loneValue = valueParams.length === 1 && vfoInputs.length === 1
+      && !VFO_ACTIONS.has(symbol);
+    const targetIndex = loneValue ? -1 : vfoInputs[0] ?? -1;
 
     if (targetIndex >= 0) {
       plan[targetIndex] = { kind: 'target-vfo' };
@@ -689,7 +707,7 @@ export function classifyFunction(
       });
     }
 
-    if (arguments_.length === 0) {
+    if (arguments_.length === 0 && !VFO_ACTIONS.has(symbol)) {
       return { symbol, reason: 'no value parameters' };
     }
 

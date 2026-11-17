@@ -45,6 +45,7 @@ import { classifyAll } from './classify.ts';
 import { loadConfig, type Model } from './config.ts';
 import { loadUpstreamDocs, type UpstreamDoc } from './docs.ts';
 import {
+  capabilityMember,
   embindArity,
   emitCapabilities,
   emitContract,
@@ -440,9 +441,7 @@ function render(
         method: operation.method,
         shape: operation.shape,
         result: operation.result,
-        capability: members.has(operation.symbol.slice(4)) && operation.shape !== 'pure'
-          ? operation.method
-          : null,
+        capability: members.has(capabilityMember(operation) ?? '') ? operation.method : null,
       }))
       .sort((a, b) => a.symbol.localeCompare(b.symbol)),
     refused: [...rejections]

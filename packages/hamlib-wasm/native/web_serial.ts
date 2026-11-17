@@ -72,8 +72,27 @@ addToLibrary({
     nextToken: 1,
     nextHandle: 1,
     lastError: null as ErrorRecord | null,
+    onLog: null as ((level: number, message: string) => void) | null,
+    onTrace: null as ((direction: 'tx' | 'rx', path: string, bytes: Uint8Array) => void) | null,
 
     /* --- diagnostics ---------------------------------------------------- */
+
+    /* A hook that throws must not take the CAT exchange down with it. */
+    log(level: number, message: string): void {
+      try {
+        this.onLog?.(level, message);
+      } catch {
+        /* the hook's own problem */
+      }
+    },
+
+    trace(direction: 'tx' | 'rx', path: string, bytes: Uint8Array): void {
+      try {
+        this.onTrace?.(direction, path, bytes);
+      } catch {
+        /* the hook's own problem */
+      }
+    },
 
     recordError(name: string, message: string, context?: string): void {
       this.lastError = {
@@ -282,7 +301,7 @@ addToLibrary({
 
     /* --- RX pump -------------------------------------------------------- */
 
-    startPump(state: PortState): Promise<void> {
+    startPump(state: PortState, path: string): Promise<void> {
       const reader = state.reader as ReadableStreamDefaultReader<Uint8Array>;
 
       return (async () => {
@@ -296,6 +315,7 @@ addToLibrary({
 
             if (result.value && result.value.length > 0) {
               state.rxBytes += result.value.length;
+              this.trace('rx', path, result.value);
               this.queuePush(state.queue, result.value);
               this.wake(state, 'data');
 
@@ -477,7 +497,7 @@ addToLibrary({
         return this.WS_ERR_IO;
       }
 
-      state.pumpPromise = this.startPump(state);
+      state.pumpPromise = this.startPump(state, record.path);
 
       return this.allocHandle(record);
     },
@@ -595,6 +615,7 @@ addToLibrary({
           }
 
           await state.writer.write(chunk);
+          this.trace('tx', entry.record.path, chunk);
           return len;
         } catch (error) {
           return this.fail(error, 'write');
@@ -860,6 +881,11 @@ addToLibrary({
 
   hamlibWsWriteLastError__deps: ['$HamlibWs'],
   hamlibWsWriteLastError: (ptr: number, len: number): number => HamlibWs.writeLastError(ptr, len),
+
+  hamlibWsLog__deps: ['$HamlibWs'],
+  hamlibWsLog: (level: number, message: number): void => {
+    HamlibWs.log(level, UTF8ToString(message));
+  },
 
   hamlibWsClearLastError__deps: ['$HamlibWs'],
   hamlibWsClearLastError: (): number => HamlibWs.clearLastError(),

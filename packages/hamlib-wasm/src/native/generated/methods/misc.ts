@@ -22,4 +22,28 @@ export abstract class MiscMethods extends InfoMethods {
       return result.value;
     });
   }
+
+  async powerToMilliwatts(power: number, freq: number, mode: string): Promise<number> {
+    return this.serialized('powerToMilliwatts', async () => {
+      const result = await this.native().powerToMilliwatts(this.handle(), power, freq, mode);
+      if (result.code !== 0) { throw this.failed(result, 'powerToMilliwatts'); }
+      return result.value;
+    });
+  }
+
+  async milliwattsToPower(milliwatts: number, freq: number, mode: string): Promise<number> {
+    return this.serialized('milliwattsToPower', async () => {
+      const result = await this.native().milliwattsToPower(this.handle(), milliwatts, freq, mode);
+      if (result.code !== 0) { throw this.failed(result, 'milliwattsToPower'); }
+      return result.value;
+    });
+  }
+
+  async sendDtmf(digits: string): Promise<void> {
+    this.available('sendDtmf');
+    return this.serialized('sendDtmf', async () => {
+      const result = await this.native().sendDtmf(this.handle(), digits);
+      if (result.code !== 0) { throw this.failed(result, 'sendDtmf'); }
+    });
+  }
 }

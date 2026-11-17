@@ -2,9 +2,9 @@
   "$comment": "Generated coverage report: which upstream declarations this generator binds and which it refuses, and why, plus the pinned signature of every symbol a bespoke operation calls.  Diff it on an upstream bump to see what changed.",
   "release": "4.7.2",
   "summary": {
-    "bespoke": 21,
-    "generated": 89,
-    "refused": 87
+    "bespoke": 25,
+    "generated": 94,
+    "refused": 80
   },
   "signatures": {
     "rig_cleanup": [
@@ -49,11 +49,17 @@
     "rig_open": [
       "int rig_open(RIG *)"
     ],
+    "rig_send_raw": [
+      "int rig_send_raw(RIG *, const unsigned char *, int, unsigned char *, int, unsigned char *)"
+    ],
     "rig_set_conf": [
       "int rig_set_conf(RIG *, hamlib_token_t, const char *)"
     ],
     "rig_set_debug": [
       "void rig_set_debug(enum rig_debug_level_e)"
+    ],
+    "rig_set_debug_callback": [
+      "vprintf_cb_t rig_set_debug_callback(vprintf_cb_t, void *)"
     ],
     "rig_set_ext_level": [
       "int rig_set_ext_level(RIG *, vfo_t, hamlib_token_t, value_t)"
@@ -363,6 +369,13 @@
       "capability": null
     },
     {
+      "symbol": "rig_mW2power",
+      "method": "milliwattsToPower",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": null
+    },
+    {
       "symbol": "rig_parse_func",
       "method": "parseFunc",
       "shape": "pure",
@@ -440,6 +453,13 @@
       "capability": null
     },
     {
+      "symbol": "rig_power2mW",
+      "method": "powerToMilliwatts",
+      "shape": "get",
+      "result": "NumberResult",
+      "capability": null
+    },
+    {
       "symbol": "rig_reset",
       "method": "reset",
       "shape": "set",
@@ -452,6 +472,20 @@
       "shape": "set",
       "result": "CodeResult",
       "capability": "scan"
+    },
+    {
+      "symbol": "rig_send_dtmf",
+      "method": "sendDtmf",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "sendDtmf"
+    },
+    {
+      "symbol": "rig_send_voice_mem",
+      "method": "sendVoiceMem",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "sendVoiceMem"
     },
     {
       "symbol": "rig_set_ant",
@@ -655,6 +689,13 @@
       "shape": "pure",
       "result": "",
       "capability": null
+    },
+    {
+      "symbol": "rig_stop_voice_mem",
+      "method": "stopVoiceMem",
+      "shape": "set",
+      "result": "CodeResult",
+      "capability": "stopVoiceMem"
     },
     {
       "symbol": "rig_strlevel",
@@ -861,10 +902,6 @@
       "reason": "excluded: not called by the upstream rigctl reference client"
     },
     {
-      "symbol": "rig_mW2power",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
-    },
-    {
       "symbol": "rig_need_debug",
       "reason": "excluded by policy (threads, transport or unsafe surface)"
     },
@@ -885,10 +922,6 @@
       "reason": "excluded: machine-local, raw-bus or credential surface"
     },
     {
-      "symbol": "rig_power2mW",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
-    },
-    {
       "symbol": "rig_probe",
       "reason": "excluded: machine-local, raw-bus or credential surface"
     },
@@ -898,27 +931,15 @@
     },
     {
       "symbol": "rig_recv_dtmf",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
+      "reason": "output of type char * is not mappable"
     },
     {
       "symbol": "rig_register",
       "reason": "excluded: machine-local, raw-bus or credential surface"
     },
     {
-      "symbol": "rig_send_dtmf",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
-    },
-    {
       "symbol": "rig_send_morse",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
-    },
-    {
-      "symbol": "rig_send_raw",
-      "reason": "excluded: machine-local, raw-bus or credential surface"
-    },
-    {
-      "symbol": "rig_send_voice_mem",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
+      "reason": "excluded: queued for the Morse worker thread this build does not start"
     },
     {
       "symbol": "rig_set_cache_timeout_ms",
@@ -934,10 +955,6 @@
     },
     {
       "symbol": "rig_set_dcd_callback",
-      "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
-    },
-    {
-      "symbol": "rig_set_debug_callback",
       "reason": "excluded: needs the asynchronous data path, disabled in this single-threaded build"
     },
     {
@@ -994,11 +1011,7 @@
     },
     {
       "symbol": "rig_stop_morse",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
-    },
-    {
-      "symbol": "rig_stop_voice_mem",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
+      "reason": "excluded: queued for the Morse worker thread this build does not start"
     },
     {
       "symbol": "rig_stragclevel",
@@ -1046,7 +1059,7 @@
     },
     {
       "symbol": "rig_wait_morse",
-      "reason": "excluded by policy (threads, transport or unsafe surface)"
+      "reason": "excluded: queued for the Morse worker thread this build does not start"
     }
   ]
 }

@@ -496,7 +496,7 @@ function emitSetter(operation: GeneratedOperation): string[] {
   const lines: string[] = [];
   const parameters = parameterDeclarations(operation);
 
-  lines.push(`    CodeResult ${operation.method}(int handle, ${parameters.join(', ')})`);
+  lines.push(`    CodeResult ${operation.method}(${['int handle', ...parameters].join(', ')})`);
   lines.push('    {');
   lines.push('        webserial_clear_error();');
   lines.push('');
@@ -596,9 +596,17 @@ export function emitOperations(operations: readonly GeneratedOperation[]): strin
   return `${lines.join('\n')}\n`;
 }
 
+/**
+ * Operations whose frontend does not depend on the matching `rig_caps` member.
+ * `rig_power2mW`/`rig_mW2power` call the backend's converter when it has one
+ * and otherwise convert through the model's transmit ranges, so gating them on
+ * the member would refuse every model that relies on the fallback.
+ */
+const FRONTEND_FALLBACK: ReadonlySet<string> = new Set(['rig_power2mW', 'rig_mW2power']);
+
 /** The `rig_caps` member a get/set operation is gated on, or `null`. */
 export function capabilityMember(operation: GeneratedOperation): string | null {
-  if (operation.shape === 'pure') {
+  if (operation.shape === 'pure' || FRONTEND_FALLBACK.has(operation.symbol)) {
     return null;
   }
 

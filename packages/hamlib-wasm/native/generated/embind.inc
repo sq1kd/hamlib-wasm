@@ -14,7 +14,9 @@
     .field("serialParity", &ModelInfo::serialParity)
     .field("serialHandshake", &ModelInfo::serialHandshake)
     .field("canGetPtt", &ModelInfo::canGetPtt)
-    .field("canSetPtt", &ModelInfo::canSetPtt);
+    .field("canSetPtt", &ModelInfo::canSetPtt)
+    .field("canSendMorse", &ModelInfo::canSendMorse)
+    .field("canStopMorse", &ModelInfo::canStopMorse);
 
     emscripten::value_object<CodeResult>("CodeResult")
     .field("code", &CodeResult::code)
@@ -201,14 +203,34 @@
         return facade().unregisterPort(logicalPath);
     });
 
-    emscripten::function("openRig", +[](int modelId, const std::string & logicalPath, int baudRate)
+    emscripten::function("openRig", +[](int modelId, const std::string & logicalPath, int baudRate, const std::string & conf)
     {
-        return facade().openRig(modelId, logicalPath, baudRate);
+        return facade().openRig(modelId, logicalPath, baudRate, conf);
     });
 
-    emscripten::function("probeBaudRate", +[](int modelId, const std::string & logicalPath, int baudRate)
+    emscripten::function("probeBaudRate", +[](int modelId, const std::string & logicalPath, int baudRate, const std::string & conf)
     {
-        return facade().probeBaudRate(modelId, logicalPath, baudRate);
+        return facade().probeBaudRate(modelId, logicalPath, baudRate, conf);
+    });
+
+    emscripten::function("setDebug", +[](int level)
+    {
+        return facade().setDebug(level);
+    });
+
+    emscripten::function("sendMorse", +[](int handle, const std::string & text, bool checkMode)
+    {
+        return facade().sendMorse(handle, text, checkMode);
+    });
+
+    emscripten::function("stopMorse", +[](int handle)
+    {
+        return facade().stopMorse(handle);
+    });
+
+    emscripten::function("sendRaw", +[](int handle, const std::string & data, int terminator, int replyLength)
+    {
+        return facade().sendRaw(handle, data, terminator, replyLength);
     });
 
     emscripten::function("closeRig", +[](int handle)
@@ -451,6 +473,16 @@
         return facade().getTs(handle);
     });
 
+    emscripten::function("powerToMilliwatts", +[](int handle, double arg0, double arg1, const std::string & arg2)
+    {
+        return facade().powerToMilliwatts(handle, arg0, arg1, arg2);
+    });
+
+    emscripten::function("milliwattsToPower", +[](int handle, double arg0, double arg1, const std::string & arg2)
+    {
+        return facade().milliwattsToPower(handle, arg0, arg1, arg2);
+    });
+
     emscripten::function("setLevel", +[](int handle, const std::string & arg0, double arg1)
     {
         return facade().setLevel(handle, arg0, arg1);
@@ -554,6 +586,21 @@
     emscripten::function("getFunc", +[](int handle, const std::string & arg0)
     {
         return facade().getFunc(handle, arg0);
+    });
+
+    emscripten::function("sendDtmf", +[](int handle, const std::string & arg0)
+    {
+        return facade().sendDtmf(handle, arg0);
+    });
+
+    emscripten::function("sendVoiceMem", +[](int handle, double arg0)
+    {
+        return facade().sendVoiceMem(handle, arg0);
+    });
+
+    emscripten::function("stopVoiceMem", +[](int handle)
+    {
+        return facade().stopVoiceMem(handle);
     });
 
     emscripten::function("setBank", +[](int handle, double arg0)

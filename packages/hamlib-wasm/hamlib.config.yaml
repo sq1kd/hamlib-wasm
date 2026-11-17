@@ -51,6 +51,11 @@ results:
       # get_ptt/set_ptt function pointer.
       - [ canGetPtt, bool ]
       - [ canSetPtt, bool ]
+      # The backend's own send_morse/stop_morse.  Hamlib's rig_send_morse only
+      # queues for a worker thread this build does not start, so the facade
+      # calls these directly and the catalogue says whether they exist.
+      - [ canSendMorse, bool ]
+      - [ canStopMorse, bool ]
   CodeResult:
     fields:
       - [ code, int ]
@@ -125,6 +130,7 @@ operations:
       - [ modelId, int ]
       - [ logicalPath, string ]
       - [ baudRate, int ]
+      - [ conf, string ]
     result: OpenResult
     calls:
       - rig_get_caps
@@ -144,6 +150,7 @@ operations:
       - [ modelId, int ]
       - [ logicalPath, string ]
       - [ baudRate, int ]
+      - [ conf, string ]
     result: CodeResult
     calls:
       - rig_get_caps
@@ -153,6 +160,49 @@ operations:
       - rig_open
       - rig_close
       - rig_cleanup
+  # Hamlib's debug output, routed to the JavaScript log hook at the given
+  # rig_debug_level_e.  Global to the module, like Hamlib's own level.
+  - name: setDebug
+    scope: module
+    args:
+      - [ level, int ]
+    result: CodeResult
+    calls:
+      - rig_set_debug
+      - rig_set_debug_callback
+  # One chunk of Morse, at most the backend's morse_qsize characters, sent
+  # through its own send_morse; the value is how many characters went.  The
+  # TypeScript layer loops over chunks so a long message never holds the call
+  # queue, and stopMorse() can get in between.  The CW check also calls
+  # rig_get_mode, deliberately not listed: `calls` excludes a symbol from
+  # generation, and getMode is generated.
+  - name: sendMorse
+    scope: module
+    args:
+      - [ handle, int ]
+      - [ text, string ]
+      - [ checkMode, bool ]
+    result: NumberResult
+    calls: []
+  - name: stopMorse
+    scope: module
+    args:
+      - [ handle, int ]
+    result: CodeResult
+    calls: []
+  # Bytes cross as hex, both ways: an Embind string is UTF-8, which would
+  # mangle every byte above 0x7f.  `terminator` -1 and `replyLength` 0 mean
+  # write only.
+  - name: sendRaw
+    scope: module
+    args:
+      - [ handle, int ]
+      - [ data, string ]
+      - [ terminator, int ]
+      - [ replyLength, int ]
+    result: TextResult
+    calls:
+      - rig_send_raw
   - name: closeRig
     scope: module
     args:
@@ -270,6 +320,14 @@ operations:
 # fixed here rather than by hand-writing the operation.
 overrides:
   operations:
+    rig_power2mW:
+      method: powerToMilliwatts
+      fields:
+        mwpower: milliwatts
+    rig_mW2power:
+      method: milliwattsToPower
+      fields:
+        mwpower: milliwatts
     rig_get_freq:
       method: getFrequency
     rig_set_freq:

@@ -54,6 +54,9 @@
         if (caps->get_ant != NULL) { available.push_back("getAnt"); }
         if (caps->set_func != NULL) { available.push_back("setFunc"); }
         if (caps->get_func != NULL) { available.push_back("getFunc"); }
+        if (caps->send_dtmf != NULL) { available.push_back("sendDtmf"); }
+        if (caps->send_voice_mem != NULL) { available.push_back("sendVoiceMem"); }
+        if (caps->stop_voice_mem != NULL) { available.push_back("stopVoiceMem"); }
         if (caps->set_bank != NULL) { available.push_back("setBank"); }
         if (caps->set_mem != NULL) { available.push_back("setMem"); }
         if (caps->get_mem != NULL) { available.push_back("getMem"); }
@@ -64,6 +67,8 @@
         if (caps->set_clock != NULL) { available.push_back("setClock"); }
         if (caps->get_clock != NULL) { available.push_back("getClock"); }
         available.push_back("getVfoInfo");
+        available.push_back("powerToMilliwatts");
+        available.push_back("milliwattsToPower");
         available.push_back("extLookup");
         available.push_back("extLookupTok");
         available.push_back("hasGetLevel");

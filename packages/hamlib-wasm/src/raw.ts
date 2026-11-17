@@ -36,10 +36,15 @@ import {
   findVerifiedModel,
 } from './browser-support.js';
 import type { BrowserSupport, DeclaredLineSettings } from './browser-support.js';
+import { confKeysPttLine, encodeConf } from './conf.js';
+import type { RigConf } from './conf.js';
+import { DiagnosticsRecorder, debugLevelIndex } from './diagnostics.js';
+import type { DebugOptions, Diagnostics, DiagnosticsRig } from './diagnostics.js';
 import { HamlibError, HAMLIB_ERROR_MESSAGES } from './errors.js';
 import { selectTransport } from './transport-select.js';
 import type {
   PortRequest,
+  SerialPortInfo,
   SerialPortLike,
   SerialTransport,
 } from './transport.js';
@@ -82,6 +87,16 @@ export type {
   VerifiedModel,
 } from './browser-support.js';
 export type { RigConfparam } from './native/confparams.js';
+export type { RigConf } from './conf.js';
+export type {
+  DebugLevel,
+  DebugOptions,
+  Diagnostics,
+  DiagnosticsRig,
+  ErrorEntry,
+  LogEntry,
+  TraceEntry,
+} from './diagnostics.js';
 export type {
   DetectBaudRateOptions,
   RigMode,
@@ -183,6 +198,14 @@ export interface RawHamlibOptions {
    * must be disposed and replaced.
    */
   callTimeoutMs?: number;
+  /**
+   * Turn on Hamlib's debug output.  The lines go to `debug.onLog` and into
+   * {@link RawHamlib.diagnostics}.  Omitted, Hamlib logs nothing.
+   *
+   * Hamlib's level is global to the module, so it applies to every rig the
+   * instance opens.
+   */
+  debug?: DebugOptions;
 }
 
 /** Options for {@link RawHamlib.open}. */
@@ -206,6 +229,31 @@ export interface OpenRawRigOptions {
    * and reuse it on the next connect.
    */
   baudRate?: number;
+  /**
+   * Hamlib configuration tokens to set before the rig opens: the frontend
+   * ones (`write_delay`, `post_write_delay`, `timeout`, `retry`, `ptt_type`,
+   * `rts_state`, `dtr_state`, ...) and the backend's own (`civaddr` on Icom),
+   * as {@link RawRig.tokenForeach} lists them.
+   *
+   * Refused with `INVALID_ARGUMENT`: the tokens hamlib-wasm sets itself
+   * (`rig_pathname`, `serial_speed` - use `baudRate`, `poll_interval`, ...)
+   * and the ones that need a second port or a device this build cannot
+   * reach (`ptt_pathname`, a parallel/CM108/GPIO `ptt_type`).  A name the
+   * model does not know, or a value it refuses, fails the open with
+   * `HAMLIB_ERROR`.
+   */
+  conf?: RigConf;
+}
+
+/** Options for {@link RawRig.sendRaw}. */
+export interface SendRawOptions {
+  /**
+   * Read the reply up to and including this byte.  `0xfd` reads one Icom
+   * CI-V frame, skipping the echo.  At most 200 bytes are read.
+   */
+  terminator?: number;
+  /** Without a terminator: read exactly this many bytes (at most 200). */
+  replyLength?: number;
 }
 
 /**
@@ -231,6 +279,39 @@ export interface RawRig extends GeneratedPublicOperations {
   readonly baudRate: number;
   /** `false` once {@link RawRig.close} has completed. */
   readonly connected: boolean;
+  /**
+   * Send `text` as Morse through the rig's keyer.  The rig must be in CW or
+   * CWR mode.
+   *
+   * Hamlib's `rig_send_morse()` queues for a worker thread this build does
+   * not start, so the text goes to the backend's own `send_morse` in chunks
+   * of what the model accepts at once, each chunk its own call: other calls
+   * run between chunks, and {@link RawRig.stopMorse} drops the rest.
+   * Resolves once the rig has accepted the last chunk, which may be before
+   * it has finished keying it.
+   *
+   * Rejects with `UNSUPPORTED_OPERATION` when the backend cannot send Morse.
+   */
+  sendMorse(text: string): Promise<void>;
+  /**
+   * Drop the chunks {@link RawRig.sendMorse} has not sent yet, and stop the
+   * rig keying when the backend can (`model.capabilities.has('stopMorse')`).
+   */
+  stopMorse(): Promise<void>;
+  /**
+   * Write bytes to the rig as they are and, when asked, read its reply.
+   *
+   * The escape hatch for a vendor command no Hamlib call covers.  Hamlib
+   * keeps no state about what it sends, so a command that changes the rig
+   * leaves the cache stale until the next read.  Without `terminator` or
+   * `replyLength` nothing is read and an empty array is returned.
+   *
+   * ```ts
+   * // Kenwood: read the frequency of VFO A
+   * const reply = await rig.sendRaw(new TextEncoder().encode('FA;'), { terminator: 0x3b });
+   * ```
+   */
+  sendRaw(bytes: Uint8Array, options?: SendRawOptions): Promise<Uint8Array>;
   /** Close the rig.  Idempotent; safe to call after a failure. */
   close(): Promise<void>;
 }
@@ -264,6 +345,13 @@ export interface RawHamlib {
    * Rejects with `RIG_UNRESPONSIVE` when no candidate answered.
    */
   detectBaudRate(options: DetectBaudRateOptions): Promise<number>;
+  /**
+   * A snapshot for a bug report: versions, runtime, the open rigs, the
+   * latest errors and port traffic, and Hamlib's debug lines when
+   * {@link RawHamlibOptions.debug} is set.  Plain JSON; nothing is sent
+   * anywhere.
+   */
+  diagnostics(): Diagnostics;
   /**
    * Close every open rig, unregister every port and reject further work.
    * Idempotent.
@@ -319,8 +407,11 @@ class Serializer {
   #closed = false;
   #hung = false;
 
-  constructor(timeoutMs: number) {
+  readonly #onError: (operation: string, error: unknown) => void;
+
+  constructor(timeoutMs: number, onError: (operation: string, error: unknown) => void) {
     this.#timeoutMs = timeoutMs;
+    this.#onError = onError;
   }
 
   /** Whether a call overran and the native stack can no longer be driven. */
@@ -362,6 +453,16 @@ class Serializer {
   }
 
   #chain<T>(operation: string, work: () => T | Promise<T>): Promise<T> {
+    const settled = this.#bounded(operation, work);
+
+    settled.catch((error: unknown) => {
+      this.#onError(operation, error);
+    });
+
+    return settled;
+  }
+
+  #bounded<T>(operation: string, work: () => T | Promise<T>): Promise<T> {
     /* Run regardless of whether the previous operation failed. */
     const result = this.#tail.then(work, work);
     this.#tail = result.then(
@@ -424,6 +525,9 @@ function hungError(operation: string): HamlibError {
 /* ------------------------------------------------------------------ */
 
 /** What a rig handle needs from the Hamlib instance that owns it. */
+/** The longest reply rig_send_raw() reads: its own buffer. */
+const MAX_RAW_REPLY = 200;
+
 interface RigContext {
   readonly native: NativeModule;
   readonly queue: Serializer;
@@ -508,9 +612,14 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
   readonly #model: RigModel;
   readonly #baudRate: number;
   readonly #scope: CompoundScope;
+  /** Operations this rig gained from its `conf`, beyond the model's own. */
+  readonly #gained: ReadonlySet<string>;
+  readonly #port: SerialPortLike;
 
   #handle: number;
   #closed = false;
+  /** Bumped by stopMorse(), so a sendMorse() loop knows to drop the rest. */
+  #morseGeneration = 0;
 
   constructor(
     context: RigContext,
@@ -518,6 +627,8 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
     model: RigModel,
     handle: number,
     baudRate: number,
+    port: SerialPortLike,
+    gained: ReadonlySet<string>,
   ) {
     super();
     this.#context = context;
@@ -525,6 +636,8 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
     this.#model = model;
     this.#handle = handle;
     this.#baudRate = baudRate;
+    this.#gained = gained;
+    this.#port = port;
     this.#scope = new CompoundScope(
       () => this.#context.native,
       () => this.#handle,
@@ -563,10 +676,111 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
 
   protected available(operation: string): void {
     this.#requireCapability(
-      this.#model.capabilities.has(operation),
+      this.#model.capabilities.has(operation) || this.#gained.has(operation),
       operation,
       `use ${operation}`,
     );
+  }
+
+  /** Whether `operation` is available on this rig, `conf` included. */
+  can(operation: string): boolean {
+    return this.#model.capabilities.has(operation) || this.#gained.has(operation);
+  }
+
+  /* --- hand-written operations ---------------------------------------- */
+
+  async sendMorse(text: string): Promise<void> {
+    this.available('sendMorse');
+
+    if (typeof text !== 'string') {
+      throw new HamlibError('sendMorse text must be a string', {
+        code: 'INVALID_ARGUMENT',
+        operation: 'sendMorse',
+      });
+    }
+
+    const generation = this.#morseGeneration;
+    let rest = text;
+    let first = true;
+
+    while (rest.length > 0 && generation === this.#morseGeneration) {
+      const checkMode = first;
+      const chunk = rest;
+      const sent = await this.#call('sendMorse', async () => {
+        const result = await this.#context.native.sendMorse(this.#handle, chunk, checkMode);
+
+        if (result.code !== RIG_OK) { throw hamlibError(result, 'sendMorse'); }
+
+        return result.value;
+      });
+
+      /* A backend that accepted nothing would loop forever. */
+      if (sent <= 0) { break; }
+
+      rest = rest.slice(sent);
+      first = false;
+    }
+  }
+
+  async stopMorse(): Promise<void> {
+    this.available('sendMorse');
+    this.#morseGeneration++;
+
+    if (!this.can('stopMorse')) { return; }
+
+    await this.#call('stopMorse', async () => {
+      const result = await this.#context.native.stopMorse(this.#handle);
+
+      if (result.code !== RIG_OK) { throw hamlibError(result, 'stopMorse'); }
+    });
+  }
+
+  async sendRaw(bytes: Uint8Array, options: SendRawOptions = {}): Promise<Uint8Array> {
+    const { terminator, replyLength } = options;
+    const invalid = (message: string): HamlibError =>
+      new HamlibError(message, { code: 'INVALID_ARGUMENT', operation: 'sendRaw' });
+
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0) {
+      throw invalid('sendRaw needs a non-empty Uint8Array');
+    }
+
+    if (terminator !== undefined && !(Number.isInteger(terminator) && terminator >= 0 && terminator <= 0xff)) {
+      throw invalid(`terminator must be a byte value, got ${String(terminator)}`);
+    }
+
+    if (
+      replyLength !== undefined
+      && !(Number.isInteger(replyLength) && replyLength >= 0 && replyLength <= MAX_RAW_REPLY)
+    ) {
+      throw invalid(`replyLength must be an integer from 0 to ${MAX_RAW_REPLY}, got ${String(replyLength)}`);
+    }
+
+    let hex = '';
+
+    for (const byte of bytes) {
+      hex += byte.toString(16).padStart(2, '0');
+    }
+
+    const reply = await this.#call('sendRaw', async () => {
+      const result = await this.#context.native.sendRaw(
+        this.#handle,
+        hex,
+        terminator ?? -1,
+        terminator === undefined ? (replyLength ?? 0) : 0,
+      );
+
+      if (result.code !== RIG_OK) { throw hamlibError(result, 'sendRaw'); }
+
+      return String(result.value);
+    });
+
+    const out = new Uint8Array(reply.length / 2);
+
+    for (let index = 0; index < out.length; index++) {
+      out[index] = Number.parseInt(reply.slice(index * 2, index * 2 + 2), 16);
+    }
+
+    return out;
   }
 
   protected failed(result: { code: number; error: unknown }, operation: string): Error {
@@ -633,6 +847,15 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
     return this.#path;
   }
 
+  /** What the port says about itself, for diagnostics; a throwing getInfo() is ignored. */
+  portInfo(): SerialPortInfo | undefined {
+    try {
+      return this.#port.getInfo?.();
+    } catch {
+      return undefined;
+    }
+  }
+
   /**
    * Run one native call on the shared chain.
    *
@@ -674,6 +897,8 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
 /** The JavaScript side of the serial registry inside the Wasm module. */
 interface SerialRegistry {
   storePort(port: SerialPortLike): number;
+  onLog: ((level: number, message: string) => void) | null;
+  onTrace: ((direction: 'tx' | 'rx', path: string, bytes: Uint8Array) => void) | null;
   /**
    * Close every registered port from the JavaScript side, ignoring errors.
    *
@@ -842,6 +1067,10 @@ function collectCapabilities(model: NativeModel, native: NativeModule): Readonly
     }
   }
 
+  /* Hand-written on top of module primitives, so not in the generated list. */
+  if (model.canSendMorse) { capabilities.add('sendMorse'); }
+  if (model.canStopMorse) { capabilities.add('stopMorse'); }
+
   return capabilities;
 }
 
@@ -911,6 +1140,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
   readonly #version: string;
   readonly #rigs = new Set<RawRigHandle>();
   readonly #paths = new Set<string>();
+  readonly #recorder: DiagnosticsRecorder;
 
   readonly queue: Serializer;
 
@@ -925,6 +1155,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
     models: RigModel[],
     version: string,
     callTimeoutMs: number,
+    recorder: DiagnosticsRecorder,
   ) {
     this.#native = native;
     this.#registry = registry;
@@ -932,10 +1163,18 @@ class RawHamlibInstance implements RawHamlib, RigContext {
     this.#models = models;
     this.#modelsById = new Map(models.map((model) => [model.id, model]));
     this.#version = version;
-    this.queue = new Serializer(callTimeoutMs);
+    this.#recorder = recorder;
+    this.queue = new Serializer(callTimeoutMs, (operation, error) => {
+      recorder.error(operation, error);
+    });
   }
 
   static async create(options: RawHamlibOptions): Promise<RawHamlibInstance> {
+    const debugLevel = options.debug === undefined
+      ? undefined
+      : debugLevelIndex(options.debug.level, 'createRawHamlib');
+    const callTimeoutMs = normalizeCallTimeout(options.callTimeoutMs);
+    const recorder = new DiagnosticsRecorder(options.debug);
     const native = await createNativeModule({
       locateFile: (file: string) => String((options.locateFile ?? locateAsset)(file)),
     });
@@ -957,6 +1196,23 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       throw hamlibError(initialization, 'initialize');
     }
 
+    registry.onTrace = (direction, path, bytes) => {
+      recorder.trace(direction, path, bytes);
+    };
+
+    /* After the backends registered: their announcements are noise. */
+    if (debugLevel !== undefined) {
+      registry.onLog = (level, message) => {
+        recorder.log(level, message);
+      };
+
+      const debug = await native.setDebug(debugLevel);
+
+      if (debug.code !== RIG_OK) {
+        throw hamlibError(debug, 'initialize');
+      }
+    }
+
     const models = collectModels(await native.listModels(), native);
 
     return new RawHamlibInstance(
@@ -965,7 +1221,8 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       await selectTransport(options.transport),
       models,
       await native.version(),
-      normalizeCallTimeout(options.callTimeoutMs),
+      callTimeoutMs,
+      recorder,
     );
   }
 
@@ -997,6 +1254,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
     this.#assertTransport('open');
 
     const { modelId, port, baudRate } = options;
+    const conf = encodeConf(options.conf, 'open');
 
     const model = this.#modelsById.get(modelId);
 
@@ -1035,7 +1293,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
           throw hamlibError(registered, 'open');
         }
 
-        const opened = await this.#native.openRig(modelId, path, baudRate ?? 0);
+        const opened = await this.#native.openRig(modelId, path, baudRate ?? 0, conf);
 
         if (opened.code !== RIG_OK) {
           throw hamlibError(opened, 'open');
@@ -1052,6 +1310,10 @@ class RawHamlibInstance implements RawHamlib, RigContext {
            * model's declared maximum (src/rig.c sets `serial_rate_max`), and
            * the facade has just verified the rig answers at it. */
           baudRate ?? model.serialRateMax,
+          port,
+          /* PTT moved onto the port's RTS/DTR line works whatever the backend
+           * declares. */
+          confKeysPttLine(options.conf) ? new Set(['getPtt', 'setPtt']) : new Set(),
         );
         this.#rigs.add(rig);
         return rig;
@@ -1086,6 +1348,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
     this.#assertTransport('detectBaudRate');
 
     const { modelId, port, rates } = options;
+    const conf = encodeConf(options.conf, 'detectBaudRate');
 
     const model = this.#modelsById.get(modelId);
 
@@ -1135,7 +1398,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
         let lastFailure: NativeResult | undefined;
 
         for (const rate of candidates) {
-          const probed = await this.#native.probeBaudRate(modelId, path, rate);
+          const probed = await this.#native.probeBaudRate(modelId, path, rate, conf);
 
           if (probed.code === RIG_OK) {
             return rate;
@@ -1171,6 +1434,33 @@ class RawHamlibInstance implements RawHamlib, RigContext {
         /* dispose() reports leftover registrations. */
       }
     }
+  }
+
+  diagnostics(): Diagnostics {
+    const rigs: DiagnosticsRig[] = [...this.#rigs].map((rig) => {
+      const info = rig.portInfo();
+      const hex = (id: number): string => id.toString(16).padStart(4, '0');
+
+      return {
+        path: rig.path,
+        modelId: rig.model.id,
+        manufacturer: rig.model.manufacturer,
+        model: rig.model.model,
+        backendVersion: rig.model.backendVersion,
+        baudRate: rig.baudRate,
+        connected: rig.connected,
+        ...(info?.usbVendorId !== undefined && info.usbProductId !== undefined
+          ? { usb: { vendorId: hex(info.usbVendorId), productId: hex(info.usbProductId) } }
+          : {}),
+      };
+    });
+
+    return this.#recorder.report({
+      hamlibVersion: this.#version,
+      transport: this.#transport.name,
+      hung: this.queue.hung,
+      rigs,
+    });
   }
 
   dispose(): Promise<void> {
