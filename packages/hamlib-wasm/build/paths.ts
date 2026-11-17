@@ -15,7 +15,6 @@ export const NATIVE_DIR = path.join(PACKAGE_DIR, 'native');
 export const NATIVE_PATCHES_DIR = path.join(NATIVE_DIR, 'patches');
 export const CONFIG_PATH = path.join(PACKAGE_DIR, 'hamlib.config.yaml');
 export const PACKAGE_JSON = path.join(PACKAGE_DIR, 'package.json');
-export const MISE_TOML = path.join(REPO_ROOT, 'mise.toml');
 export const BASELINE_JSON = path.join(PACKAGE_DIR, 'baseline', 'baseline.json');
 export const HOST_TRACE_SOURCE = path.join(REPO_ROOT, 'tests', 'native', 'host-trace.c');
 export const CONSUMER_DIR = path.join(REPO_ROOT, 'tests', 'consumer');

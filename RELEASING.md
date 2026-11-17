@@ -231,9 +231,13 @@ delete or move the tag to "fix" it. Repair only the missing artifact.
    ```
 
 2. If the tag exists but the GitHub Release does not, create only the release
-   from the existing tag, then append the bundled-components block:
+   from the existing tag, then append the bundled-components block. That block
+   reads `SOURCE.json`, so first restore the published release's copy:
 
    ```sh
+   npm pack "hamlib-wasm@<version>" --pack-destination /tmp
+   tar -xzf "/tmp/hamlib-wasm-<version>.tgz" -C packages/hamlib-wasm \
+     --strip-components=1 package/dist/third_party/hamlib/SOURCE.json
    gh release create "v<version>" --verify-tag --generate-notes
    gh release view "v<version>" --json body -q .body > /tmp/release-notes.md
    node packages/hamlib-wasm/build/release-notes.ts >> /tmp/release-notes.md

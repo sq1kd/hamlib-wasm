@@ -22,8 +22,8 @@ module.exports = {
         // @semantic-release/npm publishes, before it stamps the version.
         // --skip-deps: the job restored the build CI verified.
         verifyReleaseCmd: 'mise run --skip-deps verify-release',
-        // Adds the "Bundled components" section.  It never fails a release:
-        // missing provenance produces a shorter section, not a release error.
+        // Adds the "Bundled components" section from the restored build's
+        // SOURCE.json; it fails rather than describe a different build.
         generateNotesCmd: 'node packages/hamlib-wasm/build/release-notes.ts',
       },
     ],
