@@ -98,6 +98,7 @@ export type FakeRigName =
   | 'kenwood-ts480'
   | 'icom-ic703'
   | 'icom-ic746'
+  | 'icom-ic746pro'
   | 'yaesu-ft710'
   | 'yaesu-ft757gx2'
   | 'yaesu-frg100';

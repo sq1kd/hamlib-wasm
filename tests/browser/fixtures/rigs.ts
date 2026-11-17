@@ -153,6 +153,9 @@
           return 'FR0';
         case 'FT':
           return 'FT0';
+        case 'KY':
+          /* Keyer buffer has room; `KY <text>` itself is a set, unanswered. */
+          return 'KY0';
         default:
           return '?';
       }
@@ -204,8 +207,8 @@
    * first, which is the CI-V convention the backend decodes.
    *
    * `radioAddress` is the rig's own bus address, so one protocol serves every
-   * CI-V model the fixtures need: the IC-703 answers at 0x68, the IC-746 and
-   * IC-746PRO at 0x56.
+   * CI-V model the fixtures need: the IC-703 answers at 0x68, the IC-746 at
+   * 0x56 and the IC-746PRO at 0x66, each backend's default address.
    */
   function createIcomCiv(radioAddress: number, name: string): FakeRig {
     var PREAMBLE = [0xfe, 0xfe];
@@ -323,10 +326,15 @@
 
           if (end < 0) { break; }
 
+          var to = buffer[2];
           var body = buffer.slice(4, end);
           buffer = buffer.slice(end + 1);
 
           if (body.length === 0) { continue; }
+
+          /* A radio ignores frames for another bus address; 0x00 is the
+           * broadcast every radio hears. */
+          if (to !== RADIO && to !== 0x00) { continue; }
 
           commands.push(describe(body));
 
@@ -683,6 +691,7 @@
     'kenwood-ts480': createTs480,
     'icom-ic703': civRig(0x68, 'icom-ic703'),
     'icom-ic746': civRig(0x56, 'icom-ic746'),
+    'icom-ic746pro': civRig(0x66, 'icom-ic746pro'),
     'yaesu-ft710': createFt710,
     'yaesu-ft757gx2': createFt757gx2,
     'yaesu-frg100': createFrg100,

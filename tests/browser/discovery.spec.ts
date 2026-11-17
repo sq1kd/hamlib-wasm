@@ -33,8 +33,8 @@ test.beforeEach(async ({ page }) => {
   await installFakeSerial(page);
   await installTestHelpers(page);
   await page.goto(HARNESS_URL);
-  /* The IC-746PRO answers CI-V at 0x56. */
-  await useRig(page, 'icom-ic746');
+  /* The IC-746PRO answers CI-V at 0x66. */
+  await useRig(page, 'icom-ic746pro');
 });
 
 test('an IC-746PRO client discovers its extension parameters', async ({ page }) => {

@@ -58,6 +58,7 @@ interface FakeRigRegistry {
   'kenwood-ts480': () => FakeRig;
   'icom-ic703': () => FakeRig;
   'icom-ic746': () => FakeRig;
+  'icom-ic746pro': () => FakeRig;
   'yaesu-ft710': () => FakeRig;
   'yaesu-ft757gx2': () => FakeRig;
   'yaesu-frg100': () => FakeRig;
