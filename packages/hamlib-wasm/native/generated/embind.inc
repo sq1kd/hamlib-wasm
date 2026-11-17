@@ -10,26 +10,6 @@
     .field("code", &CodeResult::code)
     .field("error", &CodeResult::error);
 
-    emscripten::value_object<ExtLookupResult>("ExtLookupResult")
-    .field("code", &ExtLookupResult::code)
-    .field("token", &ExtLookupResult::token)
-    .field("name", &ExtLookupResult::name)
-    .field("label", &ExtLookupResult::label)
-    .field("tooltip", &ExtLookupResult::tooltip)
-    .field("dflt", &ExtLookupResult::dflt)
-    .field("type", &ExtLookupResult::type)
-    .field("error", &ExtLookupResult::error);
-
-    emscripten::value_object<ExtLookupTokResult>("ExtLookupTokResult")
-    .field("code", &ExtLookupTokResult::code)
-    .field("token", &ExtLookupTokResult::token)
-    .field("name", &ExtLookupTokResult::name)
-    .field("label", &ExtLookupTokResult::label)
-    .field("tooltip", &ExtLookupTokResult::tooltip)
-    .field("dflt", &ExtLookupTokResult::dflt)
-    .field("type", &ExtLookupTokResult::type)
-    .field("error", &ExtLookupTokResult::error);
-
     emscripten::value_object<GetAntResult>("GetAntResult")
     .field("code", &GetAntResult::code)
     .field("option", &GetAntResult::option)
@@ -37,36 +17,6 @@
     .field("antTx", &GetAntResult::antTx)
     .field("antRx", &GetAntResult::antRx)
     .field("error", &GetAntResult::error);
-
-    emscripten::value_object<GetChannelResult>("GetChannelResult")
-    .field("code", &GetChannelResult::code)
-    .field("channelNum", &GetChannelResult::channelNum)
-    .field("bankNum", &GetChannelResult::bankNum)
-    .field("vfo", &GetChannelResult::vfo)
-    .field("ant", &GetChannelResult::ant)
-    .field("freq", &GetChannelResult::freq)
-    .field("mode", &GetChannelResult::mode)
-    .field("width", &GetChannelResult::width)
-    .field("txFreq", &GetChannelResult::txFreq)
-    .field("txMode", &GetChannelResult::txMode)
-    .field("txWidth", &GetChannelResult::txWidth)
-    .field("split", &GetChannelResult::split)
-    .field("txVfo", &GetChannelResult::txVfo)
-    .field("rptrShift", &GetChannelResult::rptrShift)
-    .field("rptrOffs", &GetChannelResult::rptrOffs)
-    .field("tuningStep", &GetChannelResult::tuningStep)
-    .field("rit", &GetChannelResult::rit)
-    .field("xit", &GetChannelResult::xit)
-    .field("funcs", &GetChannelResult::funcs)
-    .field("ctcssTone", &GetChannelResult::ctcssTone)
-    .field("ctcssSql", &GetChannelResult::ctcssSql)
-    .field("dcsCode", &GetChannelResult::dcsCode)
-    .field("dcsSql", &GetChannelResult::dcsSql)
-    .field("scanGroup", &GetChannelResult::scanGroup)
-    .field("flags", &GetChannelResult::flags)
-    .field("channelDesc", &GetChannelResult::channelDesc)
-    .field("tag", &GetChannelResult::tag)
-    .field("error", &GetChannelResult::error);
 
     emscripten::value_object<GetClockResult>("GetClockResult")
     .field("code", &GetClockResult::code)
@@ -114,13 +64,6 @@
     .field("satmode", &GetVfoInfoResult::satmode)
     .field("error", &GetVfoInfoResult::error);
 
-    emscripten::value_object<LookupMemCapsResult>("LookupMemCapsResult")
-    .field("code", &LookupMemCapsResult::code)
-    .field("startc", &LookupMemCapsResult::startc)
-    .field("endc", &LookupMemCapsResult::endc)
-    .field("type", &LookupMemCapsResult::type)
-    .field("error", &LookupMemCapsResult::error);
-
     emscripten::value_object<ModelInfo>("RigModelInfo")
     .field("id", &ModelInfo::id)
     .field("manufacturer", &ModelInfo::manufacturer)
@@ -150,6 +93,53 @@
     .field("code", &PttResult::code)
     .field("ptt", &PttResult::ptt)
     .field("error", &PttResult::error);
+
+    emscripten::value_object<RigChanListResult>("RigChanListResult")
+    .field("code", &RigChanListResult::code)
+    .field("startc", &RigChanListResult::startc)
+    .field("endc", &RigChanListResult::endc)
+    .field("type", &RigChanListResult::type)
+    .field("error", &RigChanListResult::error);
+
+    emscripten::value_object<RigChannelResult>("RigChannelResult")
+    .field("code", &RigChannelResult::code)
+    .field("channelNum", &RigChannelResult::channelNum)
+    .field("bankNum", &RigChannelResult::bankNum)
+    .field("vfo", &RigChannelResult::vfo)
+    .field("ant", &RigChannelResult::ant)
+    .field("freq", &RigChannelResult::freq)
+    .field("mode", &RigChannelResult::mode)
+    .field("width", &RigChannelResult::width)
+    .field("txFreq", &RigChannelResult::txFreq)
+    .field("txMode", &RigChannelResult::txMode)
+    .field("txWidth", &RigChannelResult::txWidth)
+    .field("split", &RigChannelResult::split)
+    .field("txVfo", &RigChannelResult::txVfo)
+    .field("rptrShift", &RigChannelResult::rptrShift)
+    .field("rptrOffs", &RigChannelResult::rptrOffs)
+    .field("tuningStep", &RigChannelResult::tuningStep)
+    .field("rit", &RigChannelResult::rit)
+    .field("xit", &RigChannelResult::xit)
+    .field("funcs", &RigChannelResult::funcs)
+    .field("ctcssTone", &RigChannelResult::ctcssTone)
+    .field("ctcssSql", &RigChannelResult::ctcssSql)
+    .field("dcsCode", &RigChannelResult::dcsCode)
+    .field("dcsSql", &RigChannelResult::dcsSql)
+    .field("scanGroup", &RigChannelResult::scanGroup)
+    .field("flags", &RigChannelResult::flags)
+    .field("channelDesc", &RigChannelResult::channelDesc)
+    .field("tag", &RigChannelResult::tag)
+    .field("error", &RigChannelResult::error);
+
+    emscripten::value_object<RigConfparamsResult>("RigConfparamsResult")
+    .field("code", &RigConfparamsResult::code)
+    .field("token", &RigConfparamsResult::token)
+    .field("name", &RigConfparamsResult::name)
+    .field("label", &RigConfparamsResult::label)
+    .field("tooltip", &RigConfparamsResult::tooltip)
+    .field("dflt", &RigConfparamsResult::dflt)
+    .field("type", &RigConfparamsResult::type)
+    .field("error", &RigConfparamsResult::error);
 
     emscripten::value_object<TextResult>("TextResult")
     .field("code", &TextResult::code)

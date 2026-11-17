@@ -61,30 +61,6 @@ struct CodeResult
     std::string error;
 };
 
-struct ExtLookupResult
-{
-    int code;
-    double token;
-    std::string name;
-    std::string label;
-    std::string tooltip;
-    std::string dflt;
-    double type;
-    std::string error;
-};
-
-struct ExtLookupTokResult
-{
-    int code;
-    double token;
-    std::string name;
-    std::string label;
-    std::string tooltip;
-    std::string dflt;
-    double type;
-    std::string error;
-};
-
 struct GetAntResult
 {
     int code;
@@ -92,38 +68,6 @@ struct GetAntResult
     double antCurr;
     double antTx;
     double antRx;
-    std::string error;
-};
-
-struct GetChannelResult
-{
-    int code;
-    double channelNum;
-    double bankNum;
-    std::string vfo;
-    double ant;
-    double freq;
-    std::string mode;
-    double width;
-    double txFreq;
-    std::string txMode;
-    double txWidth;
-    bool split;
-    std::string txVfo;
-    std::string rptrShift;
-    double rptrOffs;
-    double tuningStep;
-    double rit;
-    double xit;
-    double funcs;
-    double ctcssTone;
-    double ctcssSql;
-    double dcsCode;
-    double dcsSql;
-    double scanGroup;
-    double flags;
-    std::string channelDesc;
-    std::string tag;
     std::string error;
 };
 
@@ -185,15 +129,6 @@ struct GetVfoInfoResult
     std::string error;
 };
 
-struct LookupMemCapsResult
-{
-    int code;
-    double startc;
-    double endc;
-    double type;
-    std::string error;
-};
-
 struct ModelInfo
 {
     int id;
@@ -229,6 +164,59 @@ struct PttResult
 {
     int code;
     std::string ptt;
+    std::string error;
+};
+
+struct RigChanListResult
+{
+    int code;
+    double startc;
+    double endc;
+    double type;
+    std::string error;
+};
+
+struct RigChannelResult
+{
+    int code;
+    double channelNum;
+    double bankNum;
+    std::string vfo;
+    double ant;
+    double freq;
+    std::string mode;
+    double width;
+    double txFreq;
+    std::string txMode;
+    double txWidth;
+    bool split;
+    std::string txVfo;
+    std::string rptrShift;
+    double rptrOffs;
+    double tuningStep;
+    double rit;
+    double xit;
+    double funcs;
+    double ctcssTone;
+    double ctcssSql;
+    double dcsCode;
+    double dcsSql;
+    double scanGroup;
+    double flags;
+    std::string channelDesc;
+    std::string tag;
+    std::string error;
+};
+
+struct RigConfparamsResult
+{
+    int code;
+    double token;
+    std::string name;
+    std::string label;
+    std::string tooltip;
+    std::string dflt;
+    double type;
     std::string error;
 };
 

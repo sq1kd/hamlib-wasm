@@ -38,7 +38,7 @@ import {
 
 export type GeneratedShape = 'get' | 'set' | 'pure';
 
-/** The shared result value objects and the per-operation ones. */
+/** The single-value results of the config's `results:`, shared with the bespoke operations. */
 export type FlatResult = 'NumberResult' | 'TextResult' | 'BoolResult' | 'CodeResult';
 
 export interface OperationArgument {
@@ -65,7 +65,11 @@ export interface GeneratedOperation {
   readonly arguments: readonly OperationArgument[];
   /** Getter outputs, in declaration order. */
   readonly outputs: readonly OperationArgument[];
-  /** The Embind result type: `CodeResult`, a flat result, or `<Pascal>Result`. */
+  /**
+   * The Embind result type: `CodeResult`, a flat result, `<Projection>Result`
+   * for a single struct (so every operation returning it shares one), or
+   * `<Pascal>Result` for several outputs.
+   */
   readonly result: string;
   /** The returned type of a `pure` operation. */
   readonly pure: TypeBinding | null;
@@ -393,6 +397,15 @@ function flatResultFor(binding: TypeBinding): FlatResult {
   }
 }
 
+/** The result of an operation returning one struct, named after its projection. */
+function structResult(binding: TypeBinding): string {
+  if (!binding.projection) {
+    throw new Error(`${binding.native} has no projection`);
+  }
+
+  return `${binding.projection.cpp}Result`;
+}
+
 /** A stable, non-empty field name for a C parameter: `tx_freq` -> `txFreq`. */
 function fieldName(name: string, index: number): string {
   const trimmed = name.trim();
@@ -568,7 +581,7 @@ export function classifyFunction(
       shape: 'pure',
       arguments: args,
       outputs: [],
-      result: pure.category === 'struct' ? `${pascalCase(methodName(symbol))}Result` : flatResultFor(pure),
+      result: pure.category === 'struct' ? structResult(pure) : flatResultFor(pure),
       pure,
       plan,
     };
@@ -678,7 +691,9 @@ export function classifyFunction(
     });
 
     const first = outputArguments[0] as OperationArgument;
-    const singleScalar = outputArguments.length === 1 && first.binding.category !== 'struct';
+    const result = outputArguments.length > 1
+      ? `${pascalCase(methodName(symbol))}Result`
+      : first.binding.category === 'struct' ? structResult(first.binding) : flatResultFor(first.binding);
 
     return {
       symbol,
@@ -686,7 +701,7 @@ export function classifyFunction(
       shape: 'get',
       arguments: inputArguments,
       outputs: outputArguments,
-      result: singleScalar ? flatResultFor(first.binding) : `${pascalCase(methodName(symbol))}Result`,
+      result,
       pure: null,
       plan: rebuilt,
     };

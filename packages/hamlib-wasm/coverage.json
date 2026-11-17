@@ -88,14 +88,14 @@
       "symbol": "rig_ext_lookup",
       "method": "extLookup",
       "shape": "pure",
-      "result": "ExtLookupResult",
+      "result": "RigConfparamsResult",
       "capability": null
     },
     {
       "symbol": "rig_ext_lookup_tok",
       "method": "extLookupTok",
       "shape": "pure",
-      "result": "ExtLookupTokResult",
+      "result": "RigConfparamsResult",
       "capability": null
     },
     {
@@ -109,7 +109,7 @@
       "symbol": "rig_get_channel",
       "method": "getChannel",
       "shape": "get",
-      "result": "GetChannelResult",
+      "result": "RigChannelResult",
       "capability": "getChannel"
     },
     {
@@ -368,7 +368,7 @@
       "symbol": "rig_lookup_mem_caps",
       "method": "lookupMemCaps",
       "shape": "pure",
-      "result": "LookupMemCapsResult",
+      "result": "RigChanListResult",
       "capability": null
     },
     {

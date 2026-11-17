@@ -4,7 +4,7 @@
 // pinned release; the code is MIT.
 // Do not edit: run `mise run generate` after changing the config.
 
-import type { BoolResult, CodeResult, ExtLookupResult, ExtLookupTokResult, GetAntResult, GetChannelResult, GetClockResult, GetModeResult, GetSplitFreqModeResult, GetSplitModeResult, GetSplitVfoResult, GetVfoInfoResult, LookupMemCapsResult, MainModule, NumberResult, OpenResult, PttResult, RigChannel, RigConfparamsList, RigModelList, StringList, TextResult } from '../hamlib-wasm.mjs';
+import type { BoolResult, CodeResult, GetAntResult, GetClockResult, GetModeResult, GetSplitFreqModeResult, GetSplitModeResult, GetSplitVfoResult, GetVfoInfoResult, MainModule, NumberResult, OpenResult, PttResult, RigChanListResult, RigChannel, RigChannelResult, RigConfparamsList, RigConfparamsResult, RigModelList, StringList, TextResult } from '../hamlib-wasm.mjs';
 import type { Func, Level, Parm, PowerStatus, PttState, ResetKind, RigMode, RptrShift, ScanOp, Vfo, VfoOp } from './names.js';
 import type { RigConfparam } from '../confparams.js';
 
@@ -164,9 +164,9 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   getExtFunc(handle: number, arg0: number): Asyncify<BoolResult>;
   /** Pure computation: no transport access. */
-  extLookup(handle: number, arg0: string): Asyncify<ExtLookupResult>;
+  extLookup(handle: number, arg0: string): Asyncify<RigConfparamsResult>;
   /** Pure computation: no transport access. */
-  extLookupTok(handle: number, arg0: number): Asyncify<ExtLookupTokResult>;
+  extLookupTok(handle: number, arg0: number): Asyncify<RigConfparamsResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setAnt(handle: number, arg0: number, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -210,9 +210,9 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   setChannel(handle: number, arg0: RigChannel): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getChannel(handle: number, arg0: boolean): Asyncify<GetChannelResult>;
+  getChannel(handle: number, arg0: boolean): Asyncify<RigChannelResult>;
   /** Pure computation: no transport access. */
-  lookupMemCaps(handle: number, arg0: number): Asyncify<LookupMemCapsResult>;
+  lookupMemCaps(handle: number, arg0: number): Asyncify<RigChanListResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setTwiddle(handle: number, arg0: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */

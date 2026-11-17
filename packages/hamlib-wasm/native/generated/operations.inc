@@ -772,17 +772,17 @@
         });
     }
 
-    ExtLookupResult extLookup(int handle, const std::string & arg0)
+    RigConfparamsResult extLookup(int handle, const std::string & arg0)
     {
-        return withRig<ExtLookupResult>(handle, [&](RIG *rig)
+        return withRig<RigConfparamsResult>(handle, [&](RIG *rig)
         {
             const char *value0 = arg0.c_str();
 
             const struct confparams *source = rig_ext_lookup(rig, value0);
 
-            if (!source) { return failure<ExtLookupResult>(-RIG_EINVAL, "rig_ext_lookup matched nothing"); }
+            if (!source) { return failure<RigConfparamsResult>(-RIG_EINVAL, "rig_ext_lookup matched nothing"); }
 
-            ExtLookupResult result = ok<ExtLookupResult>();
+            RigConfparamsResult result = ok<RigConfparamsResult>();
             result.token = (double) source->token;
             result.name = textOrEmpty(source->name);
             result.label = textOrEmpty(source->label);
@@ -793,18 +793,18 @@
         });
     }
 
-    ExtLookupTokResult extLookupTok(int handle, double arg0)
+    RigConfparamsResult extLookupTok(int handle, double arg0)
     {
-        return withRig<ExtLookupTokResult>(handle, [&](RIG *rig)
+        return withRig<RigConfparamsResult>(handle, [&](RIG *rig)
         {
             hamlib_token_t value0{};
-            if (!fromNumber(arg0, &value0)) { return failure<ExtLookupTokResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0, &value0)) { return failure<RigConfparamsResult>(-RIG_EINVAL); }
 
             const struct confparams *source = rig_ext_lookup_tok(rig, value0);
 
-            if (!source) { return failure<ExtLookupTokResult>(-RIG_EINVAL, "rig_ext_lookup_tok matched nothing"); }
+            if (!source) { return failure<RigConfparamsResult>(-RIG_EINVAL, "rig_ext_lookup_tok matched nothing"); }
 
-            ExtLookupTokResult result = ok<ExtLookupTokResult>();
+            RigConfparamsResult result = ok<RigConfparamsResult>();
             result.token = (double) source->token;
             result.name = textOrEmpty(source->name);
             result.label = textOrEmpty(source->label);
@@ -1176,18 +1176,18 @@
         });
     }
 
-    GetChannelResult getChannel(int handle, bool arg0)
+    RigChannelResult getChannel(int handle, bool arg0)
     {
-        return withRig<GetChannelResult>(handle, [&](RIG *rig)
+        return withRig<RigChannelResult>(handle, [&](RIG *rig)
         {
             int value0 = arg0 ? 1 : 0;
             channel_t out0{};
 
             int rc = rig_get_channel(rig, RIG_VFO_CURR, &out0, value0);
 
-            if (rc != RIG_OK) { return failure<GetChannelResult>(rc); }
+            if (rc != RIG_OK) { return failure<RigChannelResult>(rc); }
 
-            GetChannelResult result = ok<GetChannelResult>();
+            RigChannelResult result = ok<RigChannelResult>();
             result.channelNum = (double) out0.channel_num;
             result.bankNum = (double) out0.bank_num;
             result.vfo = textOrEmpty(rig_strvfo(out0.vfo));
@@ -1218,18 +1218,18 @@
         });
     }
 
-    LookupMemCapsResult lookupMemCaps(int handle, double arg0)
+    RigChanListResult lookupMemCaps(int handle, double arg0)
     {
-        return withRig<LookupMemCapsResult>(handle, [&](RIG *rig)
+        return withRig<RigChanListResult>(handle, [&](RIG *rig)
         {
             int value0{};
-            if (!fromNumber(arg0, &value0)) { return failure<LookupMemCapsResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0, &value0)) { return failure<RigChanListResult>(-RIG_EINVAL); }
 
             const chan_t *source = rig_lookup_mem_caps(rig, value0);
 
-            if (!source) { return failure<LookupMemCapsResult>(-RIG_EINVAL, "rig_lookup_mem_caps matched nothing"); }
+            if (!source) { return failure<RigChanListResult>(-RIG_EINVAL, "rig_lookup_mem_caps matched nothing"); }
 
-            LookupMemCapsResult result = ok<LookupMemCapsResult>();
+            RigChanListResult result = ok<RigChanListResult>();
             result.startc = (double) source->startc;
             result.endc = (double) source->endc;
             result.type = (double) source->type;
