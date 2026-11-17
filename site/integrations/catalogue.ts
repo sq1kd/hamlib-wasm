@@ -18,7 +18,7 @@ export interface CatalogueModel {
 }
 
 export interface Catalogue {
-  /** The upstream release, e.g. `4.7.2`. */
+  /** The upstream release, e.g. `X.Y.Z`. */
   readonly version: string;
   readonly models: readonly CatalogueModel[];
 }
