@@ -97,6 +97,8 @@ export interface Model {
   readonly lineSettings: LineSettings;
   /** Configuration tokens the facade sets itself, with what to use instead. */
   readonly ownedConf: Readonly<Record<string, string>>;
+  /** Configuration tokens that need a device or a thread this build cannot reach, with why. */
+  readonly unreachableConf: Readonly<Record<string, string>>;
   /** Declarative renames for the mechanically generated surface. */
   readonly overrides?: {
     /** Per-symbol method/field renames for generated operations. */
@@ -327,6 +329,12 @@ function readLineSettings(file: string, value: unknown): LineSettings {
   };
 }
 
+/** A `token: reason` mapping of configuration tokens. */
+function readTokens(file: string, value: unknown, what: string): Readonly<Record<string, string>> {
+  return Object.fromEntries(Object.entries(asObject(file, value, what))
+    .map(([token, why]) => [token, asString(file, why, `${what}.${token}`)]));
+}
+
 /** Read the codegen half of the config: everything except `release`. */
 export function loadConfig(file: string): CodegenConfig {
   let parsed: unknown;
@@ -355,8 +363,8 @@ export function loadConfig(file: string): CodegenConfig {
       operations: readOperations(file, root.operations, flags),
       flags,
       lineSettings: readLineSettings(file, root.lineSettings),
-      ownedConf: Object.fromEntries(Object.entries(asObject(file, root.ownedConf, 'ownedConf'))
-        .map(([token, why]) => [token, asString(file, why, `ownedConf.${token}`)])),
+      ownedConf: readTokens(file, root.ownedConf, 'ownedConf'),
+      unreachableConf: readTokens(file, root.unreachableConf, 'unreachableConf'),
       overrides: readOverrides(file, root.overrides ?? {}),
     },
   };

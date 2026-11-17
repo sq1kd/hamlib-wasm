@@ -13,8 +13,12 @@
  */
 
 import { HamlibError } from './errors.js';
-import { OWNED_CONF } from './native/generated/names.js';
-import type { OwnedConfToken } from './native/generated/names.js';
+import { LINE_DATA_BITS, LINE_HANDSHAKES, LINE_PARITIES, LINE_STOP_BITS, OWNED_CONF, UNREACHABLE_CONF } from './native/generated/names.js';
+import type { OwnedConfToken, UnreachableConfToken } from './native/generated/names.js';
+
+/** The `ptt_type`/`dcd_type` values whose line is the rig's own serial port. */
+const PTT_TYPES = ['RIG', 'RIGMICDATA', 'DTR', 'RTS', 'None'] as const;
+const DCD_TYPES = ['RIG', 'DSR', 'CTS', 'CD', 'None'] as const;
 
 /**
  * Hamlib's frontend tokens (upstream `src/conf.c`) that work here, typed with
@@ -34,18 +38,18 @@ export interface FrontendConf {
   /** Extra read attempts after a timeout. */
   readonly timeout_retry?: number;
   /** Push-to-talk through CAT, or on the rig port's RTS/DTR line. */
-  readonly ptt_type?: 'RIG' | 'RIGMICDATA' | 'DTR' | 'RTS' | 'None';
+  readonly ptt_type?: (typeof PTT_TYPES)[number];
   /** Squelch status through CAT, or from the rig port's DSR/CTS/CD line. */
-  readonly dcd_type?: 'RIG' | 'DSR' | 'CTS' | 'CD' | 'None';
+  readonly dcd_type?: (typeof DCD_TYPES)[number];
   /** RTS while the port is open: some interfaces are powered from it. */
   readonly rts_state?: 'Unset' | 'ON' | 'OFF';
   /** DTR while the port is open. */
   readonly dtr_state?: 'Unset' | 'ON' | 'OFF';
   /** Override the backend's flow control (XON/XOFF is not supported). */
-  readonly serial_handshake?: 'None' | 'Hardware';
-  readonly data_bits?: 7 | 8;
-  readonly stop_bits?: 1 | 2;
-  readonly serial_parity?: 'None' | 'Odd' | 'Even';
+  readonly serial_handshake?: Capitalize<(typeof LINE_HANDSHAKES)[number]>;
+  readonly data_bits?: (typeof LINE_DATA_BITS)[number];
+  readonly stop_bits?: (typeof LINE_STOP_BITS)[number];
+  readonly serial_parity?: Capitalize<(typeof LINE_PARITIES)[number]>;
   /** VFO compensation, in parts per million. */
   readonly vfo_comp?: number;
   /** Local oscillator frequency of a transverter, in hertz. */
@@ -63,19 +67,7 @@ export interface FrontendConf {
 }
 
 /** Tokens hamlib-wasm sets itself or cannot honour; see {@link encodeConf}. */
-type RefusedToken =
-  | OwnedConfToken
-  | 'ptt_pathname'
-  | 'dcd_pathname'
-  | 'ptt_share'
-  | 'ptt_bitnum'
-  | 'tuner_control_pathname'
-  | 'flushx'
-  | 'multicast_data_addr'
-  | 'multicast_data_port'
-  | 'multicast_cmd_addr'
-  | 'multicast_cmd_port'
-  | 'client';
+type RefusedToken = OwnedConfToken | UnreachableConfToken;
 
 /**
  * Hamlib configuration tokens to apply before the rig opens, by name.
@@ -94,24 +86,10 @@ export type RigConf = FrontendConf
   & { readonly [token in RefusedToken]?: never }
   & { readonly [backendToken: string]: string | number | boolean | undefined };
 
-/** Tokens that need a device or a thread this build cannot reach. */
-const UNREACHABLE: Readonly<Record<string, string>> = {
-  ptt_pathname: 'PTT on a second port is not supported; use ptt_type RTS or DTR on the rig\'s port',
-  dcd_pathname: 'DCD on a second port is not supported; use dcd_type CTS, DSR or CD on the rig\'s port',
-  ptt_share: 'PTT on a second port is not supported',
-  ptt_bitnum: 'parallel, CM108 and GPIO lines are not reachable from here',
-  tuner_control_pathname: 'a tuner control device is not reachable from here',
-  flushx: 'named-pipe ports are not reachable from here',
-  multicast_data_addr: 'this build has no network transport',
-  multicast_data_port: 'this build has no network transport',
-  multicast_cmd_addr: 'this build has no network transport',
-  multicast_cmd_port: 'this build has no network transport',
-  client: 'this build has no network transport',
-};
-
-/** The `ptt_type`/`dcd_type` values whose line is the rig's own serial port. */
-const PTT_TYPES: ReadonlySet<string> = new Set(['RIG', 'RIGMICDATA', 'DTR', 'RTS', 'None']);
-const DCD_TYPES: ReadonlySet<string> = new Set(['RIG', 'DSR', 'CTS', 'CD', 'None']);
+/** Whether `value` is one of `values`. */
+function isOneOf(values: readonly string[], value: string): boolean {
+  return values.includes(value);
+}
 
 function refuse(message: string, operation: string): never {
   throw new HamlibError(message, { code: 'INVALID_ARGUMENT', operation });
@@ -152,24 +130,16 @@ export function encodeConf(conf: RigConf | undefined, operation: string): string
       refuse(`conf token "${name}" is set by hamlib-wasm itself: ${OWNED_CONF[name as OwnedConfToken]}`, operation);
     }
 
-    const unreachable = UNREACHABLE[name];
-
-    if (unreachable !== undefined) {
-      refuse(`conf token "${name}" is not supported: ${unreachable}`, operation);
+    if (Object.hasOwn(UNREACHABLE_CONF, name)) {
+      refuse(`conf token "${name}" is not supported: ${UNREACHABLE_CONF[name as UnreachableConfToken]}`, operation);
     }
 
-    if (name === 'ptt_type' && !PTT_TYPES.has(value)) {
-      refuse(
-        `ptt_type "${value}" is not supported; use one of ${[...PTT_TYPES].join(', ')}`,
-        operation,
-      );
+    if (name === 'ptt_type' && !isOneOf(PTT_TYPES, value)) {
+      refuse(`ptt_type "${value}" is not supported; use one of ${PTT_TYPES.join(', ')}`, operation);
     }
 
-    if (name === 'dcd_type' && !DCD_TYPES.has(value)) {
-      refuse(
-        `dcd_type "${value}" is not supported; use one of ${[...DCD_TYPES].join(', ')}`,
-        operation,
-      );
+    if (name === 'dcd_type' && !isOneOf(DCD_TYPES, value)) {
+      refuse(`dcd_type "${value}" is not supported; use one of ${DCD_TYPES.join(', ')}`, operation);
     }
 
     lines.push(`${name}=${value}`);

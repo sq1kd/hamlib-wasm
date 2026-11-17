@@ -449,3 +449,21 @@ export const OWNED_CONF = {
 
 /** One of the tokens of {@link OWNED_CONF}. */
 export type OwnedConfToken = keyof typeof OWNED_CONF;
+
+/** The configuration tokens that need a device or a thread this build cannot reach, with why, from hamlib.config.yaml. */
+export const UNREACHABLE_CONF = {
+  ptt_pathname: 'PTT on a second port is not supported; use ptt_type RTS or DTR on the rig\'s port',
+  dcd_pathname: 'DCD on a second port is not supported; use dcd_type CTS, DSR or CD on the rig\'s port',
+  ptt_share: 'PTT on a second port is not supported',
+  ptt_bitnum: 'parallel, CM108 and GPIO lines are not reachable from here',
+  tuner_control_pathname: 'a tuner control device is not reachable from here',
+  flushx: 'named-pipe ports are not reachable from here',
+  multicast_data_addr: 'this build has no network transport',
+  multicast_data_port: 'this build has no network transport',
+  multicast_cmd_addr: 'this build has no network transport',
+  multicast_cmd_port: 'this build has no network transport',
+  client: 'this build has no network transport',
+} as const;
+
+/** One of the tokens of {@link UNREACHABLE_CONF}. */
+export type UnreachableConfToken = keyof typeof UNREACHABLE_CONF;

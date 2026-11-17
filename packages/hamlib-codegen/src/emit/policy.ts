@@ -2,7 +2,8 @@
 
 /**
  * The transport policy of `hamlib.config.yaml` - the line settings every
- * transport accepts and the configuration tokens the facade owns - in each
+ * transport accepts and the configuration tokens the facade owns or cannot
+ * reach - in each
  * language that enforces it: `native/generated/policy.h` for the serial layer
  * and the facade, `as const` lists in `names.ts` for the TypeScript layer, and
  * the narrowed types the JS library opens a port with.
@@ -112,13 +113,20 @@ export function policyConstants(model: Model, vocabularies: readonly NameVocabul
     '/** The flow controls every transport accepts, from hamlib.config.yaml. */',
     `export const LINE_HANDSHAKES = [${handshake.names.map(quote).join(', ')}] as const satisfies readonly ${handshake.union}[];`,
     '',
-    '/** The configuration tokens the facade sets itself, with what to use instead, from hamlib.config.yaml. */',
-    'export const OWNED_CONF = {',
-    ...Object.entries(model.ownedConf).map(([token, why]) => `  ${token}: ${quote(why)},`),
+    ...tokenConstants('the configuration tokens the facade sets itself, with what to use instead', 'OWNED_CONF', 'OwnedConfToken', model.ownedConf),
+    ...tokenConstants('the configuration tokens that need a device or a thread this build cannot reach, with why', 'UNREACHABLE_CONF', 'UnreachableConfToken', model.unreachableConf),
+  ];
+}
+
+function tokenConstants(what: string, constant: string, type: string, tokens: Readonly<Record<string, string>>): string[] {
+  return [
+    `/** ${what[0]?.toUpperCase()}${what.slice(1)}, from hamlib.config.yaml. */`,
+    `export const ${constant} = {`,
+    ...Object.entries(tokens).map(([token, why]) => `  ${token}: ${quote(why)},`),
     '} as const;',
     '',
-    '/** One of the tokens of {@link OWNED_CONF}. */',
-    'export type OwnedConfToken = keyof typeof OWNED_CONF;',
+    `/** One of the tokens of {@link ${constant}}. */`,
+    `export type ${type} = keyof typeof ${constant};`,
     '',
   ];
 }

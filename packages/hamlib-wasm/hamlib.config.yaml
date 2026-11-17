@@ -48,6 +48,22 @@ ownedConf:
   auto_power_on: switch the rig on with setPowerstat()
   auto_power_off: switch the rig off with setPowerstat()
 
+# Frontend configuration tokens (upstream src/conf.c) that need a device or a
+# thread this build cannot reach, with why.  open() refuses them before the
+# port is touched.
+unreachableConf:
+  ptt_pathname: PTT on a second port is not supported; use ptt_type RTS or DTR on the rig's port
+  dcd_pathname: DCD on a second port is not supported; use dcd_type CTS, DSR or CD on the rig's port
+  ptt_share: PTT on a second port is not supported
+  ptt_bitnum: parallel, CM108 and GPIO lines are not reachable from here
+  tuner_control_pathname: a tuner control device is not reachable from here
+  flushx: named-pipe ports are not reachable from here
+  multicast_data_addr: this build has no network transport
+  multicast_data_port: this build has no network transport
+  multicast_cmd_addr: this build has no network transport
+  multicast_cmd_port: this build has no network transport
+  client: this build has no network transport
+
 # The value objects the bespoke operations return, and the code-only and
 # single-value results the generated operations share with them.  The
 # generator defines each struct in native/generated/results.inc and registers
