@@ -18,13 +18,20 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: jdx/mise-action@v2
+    # ImageOS (e.g. ubuntu24) keys the caches whose contents are built for the
+    # runner image, so a new image never restores binaries made for the old one.
+    - name: Name the runner image
+      id: image
+      shell: bash
+      run: echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
+
+    - uses: jdx/mise-action@v5
       with:
         install: true
         cache: true
 
     - name: Restore the npm download cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.npm
         key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -40,20 +47,20 @@ runs:
     # artifacts; a partial restore is still useful after an unrelated edit.
     - name: Restore cached Hamlib sources and build tree
       if: inputs.hamlib == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: .cache/hamlib
-        key: hamlib-${{ runner.os }}-${{ hashFiles('packages/hamlib-wasm/hamlib.config.yaml', 'mise.toml', 'packages/hamlib-wasm/native/**', 'packages/hamlib-wasm/build/**') }}
+        key: hamlib-${{ steps.image.outputs.os }}-${{ hashFiles('packages/hamlib-wasm/hamlib.config.yaml', 'mise.toml', 'packages/hamlib-wasm/native/**', 'packages/hamlib-wasm/build/**') }}
         restore-keys: |
-          hamlib-${{ runner.os }}-
+          hamlib-${{ steps.image.outputs.os }}-
 
     - name: Restore Playwright browsers
       id: playwright-cache
       if: inputs.playwright == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+        key: playwright-${{ steps.image.outputs.os }}-${{ hashFiles('package-lock.json') }}
 
     - name: Install Playwright browsers on a cache miss
       if: inputs.playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
