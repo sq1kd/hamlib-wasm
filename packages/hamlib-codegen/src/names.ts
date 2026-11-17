@@ -116,6 +116,63 @@ export function parseSwitchNames(source: string, signature: string): string[] {
   return [...new Set(names)];
 }
 
+const STRING_ENTRY = /^"((?:[^"\\]|\\.)*)",?$/;
+
+/**
+ * The strings of one `static const char *const <table>[] = { ... };` array,
+ * one `"<text>",` per line, under the same strict grammar as
+ * {@link parseTable}.
+ */
+export function parseStringArray(source: string, table: string): string[] {
+  const lines = source.split('\n');
+  const header = lines.findIndex((line) => new RegExp(`^static const char \\*const ${table}\\[\\]\\s*=$`).test(line.trim()));
+
+  if (header < 0 || lines[header + 1]?.trim() !== '{') {
+    fail(`no "static const char *const ${table}[] =" array followed by "{"`);
+  }
+
+  const strings: string[] = [];
+
+  for (let index = header + 2; index < lines.length; index++) {
+    const line = (lines[index] as string).trim();
+
+    if (line === '};') {
+      if (strings.length === 0) {
+        fail(`${table} has no entries`);
+      }
+
+      return strings;
+    }
+
+    const entry = STRING_ENTRY.exec(line);
+
+    if (!entry) {
+      fail(`${table}: line ${index + 1} is not a "<text>", entry: ${line}`);
+    }
+
+    strings.push(entry[1] as string);
+  }
+
+  return fail(`${table} is not closed by "};"`);
+}
+
+/**
+ * Hamlib's text for each error code, indexed by the code: `rigerror_table[]`
+ * in `src/rig.c`, which `rigerror()` reads.
+ */
+export function loadErrorMessages(sourceDir: string): readonly string[] {
+  const file = path.join(sourceDir, 'rig.c');
+  let source: string;
+
+  try {
+    source = readFileSync(file, 'utf8');
+  } catch (error) {
+    fail(`cannot read ${file}: ${String(error)}`);
+  }
+
+  return parseStringArray(source, 'rigerror_table');
+}
+
 type ConstantSource = Extract<NameSource, { readonly prefix: string }>;
 
 /** The names of a record named from the enum constants clang reports. */

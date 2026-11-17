@@ -43,11 +43,11 @@ import { drainVector } from './embind.js';
 import type { DebugOptions, Diagnostics, DiagnosticsRig } from './diagnostics.js';
 import {
   HamlibError,
-  HAMLIB_ERROR_MESSAGES,
   asHamlibError,
   closedError,
   compoundError,
   disposedError,
+  hamlibError,
   hungError,
 } from './errors.js';
 import { bytesToHex, formatUsbId, hexToBytes } from './hex.js';
@@ -392,24 +392,6 @@ export interface RawHamlib {
    * Idempotent.
    */
   dispose(): Promise<void>;
-}
-
-function hamlibError(result: GeneratedCallResult, operation: string): HamlibError {
-  const transport = typeof result.error === 'string' ? result.error : '';
-  /* Hamlib reports failures as negative codes (-RIG_EIO); the message table is
-   * keyed by the bare value. */
-  const code = Math.abs(result.code);
-  const description = HAMLIB_ERROR_MESSAGES[code] ?? `unknown Hamlib error ${result.code}`;
-  const message = transport
-    ? `${operation} failed: ${description} (${transport})`
-    : `${operation} failed: ${description}`;
-
-  return new HamlibError(message, {
-    code: 'HAMLIB_ERROR',
-    operation,
-    hamlibCode: result.code,
-    hamlibMessage: description,
-  });
 }
 
 /** `result`, or the {@link HamlibError} for `operation` when Hamlib reported a failure. */

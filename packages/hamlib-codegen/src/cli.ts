@@ -49,8 +49,8 @@ import { emitContract } from './emit/contract.ts';
 import { emitCapabilities, emitCodecs, emitEmbind, emitOperations, emitResults } from './emit/cpp.ts';
 import { emitMethodFiles } from './emit/methods.ts';
 import { emitPolicyHeader, lineSettingsTypes, policyConstants } from './emit/policy.ts';
-import { emitNames, emitTransportTypes } from './emit/names.ts';
-import { loadVocabularies } from './names.ts';
+import { emitNames, emitTransportTypes, errorMessageConstants } from './emit/names.ts';
+import { loadErrorMessages, loadVocabularies } from './names.ts';
 import type { NameVocabulary } from './names.ts';
 import { createProjectionResolver, staleProjectionRenames } from './project.ts';
 import type { ProjectionSpec } from './types.ts';
@@ -495,7 +495,10 @@ function render(
         return declarations ? canonicalDeclaration(declarations).params.map((param) => param.name) : [];
       },
     })],
-    [paths.names, emitNames(vocabularies, policyConstants(model, vocabularies))],
+    [paths.names, emitNames(vocabularies, [
+      ...errorMessageConstants(vocabularies, loadErrorMessages(options.sources)),
+      ...policyConstants(model, vocabularies),
+    ])],
     [paths.coverage, `${JSON.stringify(coverage, null, 2)}\n`],
     ...emitMethodFiles(model, facts).map(
       ({ path: relative, content }) => [path.join(paths.methodsDir, relative), content] as const,

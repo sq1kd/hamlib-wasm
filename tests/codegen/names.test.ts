@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseSwitchNames, parseTable } from '../../packages/hamlib-codegen/src/names.ts';
+import { parseStringArray, parseSwitchNames, parseTable } from '../../packages/hamlib-codegen/src/names.ts';
 
 const MISC = `
 static const struct
@@ -52,5 +52,24 @@ describe('parseTable', () => {
 describe('parseSwitchNames', () => {
   it('reads the names a switch stringifier returns', () => {
     expect(parseSwitchNames(MISC, 'const char *HAMLIB_API rig_strptrshift')).toEqual(['-', 'None']);
+  });
+});
+
+describe('parseStringArray', () => {
+  it('reads every string of a char * array in order', () => {
+    const source = [
+      'static const char *const rigerror_table[] =',
+      '{',
+      '    "Command completed successfully",',
+      '    "Command performed, but arg truncated",',
+      '    "Access denied"',
+      '};',
+    ].join('\n');
+
+    expect(parseStringArray(source, 'rigerror_table')).toEqual([
+      'Command completed successfully',
+      'Command performed, but arg truncated',
+      'Access denied',
+    ]);
   });
 });

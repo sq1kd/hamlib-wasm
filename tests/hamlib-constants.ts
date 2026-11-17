@@ -3,8 +3,9 @@
  *
  * The error codes are the package's `RIG_ERRCODES`, generated from
  * `enum rig_errcode_e`.  Hamlib returns the negated value (`-RIG_EIO`), and
- * that is what `HamlibError.hamlibCode` carries; the text is what the package
- * reports as `hamlibMessage` for each, spelled out here as the specification.
+ * that is what `HamlibError.hamlibCode` carries; the text is Hamlib's own
+ * `rigerror()` text, which the package reports as `hamlibMessage`, spelled out
+ * here as the specification.
  */
 import { RIG_ERRCODES } from 'hamlib-wasm/raw';
 
@@ -25,9 +26,9 @@ export const {
 
 /** `hamlibMessage` for each code above. */
 export const HAMLIB_MESSAGE = {
-  [RIG_EINVAL]: 'invalid parameter',
-  [RIG_ECONF]: 'invalid configuration',
-  [RIG_ETIMEOUT]: 'communication timed out',
-  [RIG_EIO]: 'I/O error',
-  [RIG_EINTERNAL]: 'internal Hamlib error',
+  [RIG_EINVAL]: 'Invalid parameter',
+  [RIG_ECONF]: 'Invalid configuration',
+  [RIG_ETIMEOUT]: 'Communication timed out',
+  [RIG_EIO]: 'IO error',
+  [RIG_EINTERNAL]: 'Internal Hamlib error',
 } as const;
