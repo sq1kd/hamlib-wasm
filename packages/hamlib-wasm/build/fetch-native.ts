@@ -10,55 +10,20 @@
  * release inputs change.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
 
-import { installTransport, prepareSourceTree } from './artifact.ts';
+import { ensureArchive, installTransport, prepareSourceTree } from './artifact.ts';
+import { runMain } from './errors.ts';
 import { log, requireTool } from './exec.ts';
-import { readJson, sha256File, writeJson } from './files.ts';
-import {
-  releaseArchivePath,
-  releaseCacheDir,
-  releaseSourceDir,
-  releaseStampPath,
-} from './paths.ts';
+import { readJson, writeJson } from './files.ts';
+import { releaseSourceDir, releaseStampPath } from './paths.ts';
 import { loadUpstream, manifestDigest } from './upstream.ts';
 
 const SCOPE = 'fetch-native';
 const UPSTREAM = loadUpstream();
-const CACHE_DIR = releaseCacheDir(UPSTREAM);
-const ARCHIVE_PATH = releaseArchivePath(UPSTREAM);
 const SOURCE_DIR = releaseSourceDir(UPSTREAM);
 const STAMP_PATH = releaseStampPath(UPSTREAM, 'fetch');
-
-async function ensureArchive(): Promise<void> {
-  if (existsSync(ARCHIVE_PATH) && sha256File(ARCHIVE_PATH) === UPSTREAM.archive.sha256) {
-    log(SCOPE, `archive verified: ${path.relative(process.cwd(), ARCHIVE_PATH)}`);
-    return;
-  }
-
-  mkdirSync(CACHE_DIR, { recursive: true });
-  log(SCOPE, `downloading ${UPSTREAM.archive.url}`);
-
-  const response = await fetch(UPSTREAM.archive.url, { redirect: 'follow' });
-
-  if (!response.ok) {
-    throw new Error(`download failed with HTTP ${response.status}`);
-  }
-
-  writeFileSync(ARCHIVE_PATH, Buffer.from(await response.arrayBuffer()));
-  const actual = sha256File(ARCHIVE_PATH);
-
-  if (actual !== UPSTREAM.archive.sha256) {
-    rmSync(ARCHIVE_PATH, { force: true });
-    throw new Error(
-      `archive SHA-256 mismatch: expected ${UPSTREAM.archive.sha256}, got ${actual}`,
-    );
-  }
-
-  log(SCOPE, 'archive downloaded and verified');
-}
 
 /** The release inputs the extracted tree was produced from. */
 function extractedDigest(): string {
@@ -81,15 +46,16 @@ function stampMatches(): boolean {
 }
 
 async function main(): Promise<void> {
-  requireTool(SCOPE, 'tar', 'Run this through `mise run fetch-native`.');
-  requireTool(SCOPE, 'patch', 'Run this through `mise run fetch-native`.');
+  requireTool('tar', 'Run this through `mise run fetch-native`.');
+  requireTool('patch', 'Run this through `mise run fetch-native`.');
 
   if (stampMatches()) {
     log(SCOPE, 'extracted tree is up to date');
   } else {
-    await ensureArchive();
-    rmSync(path.join(CACHE_DIR, 'hamlib'), { recursive: true, force: true });
-    prepareSourceTree(UPSTREAM, path.dirname(SOURCE_DIR), ARCHIVE_PATH);
+    const archive = await ensureArchive(SCOPE, UPSTREAM);
+
+    rmSync(path.dirname(SOURCE_DIR), { recursive: true, force: true });
+    prepareSourceTree(UPSTREAM, path.dirname(SOURCE_DIR), archive);
     writeJson(STAMP_PATH, { digest: extractedDigest() });
   }
 
@@ -99,9 +65,4 @@ async function main(): Promise<void> {
   log(SCOPE, 'upstream tree ready');
 }
 
-try {
-  await main();
-} catch (error) {
-  process.stderr.write(`[${SCOPE}] error: ${String(error)}\n`);
-  process.exit(1);
-}
+await runMain(SCOPE, main);

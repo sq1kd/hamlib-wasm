@@ -5,9 +5,10 @@ import {
   spawn,
   type StdioOptions,
 } from 'node:child_process';
+import os from 'node:os';
 import process from 'node:process';
 
-import { assert, fail } from './errors.ts';
+import { assert, errorMessage } from './errors.ts';
 
 export interface RunOptions {
   readonly cwd?: string;
@@ -34,7 +35,7 @@ export function run(
       encoding: options.encoding,
     });
   } catch (error) {
-    fail(scope, `${command} failed: ${String(error)}`);
+    throw new Error(`[${scope}] ${command} failed: ${errorMessage(error)}`);
   }
 }
 
@@ -52,16 +53,21 @@ export function capture(
       stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
     });
   } catch (error) {
-    throw new Error(`[${scope}] ${command} failed: ${String(error)}`);
+    throw new Error(`[${scope}] ${command} failed: ${errorMessage(error)}`);
   }
 }
 
-export function requireTool(scope: string, tool: string, hint: string): void {
+export function requireTool(tool: string, hint: string): void {
   try {
     execFileSync('which', [tool], { stdio: 'ignore' });
   } catch {
-    fail(scope, `${tool} is not available. ${hint}`);
+    throw new Error(`${tool} is not available. ${hint}`);
   }
+}
+
+/** Parallel jobs for `make`. */
+export function jobs(): string {
+  return String(os.availableParallelism());
 }
 
 export interface ConcurrentCommand {

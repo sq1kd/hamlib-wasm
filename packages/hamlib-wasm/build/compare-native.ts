@@ -18,196 +18,144 @@
  * The C emulator in `tests/native/host-trace.c` is a second copy of
  * `tests/browser/fixtures/rigs.ts` and must change with it.
  *
- * The host build lives in `.cache/hamlib-host` and is unrelated to the Wasm
- * build.  This is an opt-in verification step (`mise run compare-native`): it
- * needs a host C compiler and network access, but no browser.
+ * The host build lives next to the Wasm build in the release cache and shares
+ * its verified archive.  This is an opt-in verification step
+ * (`mise run compare-native`): it needs a host C compiler and, on a cold
+ * cache, network access, but no browser.
  */
-import { execFileSync, type StdioOptions } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
 
-import { applyPatches } from './artifact.ts';
-import { sha256File } from './files.ts';
+import { ensureArchive, preparePatchedTree } from './artifact.ts';
+import { assert, runMain } from './errors.ts';
+import { capture, jobs, log, run } from './exec.ts';
+import { readJson, writeJson } from './files.ts';
 import { CONFIGURE_ARGS } from './native-flags.ts';
-import { PACKAGE_DIR, REPO_ROOT } from './paths.ts';
-import { loadUpstream, manifestDigest } from './upstream.ts';
+import {
+  BASELINE_JSON,
+  HOST_TRACE_SOURCE,
+  REPO_ROOT,
+  releaseHostDir,
+  releaseSourceDirName,
+  releaseStampPath,
+} from './paths.ts';
+import { loadUpstream, manifestDigest, type Upstream } from './upstream.ts';
 
-const UPSTREAM = loadUpstream();
-const INPUT_DIGEST = manifestDigest(UPSTREAM);
+const SCOPE = 'compare-native';
 
-const HOST_CACHE = path.join(REPO_ROOT, '.cache', 'hamlib-host');
-const ARCHIVE_PATH = path.join(HOST_CACHE, UPSTREAM.archive.name);
-const HOST_SOURCE_DIR = path.join(HOST_CACHE, `hamlib-${UPSTREAM.version}`);
-const HOST_BUILD_DIR = path.join(HOST_SOURCE_DIR, 'build');
-const LIBRARY = path.join(HOST_BUILD_DIR, 'src', '.libs', 'libhamlib.a');
-const STAMP = path.join(HOST_CACHE, 'build-stamp.json');
-const BINARY = path.join(HOST_CACHE, 'host-trace');
-
-const BASELINE_PATH = path.join(PACKAGE_DIR, 'baseline', 'baseline.json');
-const HARNESS = path.join(REPO_ROOT, 'tests', 'native', 'host-trace.c');
-
-function log(message: string): void {
-  process.stdout.write(`[compare-native] ${message}\n`);
+interface HostBuild {
+  readonly sourceDir: string;
+  readonly buildDir: string;
+  readonly library: string;
+  readonly binary: string;
 }
 
-function fail(message: string): never {
-  process.stderr.write(`[compare-native] error: ${message}\n`);
-  process.exit(1);
+function hostBuild(upstream: Upstream): HostBuild {
+  const hostDir = releaseHostDir(upstream);
+  const buildDir = path.join(hostDir, 'build');
+
+  return {
+    sourceDir: path.join(hostDir, releaseSourceDirName(upstream)),
+    buildDir,
+    library: path.join(buildDir, 'src', '.libs', 'libhamlib.a'),
+    binary: path.join(hostDir, 'host-trace'),
+  };
 }
 
-interface RunOptions {
-  readonly stdio?: StdioOptions;
-  readonly cwd?: string;
-  readonly encoding?: BufferEncoding;
+function stampMatches(upstream: Upstream, build: HostBuild): boolean {
+  const stamp = releaseStampPath(upstream, 'host');
+
+  return existsSync(build.library)
+    && existsSync(stamp)
+    && readJson<{ digest?: unknown }>(stamp).digest === manifestDigest(upstream);
 }
 
-function run(
-  command: string,
-  args: readonly string[],
-  options: RunOptions & { readonly encoding: BufferEncoding },
-): string;
-function run(command: string, args: readonly string[], options?: RunOptions): void;
-function run(
-  command: string,
-  args: readonly string[],
-  options: RunOptions = {},
-): string | undefined {
-  const output = execFileSync(command, args, {
-    stdio: options.stdio ?? 'inherit',
-    cwd: options.cwd,
-    encoding: options.encoding,
-  });
-
-  return typeof output === 'string' ? output : undefined;
-}
-
-async function ensureArchive(): Promise<void> {
-  if (existsSync(ARCHIVE_PATH) && sha256File(ARCHIVE_PATH) === UPSTREAM.archive.sha256) {
-    return;
-  }
-
-  mkdirSync(HOST_CACHE, { recursive: true });
-  log(`downloading ${UPSTREAM.archive.url}`);
-
-  const response = await fetch(UPSTREAM.archive.url, { redirect: 'follow' });
-
-  if (!response.ok) {
-    fail(`download failed with HTTP ${response.status}`);
-  }
-
-  writeFileSync(ARCHIVE_PATH, Buffer.from(await response.arrayBuffer()));
-
-  const actual = sha256File(ARCHIVE_PATH);
-
-  if (actual !== UPSTREAM.archive.sha256) {
-    rmSync(ARCHIVE_PATH, { force: true });
-    fail(`archive SHA-256 mismatch: expected ${UPSTREAM.archive.sha256}, got ${actual}`);
-  }
-}
-
-async function ensureLibrary(): Promise<void> {
+async function ensureLibrary(upstream: Upstream, build: HostBuild): Promise<void> {
   /* An unpatched cache would make the trace comparison meaningless, so the
    * cached library counts only when it was built from these release inputs. */
-  if (
-    existsSync(LIBRARY)
-    && existsSync(STAMP)
-    && readFileSync(STAMP, 'utf8').trim() === INPUT_DIGEST
-  ) {
+  if (stampMatches(upstream, build)) {
+    log(SCOPE, 'host library is up to date, reusing it');
     return;
   }
 
-  await ensureArchive();
+  const archive = await ensureArchive(SCOPE, upstream);
+  const hostDir = releaseHostDir(upstream);
 
-  log('extracting a pristine tree for the host build');
-  rmSync(HOST_SOURCE_DIR, { recursive: true, force: true });
-  run('tar', ['xzf', ARCHIVE_PATH, '-C', HOST_CACHE]);
+  log(SCOPE, 'extracting and patching a tree for the host build');
+  rmSync(hostDir, { recursive: true, force: true });
+  preparePatchedTree(upstream, hostDir, archive);
 
-  if (!existsSync(path.join(HOST_SOURCE_DIR, 'configure'))) {
-    fail(`unexpected archive layout: ${HOST_SOURCE_DIR}/configure is missing`);
-  }
-
-  log('applying the pinned Hamlib patches to the host tree');
-  applyPatches(UPSTREAM, HOST_SOURCE_DIR);
-
-  mkdirSync(HOST_BUILD_DIR, { recursive: true });
-
-  log('configuring and building the host library');
-  run(path.join(HOST_SOURCE_DIR, 'configure'), CONFIGURE_ARGS, { cwd: HOST_BUILD_DIR });
-  run('make', ['-j', '8', '-C', 'src'], { cwd: HOST_BUILD_DIR });
-  writeFileSync(STAMP, `${INPUT_DIGEST}\n`);
+  log(SCOPE, 'configuring and building the host library');
+  mkdirSync(build.buildDir, { recursive: true });
+  run(SCOPE, path.join(build.sourceDir, 'configure'), CONFIGURE_ARGS, { cwd: build.buildDir });
+  run(SCOPE, 'make', ['-j', jobs(), '-C', 'src'], { cwd: build.buildDir });
+  writeJson(releaseStampPath(upstream, 'host'), { digest: manifestDigest(upstream) });
 }
 
-function buildHarness(): void {
-  log('building the reference harness');
-
-  run('cc', [
+function buildHarness(build: HostBuild): void {
+  log(SCOPE, 'building the reference harness');
+  run(SCOPE, 'cc', [
     '-O1',
     '-o',
-    BINARY,
-    HARNESS,
-    `-I${path.join(HOST_BUILD_DIR, 'include')}`,
-    `-I${path.join(HOST_SOURCE_DIR, 'include')}`,
-    LIBRARY,
+    build.binary,
+    HOST_TRACE_SOURCE,
+    `-I${path.join(build.buildDir, 'include')}`,
+    `-I${path.join(build.sourceDir, 'include')}`,
+    build.library,
   ]);
 }
 
-function trace(): string[] {
-  const output = run(BINARY, [HOST_SOURCE_DIR], {
-    encoding: 'utf8',
+function trace(build: HostBuild): string[] {
+  return capture(SCOPE, build.binary, [build.sourceDir], {
     stdio: ['ignore', 'pipe', 'inherit'],
-  });
-
-  return output.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+  })
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 }
 
-function main(): void {
-  log(`pinned release ${UPSTREAM.version}`);
+function describeDifference(browser: readonly string[], native: readonly string[]): string {
+  const width = Math.max(native.length, browser.length);
+  const lines = ['  #  browser            native'];
 
-  if (!existsSync(HARNESS)) {
-    fail(`the reference harness is missing: ${path.relative(REPO_ROOT, HARNESS)}`);
-  }
+  for (let index = 0; index < width; index++) {
+    const left = browser[index] ?? '<none>';
+    const right = native[index] ?? '<none>';
 
-  if (!existsSync(BASELINE_PATH)) {
-    fail(
-      'the browser baseline is missing; run `mise run baseline-record` first',
+    lines.push(
+      `  ${String(index).padStart(2)}  ${left.padEnd(18)} ${right}`
+      + (left === right ? '' : '   <-- differs'),
     );
   }
 
-  ensureLibrary().then(() => {
-    buildHarness();
-
-    const browser: string[] = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).ts480.wire;
-    const native = trace();
-
-    if (native.join('|') === browser.join('|')) {
-      log(`identical: ${native.length} CAT commands match the browser baseline`);
-      return;
-    }
-
-    const width = Math.max(native.length, browser.length);
-    const lines = ['  #  browser            native'];
-
-    for (let index = 0; index < width; index++) {
-      const left = browser[index] ?? '<none>';
-      const right = native[index] ?? '<none>';
-
-      lines.push(
-        `  ${String(index).padStart(2)}  ${left.padEnd(18)} ${right}`
-        + (left === right ? '' : '   <-- differs'),
-      );
-    }
-
-    fail(`the CAT traces differ:\n${lines.join('\n')}`);
-  }).catch((error: unknown) => {
-    fail(error instanceof Error ? error.message : String(error));
-  });
+  return lines.join('\n');
 }
 
-main();
+async function main(): Promise<void> {
+  const upstream = loadUpstream();
+  const build = hostBuild(upstream);
+
+  log(SCOPE, `pinned release ${upstream.version}`);
+  assert(
+    existsSync(HOST_TRACE_SOURCE),
+    `the reference harness is missing: ${path.relative(REPO_ROOT, HOST_TRACE_SOURCE)}`,
+  );
+  assert(
+    existsSync(BASELINE_JSON),
+    'the browser baseline is missing; run `mise run baseline-record` first',
+  );
+
+  await ensureLibrary(upstream, build);
+  buildHarness(build);
+
+  const browser = readJson<{ ts480: { wire: string[] } }>(BASELINE_JSON).ts480.wire;
+  const native = trace(build);
+
+  assert(
+    native.join('|') === browser.join('|'),
+    `the CAT traces differ:\n${describeDifference(browser, native)}`,
+  );
+  log(SCOPE, `identical: ${native.length} CAT commands match the browser baseline`);
+}
+
+await runMain(SCOPE, main);

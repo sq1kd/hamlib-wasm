@@ -7,11 +7,17 @@ import type { Upstream } from './upstream.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
+export const BUILD_SCRIPTS_DIR = HERE;
 export const PACKAGE_DIR = path.resolve(HERE, '..');
 export const REPO_ROOT = path.resolve(PACKAGE_DIR, '..', '..');
 export const NATIVE_DIR = path.join(PACKAGE_DIR, 'native');
 export const CONFIG_PATH = path.join(PACKAGE_DIR, 'hamlib.config.yaml');
 export const PACKAGE_JSON = path.join(PACKAGE_DIR, 'package.json');
+export const MISE_TOML = path.join(REPO_ROOT, 'mise.toml');
+export const BASELINE_JSON = path.join(PACKAGE_DIR, 'baseline', 'baseline.json');
+export const HOST_TRACE_SOURCE = path.join(REPO_ROOT, 'tests', 'native', 'host-trace.c');
+export const CONSUMER_DIR = path.join(REPO_ROOT, 'tests', 'consumer');
+export const CONSUMER_PACKED_DIR = path.join(CONSUMER_DIR, 'packed');
 
 export const DIST_DIR = path.join(PACKAGE_DIR, 'dist');
 export const DIST_NATIVE_DIR = path.join(DIST_DIR, 'native');
@@ -40,11 +46,12 @@ export const LIBRARY_JS = path.join(DIST_NATIVE_DIR, 'library', 'web_serial.js')
 export const GENERATED_INC = path.join(NATIVE_DIR, 'generated');
 export const GENERATED_TS = path.join(PACKAGE_DIR, 'src', 'native', 'generated');
 export const CODEGEN_DIR = path.join(REPO_ROOT, 'packages', 'hamlib-codegen', 'src');
+export const CODEGEN_CLI = path.join(CODEGEN_DIR, 'cli.ts');
 
 export const PACKAGE_LICENSES_DIR = path.join(PACKAGE_DIR, 'LICENSES');
 export const PACKAGE_REBUILDING = path.join(PACKAGE_DIR, 'REBUILDING.md');
-export const REBUILDING_TEMPLATE = path.join(PACKAGE_DIR, 'build', 'REBUILDING.md.in');
-export const REBUILD_SCRIPT = path.join(PACKAGE_DIR, 'build', 'rebuild.sh');
+export const REBUILDING_TEMPLATE = path.join(BUILD_SCRIPTS_DIR, 'REBUILDING.md.in');
+export const REBUILD_SCRIPT = path.join(BUILD_SCRIPTS_DIR, 'rebuild.sh');
 
 export const BRIDGE_INPUTS: readonly string[] = [
   'native/facade.cpp',
@@ -93,7 +100,7 @@ export function releaseBuildDir(upstream: Upstream): string {
 
 export function releaseStampPath(
   upstream: Upstream,
-  kind: 'fetch' | 'build',
+  kind: 'fetch' | 'build' | 'host',
 ): string {
   return path.join(releaseCacheDir(upstream), `${kind}-stamp.json`);
 }
@@ -106,3 +113,8 @@ export function releaseKitStaging(upstream: Upstream): string {
   return path.join(releaseCacheDir(upstream), 'corresponding-source');
 }
 
+
+/** The host (non-Wasm) build `compare-native` traces against. */
+export function releaseHostDir(upstream: Upstream): string {
+  return path.join(releaseCacheDir(upstream), 'host');
+}

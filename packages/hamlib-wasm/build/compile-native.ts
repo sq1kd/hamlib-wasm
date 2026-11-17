@@ -245,9 +245,9 @@ function verifyBindings(): void {
 }
 
 function main(): void {
-  requireTool(SCOPE, 'emcc', 'Run this through `mise run build-native` so emsdk is on PATH.');
-  requireTool(SCOPE, 'emconfigure', 'Run this through `mise run build-native` so emsdk is on PATH.');
-  requireTool(SCOPE, 'em++', 'Run this through `mise run build-native` so emsdk is on PATH.');
+  requireTool('emcc', 'Run this through `mise run build-native` so emsdk is on PATH.');
+  requireTool('emconfigure', 'Run this through `mise run build-native` so emsdk is on PATH.');
+  requireTool('em++', 'Run this through `mise run build-native` so emsdk is on PATH.');
 
   const key = buildKey();
   const stamp = readStamp();

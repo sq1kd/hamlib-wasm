@@ -21,16 +21,16 @@
  * asserted against a recorded set: growing it means a backend the transport
  * cannot serve, which should be a deliberate decision.
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
 
+import { assert, runMain } from './errors.ts';
+import { log } from './exec.ts';
+import { walk } from './files.ts';
 import { releaseSourceDir } from './paths.ts';
 import { loadUpstream } from './upstream.ts';
 
-const UPSTREAM = loadUpstream();
-
-const SOURCE_DIR = releaseSourceDir(UPSTREAM);
+const SCOPE = 'audit-backends';
 
 /**
  * Files that reach the device outside the common port layer in the pinned
@@ -79,19 +79,6 @@ interface Counts {
 /** The report sections, in the order they are printed. */
 const CATEGORIES = ['thread', 'lineSettings', 'posixIo'] as const;
 
-function walk(directory: string): string[] {
-  const files: string[] = [];
-
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const full = path.join(directory, entry.name);
-
-    if (entry.isDirectory()) { files.push(...walk(full)); }
-    else if (entry.name.endsWith('.c') || entry.name.endsWith('.h')) { files.push(full); }
-  }
-
-  return files;
-}
-
 /** Comments talk about reading and writing; only code counts. */
 function stripComments(source: string): string {
   return source
@@ -110,15 +97,20 @@ function looksLikeBareIo(code: string): boolean {
 }
 
 function main(): void {
-  if (!path.isAbsolute(SOURCE_DIR) || !existsSync(path.join(SOURCE_DIR, 'rigs'))) {
-    process.stderr.write('[audit-backends] error: the source tree is missing\n');
-    process.exit(1);
-  }
+  const upstream = loadUpstream();
+  const sourceDir = releaseSourceDir(upstream);
+
+  assert(
+    existsSync(path.join(sourceDir, 'rigs')),
+    'the source tree is missing; run `mise run fetch-native` first',
+  );
 
   const counts: Counts = { thread: [], lineSettings: [], posixIo: [] };
-  const relative = (file: string): string => path.relative(SOURCE_DIR, file);
+  const relative = (file: string): string => path.relative(sourceDir, file);
+  const sources = walk(path.join(sourceDir, 'rigs'))
+    .filter((file) => file.endsWith('.c') || file.endsWith('.h'));
 
-  for (const file of walk(path.join(SOURCE_DIR, 'rigs'))) {
+  for (const file of sources) {
     let source: string;
 
     try {
@@ -143,36 +135,31 @@ function main(): void {
 
   for (const key of CATEGORIES) { counts[key].sort(); }
 
-  process.stdout.write(
-    `[audit-backends] ${UPSTREAM.version}: `
+  log(
+    SCOPE,
+    `${upstream.version}: `
     + `${counts.thread.length} threaded, `
     + `${counts.lineSettings.length} with unwritable line settings, `
-    + `${counts.posixIo.length} bypassing the port layer\n`,
+    + `${counts.posixIo.length} bypassing the port layer`,
   );
-  process.stdout.write(`[audit-backends] threaded: ${counts.thread.join(', ')}\n`);
-  process.stdout.write(
-    `[audit-backends] unwritable line settings: ${counts.lineSettings.join(', ')}\n`,
-  );
+  log(SCOPE, `threaded: ${counts.thread.join(', ')}`);
+  log(SCOPE, `unwritable line settings: ${counts.lineSettings.join(', ')}`);
 
   const unexpected = counts.posixIo.filter((file) => !EXPECTED_POSIX_IO.includes(file));
   const vanished = EXPECTED_POSIX_IO.filter((file) => !counts.posixIo.includes(file));
 
-  if (unexpected.length > 0) {
-    process.stderr.write(
-      '[audit-backends] error: these backends now bypass the common port layer:\n'
-      + `${unexpected.map((file) => `  - ${file}`).join('\n')}\n`
-      + 'The browser transport does not cover them; classify them deliberately.\n',
-    );
-    process.exit(1);
-  }
+  assert(
+    unexpected.length === 0,
+    'these backends now bypass the common port layer:\n'
+    + `${unexpected.map((file) => `  - ${file}`).join('\n')}\n`
+    + 'The browser transport does not cover them; classify them deliberately.',
+  );
 
   if (vanished.length > 0) {
-    process.stdout.write(
-      `[audit-backends] note: no longer bypassing the port layer: ${vanished.join(', ')}\n`,
-    );
+    log(SCOPE, `note: no longer bypassing the port layer: ${vanished.join(', ')}`);
   }
 
-  process.stdout.write('[audit-backends] the port layer still covers every other backend\n');
+  log(SCOPE, 'the port layer still covers every other backend');
 }
 
-main();
+await runMain(SCOPE, main);

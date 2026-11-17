@@ -10,15 +10,14 @@
  * is reported on stderr and the block is built from whatever is available.
  */
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import process from 'node:process';
 
+import { errorMessage as message } from './errors.ts';
 import { readJson } from './files.ts';
-import { CONFIG_PATH, REPO_ROOT, SOURCE_JSON } from './paths.ts';
+import { CONFIG_PATH, MISE_TOML, SOURCE_JSON } from './paths.ts';
 import { parseUpstreamConfig } from './upstream.ts';
 
 const SCOPE = 'release-notes';
-const MISE_TOML = path.join(REPO_ROOT, 'mise.toml');
 
 interface Components {
   readonly hamlibVersion?: string | undefined;
@@ -28,10 +27,6 @@ interface Components {
 
 function warn(message: string): void {
   process.stderr.write(`[${SCOPE}] ${message}\n`);
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /** Reduce the full `emcc --version` banner to the release number. */

@@ -20,8 +20,8 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
 
+import { assert, runMain } from './errors.ts';
 import { capture, log } from './exec.ts';
 import { REPO_ROOT } from './paths.ts';
 
@@ -133,18 +133,12 @@ function main(): void {
     }
   }
 
-  if (mismatches.length > 0) {
-    for (const mismatch of mismatches) { log(SCOPE, mismatch); }
-    log(SCOPE, `${mismatches.length} documentation mismatch(es)`);
-    process.exit(1);
-  }
+  assert(
+    mismatches.length === 0,
+    `${mismatches.length} documentation mismatch(es):\n${mismatches.join('\n')}`,
+  );
 
   log(SCOPE, 'documented tasks and layout paths all exist');
 }
 
-try {
-  main();
-} catch (error) {
-  process.stderr.write(`[${SCOPE}] error: ${String(error)}\n`);
-  process.exit(1);
-}
+await runMain(SCOPE, main);

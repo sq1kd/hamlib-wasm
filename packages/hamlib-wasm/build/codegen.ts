@@ -15,16 +15,15 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { runMain } from './errors.ts';
 import {
-  CODEGEN_DIR,
+  CODEGEN_CLI,
   CONFIG_PATH,
   PACKAGE_DIR,
   releaseIncludeDir,
   releaseSourceDir,
 } from './paths.ts';
 import { loadUpstream } from './upstream.ts';
-
-const GENERATOR = path.join(CODEGEN_DIR, 'cli.ts');
 
 /** Run the generator with the package's config, outputs and pinned headers. */
 export function runCodegen(args: readonly string[]): void {
@@ -35,7 +34,7 @@ export function runCodegen(args: readonly string[]): void {
   execFileSync(
     process.execPath,
     [
-      GENERATOR,
+      CODEGEN_CLI,
       '--config',
       CONFIG_PATH,
       '--package',
@@ -51,5 +50,5 @@ export function runCodegen(args: readonly string[]): void {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  runCodegen(process.argv.slice(2));
+  await runMain('codegen', () => runCodegen(process.argv.slice(2)));
 }

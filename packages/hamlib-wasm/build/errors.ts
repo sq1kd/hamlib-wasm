@@ -2,21 +2,27 @@
 
 import process from 'node:process';
 
-/** Print a scoped error and exit. */
-export function fail(scope: string, message: string): never {
-  process.stderr.write(`[${scope}] error: ${message}\n`);
-  process.exit(1);
-}
-
-/** Throw an assertion error; the caller's main handler prints it. */
+/** Throw an assertion error; `runMain` prints it. */
 export function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-/** Report an uncaught error for a scoped entry point and exit. */
-export function reportError(scope: string, error: unknown): never {
-  process.stderr.write(`[${scope}] error: ${String(error)}\n`);
-  process.exit(1);
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The entry point of every build script.  Library code only throws, so its
+ * `finally` blocks (temporary directories) run before the process reports the
+ * error and exits non-zero.
+ */
+export async function runMain(scope: string, main: () => void | Promise<void>): Promise<void> {
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(`[${scope}] error: ${errorMessage(error)}\n`);
+    process.exitCode = 1;
+  }
 }

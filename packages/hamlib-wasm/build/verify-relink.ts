@@ -32,7 +32,7 @@ import {
   extractTarball,
   packTarball,
 } from './artifact.ts';
-import { assert } from './errors.ts';
+import { assert, runMain } from './errors.ts';
 import { capture, log, parseFlag, run } from './exec.ts';
 import { sha256File } from './files.ts';
 import { releaseSourceDirName } from './paths.ts';
@@ -133,23 +133,24 @@ function main(): void {
   const args = process.argv.slice(2);
   const tarballArg = parseFlag(args, '--tarball');
   const workArg = parseFlag(args, '--work-dir');
-  const keep = args.includes('--keep');
   const work = workArg ?? mkdtempSync(path.join(os.tmpdir(), 'hamlib-wasm-relink-'));
 
   mkdirSync(work, { recursive: true });
 
-  const tarball = tarballArg ?? packTarball(path.join(work, 'artifact'));
-  const packageRoot = extractTarball(tarball, path.join(work, 'unpacked'));
-  const kitArtifact = extractKit(packageRoot, path.join(work, 'kit'));
+  try {
+    const tarball = tarballArg ?? packTarball(path.join(work, 'artifact'));
+    const packageRoot = extractTarball(tarball, path.join(work, 'unpacked'));
+    const kitArtifact = extractKit(packageRoot, path.join(work, 'kit'));
 
-  runRelink({
-    packageRoot,
-    kit: kitArtifact.kit,
-    tarball,
-    work: path.join(work, 'relink'),
-  });
-
-  cleanup(work, keep);
+    runRelink({
+      packageRoot,
+      kit: kitArtifact.kit,
+      tarball,
+      work: path.join(work, 'relink'),
+    });
+  } finally {
+    cleanup(work, args.includes('--keep'));
+  }
 }
 
 const entryPoint = process.argv[1];
@@ -158,10 +159,5 @@ if (
   entryPoint
   && pathToFileURL(path.resolve(entryPoint)).href === import.meta.url
 ) {
-  try {
-    main();
-  } catch (error) {
-    process.stderr.write(`[${SCOPE}] error: ${String(error)}\n`);
-    process.exit(1);
-  }
+  await runMain(SCOPE, main);
 }

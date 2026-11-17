@@ -7,11 +7,13 @@ import {
   mkdirSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-import { assert, fail } from './errors.ts';
+import { assert } from './errors.ts';
+import { log } from './exec.ts';
 import { assertFile, readJson, sha256File, walk } from './files.ts';
 import {
   NATIVE_DIR,
@@ -81,11 +83,11 @@ export function extractKit(packageRoot: string, destination: string): KitArtifac
 }
 
 /** Any .rej or .orig left behind means a hunk did not land where intended. */
-export function collectPatchLeftovers(dir: string): string[] {
+function collectPatchLeftovers(dir: string): string[] {
   return walk(dir).filter((file) => file.endsWith('.rej') || file.endsWith('.orig'));
 }
 
-export function applyPatchFile(patchFile: string, sourceDir: string): void {
+function applyPatchFile(patchFile: string, sourceDir: string): void {
   try {
     execFileSync(
       'patch',
@@ -93,20 +95,22 @@ export function applyPatchFile(patchFile: string, sourceDir: string): void {
       { cwd: sourceDir, stdio: 'inherit' },
     );
   } catch {
-    fail('patch', `patch did not apply cleanly: ${patchFile}`);
+    throw new Error(`patch did not apply cleanly: ${patchFile}`);
   }
 }
 
-export function applyPatches(upstream: Upstream, sourceDir: string): void {
-  for (const patch of upstream.patches) {
-    applyPatchFile(patch.path, sourceDir);
+/** Apply patch files in order and require that every hunk landed. */
+export function applyPatchFiles(patchFiles: readonly string[], sourceDir: string): void {
+  for (const patchFile of patchFiles) {
+    applyPatchFile(patchFile, sourceDir);
   }
 
   const leftovers = collectPatchLeftovers(sourceDir);
 
-  if (leftovers.length > 0) {
-    fail('patch', `patch application left rejects behind: ${leftovers.join(', ')}`);
-  }
+  assert(
+    leftovers.length === 0,
+    `patch application left rejects behind: ${leftovers.join(', ')}`,
+  );
 }
 
 export function installTransport(sourceDir: string): void {
@@ -117,13 +121,44 @@ export function installTransport(sourceDir: string): void {
 
   const serial = readFileSync(path.join(sourceDir, 'src', 'serial.c'), 'utf8');
 
-  if (!serial.includes('Web Serial')) {
-    fail('transport', 'src/serial.c was not replaced with the browser implementation');
-  }
+  assert(
+    serial.includes('Web Serial'),
+    'src/serial.c was not replaced with the browser implementation',
+  );
 }
 
-/** Verify, extract, patch and prepare the pinned tree in `workDir`. */
-export function prepareSourceTree(
+/** Download the pinned archive unless the release cache holds a verified copy. */
+export async function ensureArchive(scope: string, upstream: Upstream): Promise<string> {
+  const archive = releaseArchivePath(upstream);
+
+  if (existsSync(archive) && sha256File(archive) === upstream.archive.sha256) {
+    log(scope, `archive verified: ${path.relative(REPO_ROOT, archive)}`);
+    return archive;
+  }
+
+  mkdirSync(path.dirname(archive), { recursive: true });
+  log(scope, `downloading ${upstream.archive.url}`);
+
+  const response = await fetch(upstream.archive.url, { redirect: 'follow' });
+
+  assert(response.ok, `download failed with HTTP ${response.status}`);
+  writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
+
+  const actual = sha256File(archive);
+
+  if (actual !== upstream.archive.sha256) {
+    rmSync(archive, { force: true });
+    throw new Error(
+      `archive SHA-256 mismatch: expected ${upstream.archive.sha256}, got ${actual}`,
+    );
+  }
+
+  log(scope, 'archive downloaded and verified');
+  return archive;
+}
+
+/** Verify, extract and patch the pinned tree in `workDir`. */
+export function preparePatchedTree(
   upstream: Upstream,
   workDir: string,
   archive = releaseArchivePath(upstream),
@@ -140,44 +175,20 @@ export function prepareSourceTree(
   const sourceDir = path.join(workDir, releaseSourceDirName(upstream));
   assert(existsSync(path.join(sourceDir, 'configure')), 'the archive layout is unexpected');
 
-  applyPatches(upstream, sourceDir);
-  installTransport(sourceDir);
+  applyPatchFiles(upstream.patches.map((patch) => patch.path), sourceDir);
   return sourceDir;
 }
 
-export interface PreparedKit extends KitArtifact {
-  readonly sourceDir: string;
-}
-
-/** Extract the kit, verify its archive and patch, and prepare the source tree. */
-export function prepareKit(
+/** The patched tree with the browser transport installed. */
+export function prepareSourceTree(
   upstream: Upstream,
-  packageRoot: string,
   workDir: string,
-): PreparedKit {
-  const artifact = extractKit(packageRoot, path.join(workDir, 'kit'));
-  const archive = path.join(artifact.kit, 'source', upstream.archive.name);
-  const patch = upstream.patches[0];
+  archive = releaseArchivePath(upstream),
+): string {
+  const sourceDir = preparePatchedTree(upstream, workDir, archive);
 
-  assert(patch, 'the release config has no patch');
-  const kitPatch = path.join(artifact.kit, 'patches', patch.file);
-  assertFile(archive, 'kit source archive');
-  assertFile(kitPatch, 'kit patch');
-  assert(
-    sha256File(archive) === upstream.archive.sha256,
-    'the kit archive hash does not match hamlib.config.yaml',
-  );
-  assert(
-    artifact.source.sourceArchiveSha256 === upstream.archive.sha256,
-    'the kit SOURCE.json archive hash does not match hamlib.config.yaml',
-  );
-  assert(
-    sha256File(kitPatch) === artifact.source.patchSha256,
-    'the kit patch hash does not match SOURCE.json',
-  );
-
-  const sourceDir = prepareSourceTree(upstream, path.join(workDir, 'source'), archive);
-  return { ...artifact, sourceDir };
+  installTransport(sourceDir);
+  return sourceDir;
 }
 
 /** Remove a work directory unless the caller asked to keep it. */

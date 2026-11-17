@@ -23,9 +23,8 @@ import path from 'node:path';
 import process from 'node:process';
 
 import {
-  applyPatchFile,
+  applyPatchFiles,
   cleanup,
-  collectPatchLeftovers,
   extractKit,
   extractTarball,
   packTarball,
@@ -295,9 +294,7 @@ function main(): void {
   execFileSync('tar', ['-xzf', kitArchiveFile, '-C', patchCheck], { stdio: 'inherit' });
 
   const patchSource = path.join(patchCheck, releaseSourceDirName(upstream));
-  applyPatchFile(kitPatch, patchSource);
-  const leftovers = collectPatchLeftovers(patchSource);
-  assert(leftovers.length === 0, `patch left rejects behind: ${leftovers.join(', ')}`);
+  applyPatchFiles([kitPatch], patchSource);
 
   for (const file of walk(kitArtifact.kit)) {
     if (file.endsWith('.md') || file.endsWith('.json') || file.endsWith('.txt')) {

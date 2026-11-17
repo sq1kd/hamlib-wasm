@@ -14,9 +14,9 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
 import { parse } from 'yaml';
 
+import { errorMessage } from './errors.ts';
 import { CONFIG_PATH, NATIVE_DIR, REPO_ROOT } from './paths.ts';
 
 const VERSION_PATTERN = /^\d+\.\d+(?:\.\d+)?$/;
@@ -153,20 +153,16 @@ export function parseUpstreamConfig(text: string): Upstream {
 
 /** Read and validate the `release:` section of the config. */
 export function loadUpstream(): Upstream {
+  const config = path.relative(REPO_ROOT, CONFIG_PATH);
+
   if (!existsSync(CONFIG_PATH)) {
-    process.stderr.write(
-      `[upstream] error: the config is missing: ${path.relative(REPO_ROOT, CONFIG_PATH)}\n`,
-    );
-    process.exit(1);
+    throw new Error(`the config is missing: ${config}`);
   }
 
   try {
     return parseUpstreamConfig(readFileSync(CONFIG_PATH, 'utf8'));
   } catch (error) {
-    process.stderr.write(
-      `[upstream] error: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
-    process.exit(1);
+    throw new Error(`${config}: ${errorMessage(error)}`);
   }
 }
 

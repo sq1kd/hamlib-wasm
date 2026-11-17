@@ -13,19 +13,17 @@ import { renameSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 import { packTarball } from './artifact.ts';
-import { reportError } from './errors.ts';
+import { runMain } from './errors.ts';
 import { log, run } from './exec.ts';
-import { REPO_ROOT } from './paths.ts';
+import { CONSUMER_DIR, CONSUMER_PACKED_DIR } from './paths.ts';
 
 const SCOPE = 'typecheck-consumer';
-const CONSUMER_DIR = path.join(REPO_ROOT, 'tests', 'consumer');
-const PACKED_DIR = path.join(CONSUMER_DIR, 'packed');
 
 function main(): void {
-  rmSync(PACKED_DIR, { recursive: true, force: true });
+  rmSync(CONSUMER_PACKED_DIR, { recursive: true, force: true });
   rmSync(path.join(CONSUMER_DIR, 'node_modules'), { recursive: true, force: true });
 
-  renameSync(packTarball(PACKED_DIR), path.join(PACKED_DIR, 'hamlib-wasm.tgz'));
+  renameSync(packTarball(CONSUMER_PACKED_DIR), path.join(CONSUMER_PACKED_DIR, 'hamlib-wasm.tgz'));
 
   run(SCOPE, 'npm', [
     'install',
@@ -38,8 +36,4 @@ function main(): void {
   log(SCOPE, 'installed the packed package into tests/consumer');
 }
 
-try {
-  main();
-} catch (error) {
-  reportError(SCOPE, error);
-}
+await runMain(SCOPE, main);
