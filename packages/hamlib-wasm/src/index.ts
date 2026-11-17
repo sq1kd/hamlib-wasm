@@ -58,7 +58,7 @@ import type {
 import type { DetectBaudRateOptions, RigMode, RigModeState, RigModel } from './catalogue.js';
 import { PTT_STATES } from './native/generated/names.js';
 import type { Level } from './native/generated/names.js';
-import type { CompoundHost } from './native/seam.js';
+import type { CompoundHost, CompoundOperations } from './native/seam.js';
 
 export {
   RIG_MODES,
@@ -685,57 +685,17 @@ class RigHandle implements Rig {
 
   async refresh(): Promise<RigState> {
     return this.#call('refresh', () => this.#rig.runCompound('refresh', async (operations) => {
-      const state: RigState = {};
+      const { partial, failures } = await this.#read(
+        operations,
+        new Set(RIG_FIELDS),
+        this.#advertisedLevels,
+        { bestEffort: false },
+      );
 
-      /* Read only what the model advertises; never invent a field. */
-      if (this.#operations.getFrequency) {
-        state.frequency = await operations.getFrequency();
-      }
+      this.#publish(partial);
+      this.#publishFailures(failures);
 
-      if (this.#operations.getMode) {
-        const mode = await operations.getMode();
-
-        state.mode = mode.mode;
-        state.passband = mode.passband;
-      }
-
-      if (this.#operations.getPtt) {
-        state.ptt = toPttState(await operations.getPtt());
-      }
-
-      if (this.#advertisedLevels.length > 0) {
-        const levels: Partial<Record<LevelName, number>> = {};
-        const failures: HamlibError[] = [];
-
-        /* A meter is decoration: one level a backend advertises but answers
-         * slowly or refuses must not fail the core snapshot.  The core fields
-         * above stay all-or-nothing; level failures are reported as `error`
-         * events after the snapshot is published. */
-        for (const name of this.#advertisedLevels) {
-          if (this.#unreadable(name)) {
-            continue;
-          }
-
-          try {
-            levels[name] = await operations.getLevel(name);
-            this.#levelFailures.delete(name);
-          } catch (error) {
-            failures.push(this.#recordLevelFailure(name, error));
-          }
-        }
-
-        if (Object.keys(levels).length > 0) {
-          state.levels = levels;
-        }
-
-        this.#publish(state);
-        this.#publishFailures(failures);
-
-        return this.#state ?? state;
-      }
-
-      this.#publish(state);
-      return this.#state ?? state;
+      return this.#state ?? partial;
     }));
   }
 
@@ -955,60 +915,9 @@ class RigHandle implements Rig {
 
     try {
       const { partial, failures } = await this.#call('watch', () => (
-        this.#rig.runCompound('watch', async (operations) => {
-          const read: RigState = {};
-          const errors: HamlibError[] = [];
-
-          if (fields.has('frequency') && this.#operations.getFrequency) {
-            try {
-              read.frequency = await operations.getFrequency();
-            } catch (error) {
-              errors.push(asHamlibError(error, 'getFrequency'));
-            }
-          }
-
-          if (fields.has('mode') && this.#operations.getMode) {
-            try {
-              const mode = await operations.getMode();
-
-              read.mode = mode.mode;
-              read.passband = mode.passband;
-            } catch (error) {
-              errors.push(asHamlibError(error, 'getMode'));
-            }
-          }
-
-          if (fields.has('ptt') && this.#operations.getPtt) {
-            try {
-              read.ptt = toPttState(await operations.getPtt());
-            } catch (error) {
-              errors.push(asHamlibError(error, 'getPtt'));
-            }
-          }
-
-          if (fields.has('levels') && levels.size > 0) {
-            const values: Partial<Record<LevelName, number>> = {};
-
-            for (const name of levels) {
-              if (this.#unreadable(name)) {
-                continue;
-              }
-
-              try {
-                values[name] = await operations.getLevel(name);
-                this.#levelFailures.delete(name);
-              } catch (error) {
-                errors.push(this.#recordLevelFailure(name, error));
-              }
-            }
-
-            if (Object.keys(values).length > 0) {
-              read.levels = values;
-            }
-          }
-
-          return { partial: read, failures: errors };
-        })
+        this.#rig.runCompound('watch', (operations) => (
+          this.#read(operations, fields, levels, { bestEffort: true })
+        ))
       ));
 
       this.#publish(partial);
@@ -1023,6 +932,81 @@ class RigHandle implements Rig {
         current.polling = false;
       }
     }
+  }
+
+  /**
+   * Read `fields` - only those the model advertises; never invent one - and
+   * `levels`, inside the caller's compound.
+   *
+   * A meter is decoration: a level a backend advertises but answers slowly or
+   * refuses never fails the read; it comes back in `failures`.  The core
+   * fields fail the read unless `bestEffort`, which turns their failures into
+   * `failures` as well and keeps whatever else was read.
+   */
+  async #read(
+    operations: CompoundOperations,
+    fields: ReadonlySet<RigField>,
+    levels: Iterable<LevelName>,
+    { bestEffort }: { readonly bestEffort: boolean },
+  ): Promise<{ partial: RigState; failures: HamlibError[] }> {
+    const partial: RigState = {};
+    const failures: HamlibError[] = [];
+    const attempt = async (operation: string, read: () => Promise<void>): Promise<void> => {
+      if (!bestEffort) {
+        await read();
+        return;
+      }
+
+      try {
+        await read();
+      } catch (error) {
+        failures.push(asHamlibError(error, operation));
+      }
+    };
+
+    if (fields.has('frequency') && this.#operations.getFrequency) {
+      await attempt('getFrequency', async () => {
+        partial.frequency = await operations.getFrequency();
+      });
+    }
+
+    if (fields.has('mode') && this.#operations.getMode) {
+      await attempt('getMode', async () => {
+        const { mode, passband } = await operations.getMode();
+
+        partial.mode = mode;
+        partial.passband = passband;
+      });
+    }
+
+    if (fields.has('ptt') && this.#operations.getPtt) {
+      await attempt('getPtt', async () => {
+        partial.ptt = toPttState(await operations.getPtt());
+      });
+    }
+
+    if (fields.has('levels')) {
+      const values: Partial<Record<LevelName, number>> = {};
+
+      for (const name of levels) {
+        if (this.#unreadable(name)) {
+          continue;
+        }
+
+        try {
+          values[name] = await operations.getLevel(name);
+          this.#levelFailures.delete(name);
+        } catch (error) {
+          failures.push(this.#recordLevelFailure(name, error));
+        }
+      }
+
+      if (Object.keys(values).length > 0) {
+        partial.levels = values;
+      }
+    }
+
+    return { partial, failures };
   }
 
   /** Whether this level has been dropped after repeated failed reads. */
