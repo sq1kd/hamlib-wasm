@@ -17,9 +17,11 @@ module.exports = {
     [
       '@semantic-release/exec',
       {
-        // Runs only when a version is about to be published: the clean-room
-        // relink of the tarball that will ship.
-        verifyReleaseCmd: 'node packages/hamlib-wasm/build/verify-package.ts --relink',
+        // Runs only when a version is about to be published: the package audit
+        // and clean-room relink of a tarball packed from the directory
+        // @semantic-release/npm publishes, before it stamps the version.
+        // --skip-deps: the job restored the build CI verified.
+        verifyReleaseCmd: 'mise run --skip-deps verify-release',
         // Adds the "Bundled components" section.  It never fails a release:
         // missing provenance produces a shorter section, not a release error.
         generateNotesCmd: 'node packages/hamlib-wasm/build/release-notes.ts',

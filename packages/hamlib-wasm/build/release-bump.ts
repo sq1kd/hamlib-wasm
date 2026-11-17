@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * Update the pinned Hamlib release in one place.  The patch remains reviewed
- * source: this helper updates the config and, with --verify, runs the full
- * fetch/generate/build/verify sequence.
+ * Update the pinned Hamlib release in one place.  The patches remain reviewed
+ * source: this helper updates the config and, with --verify, regenerates the
+ * bindings and runs the release verification (`mise run verify-release`).
  *
  * The config is edited as a YAML document rather than by line regexes, so
  * comments and the surrounding binding-surface sections survive untouched, and
@@ -16,14 +16,12 @@ import path from 'node:path';
 import process from 'node:process';
 import { parseDocument } from 'yaml';
 
-import { assert } from './errors.ts';
+import { assert, runMain } from './errors.ts';
 import { log, parseFlag, run } from './exec.ts';
 import { CONFIG_PATH } from './paths.ts';
 import { loadUpstream, parseUpstreamConfig } from './upstream.ts';
 
 const SCOPE = 'release-bump';
-const SHA256 = /^[0-9a-f]{64}$/;
-const COMMIT = /^[0-9a-f]{40}$/;
 
 /** Every value for a repeated flag, in command-line order. */
 function parseFlagValues(args: readonly string[], flag: string): string[] {
@@ -51,19 +49,12 @@ function main(): void {
   const verify = args.includes('--verify');
   const current = loadUpstream();
 
+  /* The values themselves are validated by parseUpstreamConfig below. */
   assert(version, '--version is required');
-  assert(/^\d+\.\d+(?:\.\d+)?$/.test(version), '--version is not a Hamlib release');
-  assert(commit && COMMIT.test(commit), '--commit must be a 40-character lower-case SHA');
-  assert(
-    tagObject && COMMIT.test(tagObject),
-    '--tag-object must be a 40-character lower-case SHA',
-  );
+  assert(commit, '--commit is required');
+  assert(tagObject, '--tag-object is required');
   assert(archiveUrl, '--archive-url is required');
-  assert(
-    archiveSha256 && SHA256.test(archiveSha256),
-    '--archive-sha256 (or --sha256) must be 64 lower-case hex',
-  );
-  assert(current.patches.length > 0, 'the release config has no patch');
+  assert(archiveSha256, '--archive-sha256 (or --sha256) is required');
   assert(
     patchFiles.length === 0 || patchFiles.length === current.patches.length,
     `--patch-file must be given once per configured patch (${current.patches.length})`,
@@ -100,20 +91,15 @@ function main(): void {
   writeFileSync(CONFIG_PATH, text);
   log(SCOPE, `updated ${path.relative(process.cwd(), CONFIG_PATH)} for Hamlib ${version}`);
 
+  /* One mise graph: `generate` runs before the build that verify-release
+   * depends on. */
+  const tasks = ['generate', ':::', 'verify-release'];
+
   if (verify) {
-    run(SCOPE, 'npm', ['run', 'fetch-native']);
-    run(SCOPE, 'npm', ['run', 'generate']);
-    run(SCOPE, 'npm', ['run', 'build-package']);
-    run(SCOPE, 'npm', ['run', 'verify-package']);
+    run(SCOPE, 'mise', ['run', ...tasks]);
   } else {
-    log(SCOPE, 'next: mise run fetch-native && mise run generate && mise run build-package');
-    log(SCOPE, 'then: mise run verify-package && mise run verify-relink');
+    log(SCOPE, `next: mise run ${tasks.join(' ')}`);
   }
 }
 
-try {
-  main();
-} catch (error) {
-  process.stderr.write(`[${SCOPE}] error: ${String(error)}\n`);
-  process.exit(1);
-}
+await runMain(SCOPE, main);

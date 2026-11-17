@@ -175,11 +175,6 @@ depends = ["generate", "audit-backends", "typecheck", "test"]
 
 # --- Package verification and release ----------------------------------------
 
-[tasks.pack-package]
-description = "List the published package contents (npm pack --dry-run)"
-depends = ["build-package"]
-run = "npm pack --dry-run --workspace packages/hamlib-wasm"
-
 [tasks.verify-package]
 description = "Verify the actual npm tarball, notices, hashes, link inputs and source kit"
 depends = ["build-package"]
@@ -191,7 +186,7 @@ depends = ["build-package"]
 run = "node packages/hamlib-wasm/build/verify-relink.ts"
 
 [tasks.verify-release]
-description = "Pack once, verify the package and run the clean-room relink against the same tarball"
+description = "Pack once, verify the package and run the clean-room relink against the same tarball (semantic-release runs this before it publishes)"
 depends = ["build-package"]
 run = "node packages/hamlib-wasm/build/verify-package.ts --relink"
 
@@ -199,10 +194,6 @@ run = "node packages/hamlib-wasm/build/verify-package.ts --relink"
 description = "Fail when a Hamlib release-block change is not a feat/fix/perf commit"
 run = "node packages/hamlib-wasm/build/release-commit-guard.ts"
 
-[tasks.release-dry-run]
-description = "Report the next semantic-release version without publishing (needs GITHUB_TOKEN and a remote)"
-run = "semantic-release --dry-run --no-ci"
-
 [tasks.release]
-description = "Publish with semantic-release and write the GitHub step outputs (CI; a dry run elsewhere)"
-run = "node packages/hamlib-wasm/build/release-publish.ts"
+description = "Publish with semantic-release in CI; elsewhere a dry run that reports the next version and notes"
+run = "semantic-release"
