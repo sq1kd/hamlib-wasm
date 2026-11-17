@@ -151,15 +151,22 @@ export async function installTestHelpers(page: Page): Promise<void> {
   await page.addInitScript({ content: TEST_HELPERS_SOURCE });
 }
 
-/** Remove `navigator.serial` so the unavailable path can be exercised. */
-export async function removeWebSerial(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
+/** Delete every `serial` accessor: the page's own, and the fake's on `navigator`. */
+function deleteWebSerial(): void {
+  delete (navigator as { serial?: unknown }).serial;
+  delete (Navigator.prototype as { serial?: unknown }).serial;
+}
 
-    Object.defineProperty(navigator, 'serial', { value: undefined, configurable: true });
-  });
+/**
+ * Take Web Serial away the way a browser without it lacks it: no `serial`
+ * member at all, not one that reads `undefined`.  It applies to the document
+ * already loaded and to every later one, so a spec may call it before
+ * `page.goto()` or after.  Firefox builds that predate Web Serial already lack
+ * the member; deleting it again is harmless.
+ */
+export async function removeWebSerial(page: Page): Promise<void> {
+  await page.addInitScript(deleteWebSerial);
+  await page.evaluate(deleteWebSerial);
 }
 
 /** Select the emulated radio the fixture should answer as. */

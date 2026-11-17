@@ -22,6 +22,7 @@ import {
   pressPtt,
   readFakeSerial,
   releasePtt,
+  removeWebSerial,
   runClockUntilElement,
   useRig,
 } from '../fixtures';
@@ -128,9 +129,7 @@ test('Auto-detect finds the rate, connects, and says which rate it used', async 
 });
 
 test('without Web Serial the panel says why, keeps Connect disabled and fetches nothing', async ({ page }) => {
-  await page.addInitScript(() => {
-    delete (Navigator.prototype as { serial?: unknown }).serial;
-  });
+  await removeWebSerial(page);
 
   const wasm = wasmRequests(page);
 

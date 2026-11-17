@@ -4,17 +4,13 @@
  */
 import { expect, test } from '@playwright/test';
 
+import { removeWebSerial } from '../fixtures';
 import { UPSTREAM_VERSION } from '../upstream';
 
 const REACT_URL = 'http://127.0.0.1:4176/demo/';
 
 test('reports that Web Serial is unavailable and keeps connect disabled', async ({ page }) => {
-  /* A browser without Web Serial has no `serial` member at all, so remove the
-   * accessor rather than shadow it with `undefined`.  Firefox builds that
-   * predate Web Serial already lack it; deleting it again is harmless. */
-  await page.addInitScript(() => {
-    delete (Navigator.prototype as { serial?: unknown }).serial;
-  });
+  await removeWebSerial(page);
 
   await page.goto(REACT_URL);
 
