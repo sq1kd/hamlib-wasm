@@ -7,6 +7,7 @@
  * implement is refused before the rig is touched.
  */
 
+import { RIG_EINVAL } from '../hamlib-constants';
 import { expect, expectFailure, expectOk, test } from './fixtures';
 
 test('exposes the generated capability matrix and drives a generated operation', async ({ harnessPage: page }) => {
@@ -38,6 +39,11 @@ test('exposes the generated capability matrix and drives a generated operation',
     const missTok = await rig.extLookupTok(0);
     const setting = await rig.idxToSetting(await rig.settingToIdx(0));
 
+    /* An integer argument takes a whole number its C type can hold; anything
+     * else is refused instead of truncated. */
+    const fraction = await window.__testHelpers.capture(() => rig.strLevel(1.5));
+    const outOfRange = await window.__testHelpers.capture(() => rig.strLevel(2 ** 64));
+
     /* A generated getter the TS-480 backend does not implement is gated by the
      * capability matrix, so it never reaches Wasm. */
     const gated = await window.__testHelpers.capture(() => rig.getParm('BAT'));
@@ -53,6 +59,8 @@ test('exposes the generated capability matrix and drives a generated operation',
       miss,
       missTok,
       setting,
+      fraction,
+      outOfRange,
       gated,
     };
   }));
@@ -114,6 +122,10 @@ test('exposes the generated capability matrix and drives a generated operation',
   expect(result.miss.name).toBe('');
   expect(result.missTok.name).toBe('');
   expect(typeof result.setting).toBe('number');
+
+  for (const refused of [result.fraction, result.outOfRange]) {
+    expect(expectFailure(refused).hamlibCode).toBe(-RIG_EINVAL);
+  }
 
   /* `get_ant` is one of the functions the TS-480 declares. */
   expect(result.capabilities).toContain('getAnt');

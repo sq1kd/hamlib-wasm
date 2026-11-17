@@ -5,7 +5,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            freq_t value0 = static_cast<freq_t>(arg0);
+            freq_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_freq(rig, RIG_VFO_CURR, value0);
 
@@ -38,7 +39,8 @@
         {
             rmode_t value0 = rig_parse_mode(arg0.c_str());
             if (value0 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-            pbwidth_t value1 = static_cast<pbwidth_t>(arg1);
+            pbwidth_t value1{};
+            if (!fromNumber(arg1, &value1)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_mode(rig, RIG_VFO_CURR, value0, value1);
 
@@ -175,7 +177,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
+            shortfreq_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_rptr_offs(rig, RIG_VFO_CURR, value0);
 
@@ -206,7 +209,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            tone_t value0 = static_cast<tone_t>(arg0);
+            tone_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_ctcss_tone(rig, RIG_VFO_CURR, value0);
 
@@ -237,7 +241,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            tone_t value0 = static_cast<tone_t>(arg0);
+            tone_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_dcs_code(rig, RIG_VFO_CURR, value0);
 
@@ -268,7 +273,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            tone_t value0 = static_cast<tone_t>(arg0);
+            tone_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_ctcss_sql(rig, RIG_VFO_CURR, value0);
 
@@ -299,7 +305,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            tone_t value0 = static_cast<tone_t>(arg0);
+            tone_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_dcs_sql(rig, RIG_VFO_CURR, value0);
 
@@ -330,7 +337,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            freq_t value0 = static_cast<freq_t>(arg0);
+            freq_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_split_freq(rig, RIG_VFO_CURR, value0);
 
@@ -363,7 +371,8 @@
         {
             rmode_t value0 = rig_parse_mode(arg0.c_str());
             if (value0 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-            pbwidth_t value1 = static_cast<pbwidth_t>(arg1);
+            pbwidth_t value1{};
+            if (!fromNumber(arg1, &value1)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_split_mode(rig, RIG_VFO_CURR, value0, value1);
 
@@ -396,10 +405,12 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            freq_t value0 = static_cast<freq_t>(arg0);
+            freq_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
             rmode_t value1 = rig_parse_mode(arg1.c_str());
             if (value1 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-            pbwidth_t value2 = static_cast<pbwidth_t>(arg2);
+            pbwidth_t value2{};
+            if (!fromNumber(arg2, &value2)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_split_freq_mode(rig, RIG_VFO_CURR, value0, value1, value2);
 
@@ -469,7 +480,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
+            shortfreq_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_rit(rig, RIG_VFO_CURR, value0);
 
@@ -500,7 +512,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
+            shortfreq_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_xit(rig, RIG_VFO_CURR, value0);
 
@@ -531,7 +544,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
+            shortfreq_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_ts(rig, RIG_VFO_CURR, value0);
 
@@ -562,8 +576,10 @@
     {
         return withRig<NumberResult>(handle, [&](RIG *rig)
         {
-            float value0 = static_cast<float>(arg0);
-            freq_t value1 = static_cast<freq_t>(arg1);
+            float value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<NumberResult>(-RIG_EINVAL); }
+            freq_t value1{};
+            if (!fromNumber(arg1, &value1)) { return failure<NumberResult>(-RIG_EINVAL); }
             rmode_t value2 = rig_parse_mode(arg2.c_str());
             if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
             unsigned int out0{};
@@ -582,8 +598,10 @@
     {
         return withRig<NumberResult>(handle, [&](RIG *rig)
         {
-            unsigned int value0 = static_cast<unsigned int>(arg0);
-            freq_t value1 = static_cast<freq_t>(arg1);
+            unsigned int value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<NumberResult>(-RIG_EINVAL); }
+            freq_t value1{};
+            if (!fromNumber(arg1, &value1)) { return failure<NumberResult>(-RIG_EINVAL); }
             rmode_t value2 = rig_parse_mode(arg2.c_str());
             if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
             float out0{};
@@ -605,7 +623,7 @@
             setting_t value0 = rig_parse_level(arg0.c_str());
             if (value0 == RIG_LEVEL_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
             value_t value1{};
-            if (RIG_LEVEL_IS_FLOAT(value0)) { value1.f = (float) arg1; } else { value1.i = (int) arg1; }
+            if (RIG_LEVEL_IS_FLOAT(value0)) { value1.f = (float) arg1; } else if (!fromNumber(arg1, &value1.i)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_level(rig, RIG_VFO_CURR, value0, value1);
 
@@ -641,7 +659,7 @@
             setting_t value0 = rig_parse_parm(arg0.c_str());
             if (value0 == RIG_PARM_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
             value_t value1{};
-            if (RIG_PARM_IS_FLOAT(value0)) { value1.f = (float) arg1; } else { value1.i = (int) arg1; }
+            if (RIG_PARM_IS_FLOAT(value0)) { value1.f = (float) arg1; } else if (!fromNumber(arg1, &value1.i)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_parm(rig, value0, value1);
 
@@ -723,7 +741,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
+            hamlib_token_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
             int value1 = arg1 ? 1 : 0;
 
             int rc = rig_set_ext_func(rig, RIG_VFO_CURR, value0, value1);
@@ -739,7 +758,8 @@
     {
         return withRig<BoolResult>(handle, [&](RIG *rig)
         {
-            hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
+            hamlib_token_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<BoolResult>(-RIG_EINVAL); }
             int out0{};
 
             int rc = rig_get_ext_func(rig, RIG_VFO_CURR, value0, &out0);
@@ -778,7 +798,8 @@
     {
         return withRig<ExtLookupTokResult>(handle, [&](RIG *rig)
         {
-            hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
+            hamlib_token_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<ExtLookupTokResult>(-RIG_EINVAL); }
 
             const struct confparams *source = rig_ext_lookup_tok(rig, value0);
             ExtLookupTokResult result = ok<ExtLookupTokResult>();
@@ -800,9 +821,10 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            ant_t value0 = static_cast<ant_t>(arg0);
+            ant_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
             value_t value1{};
-            value1.i = (int) arg1;
+            if (!fromNumber(arg1, &value1.i)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_ant(rig, RIG_VFO_CURR, value0, value1);
 
@@ -817,7 +839,8 @@
     {
         return withRig<GetAntResult>(handle, [&](RIG *rig)
         {
-            ant_t value0 = static_cast<ant_t>(arg0);
+            ant_t value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<GetAntResult>(-RIG_EINVAL); }
             value_t out0{};
             ant_t out1{};
             ant_t out2{};
@@ -974,7 +997,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            int value0 = static_cast<int>(arg0);
+            int value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_send_voice_mem(rig, RIG_VFO_CURR, value0);
 
@@ -1002,7 +1026,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            int value0 = static_cast<int>(arg0);
+            int value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_bank(rig, RIG_VFO_CURR, value0);
 
@@ -1017,7 +1042,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            int value0 = static_cast<int>(arg0);
+            int value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_mem(rig, RIG_VFO_CURR, value0);
 
@@ -1080,7 +1106,8 @@
         {
             scan_t value0 = rig_parse_scan(arg0.c_str());
             if (value0 == RIG_SCAN_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-            int value1 = static_cast<int>(arg1);
+            int value1{};
+            if (!fromNumber(arg1, &value1)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_scan(rig, RIG_VFO_CURR, value0, value1);
 
@@ -1110,35 +1137,35 @@
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
             channel_t value0{};
-            value0.channel_num = static_cast<int>(arg0.channelNum);
-            value0.bank_num = static_cast<int>(arg0.bankNum);
+            if (!fromNumber(arg0.channelNum, &value0.channel_num)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.bankNum, &value0.bank_num)) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.vfo = rig_parse_vfo(arg0.vfo.c_str());
             if (value0.vfo == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-            value0.ant = static_cast<ant_t>(arg0.ant);
-            value0.freq = static_cast<freq_t>(arg0.freq);
+            if (!fromNumber(arg0.ant, &value0.ant)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.freq, &value0.freq)) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.mode = rig_parse_mode(arg0.mode.c_str());
             if (value0.mode == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-            value0.width = static_cast<pbwidth_t>(arg0.width);
-            value0.tx_freq = static_cast<freq_t>(arg0.txFreq);
+            if (!fromNumber(arg0.width, &value0.width)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.txFreq, &value0.tx_freq)) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.tx_mode = rig_parse_mode(arg0.txMode.c_str());
             if (value0.tx_mode == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-            value0.tx_width = static_cast<pbwidth_t>(arg0.txWidth);
+            if (!fromNumber(arg0.txWidth, &value0.tx_width)) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.split = arg0.split ? RIG_SPLIT_ON : RIG_SPLIT_OFF;
             value0.tx_vfo = rig_parse_vfo(arg0.txVfo.c_str());
             if (value0.tx_vfo == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.rptr_shift = rig_parse_rptr_shift(arg0.rptrShift.c_str());
             if (value0.rptr_shift == RIG_RPT_SHIFT_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-            value0.rptr_offs = static_cast<shortfreq_t>(arg0.rptrOffs);
-            value0.tuning_step = static_cast<shortfreq_t>(arg0.tuningStep);
-            value0.rit = static_cast<shortfreq_t>(arg0.rit);
-            value0.xit = static_cast<shortfreq_t>(arg0.xit);
-            value0.funcs = static_cast<setting_t>(arg0.funcs);
-            value0.ctcss_tone = static_cast<tone_t>(arg0.ctcssTone);
-            value0.ctcss_sql = static_cast<tone_t>(arg0.ctcssSql);
-            value0.dcs_code = static_cast<tone_t>(arg0.dcsCode);
-            value0.dcs_sql = static_cast<tone_t>(arg0.dcsSql);
-            value0.scan_group = static_cast<int>(arg0.scanGroup);
-            value0.flags = static_cast<unsigned int>(arg0.flags);
+            if (!fromNumber(arg0.rptrOffs, &value0.rptr_offs)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.tuningStep, &value0.tuning_step)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.rit, &value0.rit)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.xit, &value0.xit)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.funcs, &value0.funcs)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.ctcssTone, &value0.ctcss_tone)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.ctcssSql, &value0.ctcss_sql)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.dcsCode, &value0.dcs_code)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.dcsSql, &value0.dcs_sql)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.scanGroup, &value0.scan_group)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg0.flags, &value0.flags)) { return failure<CodeResult>(-RIG_EINVAL); }
             std::strncpy(value0.channel_desc, arg0.channelDesc.c_str(), sizeof(value0.channel_desc) - 1);
             std::strncpy(value0.tag, arg0.tag.c_str(), sizeof(value0.tag) - 1);
 
@@ -1197,7 +1224,8 @@
     {
         return withRig<LookupMemCapsResult>(handle, [&](RIG *rig)
         {
-            int value0 = static_cast<int>(arg0);
+            int value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<LookupMemCapsResult>(-RIG_EINVAL); }
 
             const chan_t *source = rig_lookup_mem_caps(rig, value0);
             LookupMemCapsResult result = ok<LookupMemCapsResult>();
@@ -1216,7 +1244,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            int value0 = static_cast<int>(arg0);
+            int value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_twiddle(rig, value0);
 
@@ -1247,7 +1276,8 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            int value0 = static_cast<int>(arg0);
+            int value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_uplink(rig, value0);
 
@@ -1315,7 +1345,8 @@
     {
         webserial_clear_error();
 
-        setting_t value0 = static_cast<setting_t>(arg0);
+        setting_t value0{};
+        if (!fromNumber(arg0, &value0)) { return failure<NumberResult>(-RIG_EINVAL); }
 
         const auto returned = rig_setting2idx(value0);
         NumberResult result = ok<NumberResult>();
@@ -1327,7 +1358,8 @@
     {
         webserial_clear_error();
 
-        int value0 = static_cast<int>(arg0);
+        int value0{};
+        if (!fromNumber(arg0, &value0)) { return failure<NumberResult>(-RIG_EINVAL); }
 
         const auto returned = rig_idx2setting(value0);
         NumberResult result = ok<NumberResult>();
@@ -1339,7 +1371,8 @@
     {
         webserial_clear_error();
 
-        rmode_t value0 = static_cast<rmode_t>(arg0);
+        rmode_t value0{};
+        if (!fromNumber(arg0, &value0)) { return failure<TextResult>(-RIG_EINVAL); }
 
         const auto returned = rig_strrmode(value0);
         TextResult result = ok<TextResult>();
@@ -1351,7 +1384,8 @@
     {
         webserial_clear_error();
 
-        vfo_t value0 = static_cast<vfo_t>(arg0);
+        vfo_t value0{};
+        if (!fromNumber(arg0, &value0)) { return failure<TextResult>(-RIG_EINVAL); }
 
         const auto returned = rig_strvfo(value0);
         TextResult result = ok<TextResult>();
@@ -1363,7 +1397,8 @@
     {
         webserial_clear_error();
 
-        setting_t value0 = static_cast<setting_t>(arg0);
+        setting_t value0{};
+        if (!fromNumber(arg0, &value0)) { return failure<TextResult>(-RIG_EINVAL); }
 
         const auto returned = rig_strlevel(value0);
         TextResult result = ok<TextResult>();
@@ -1375,7 +1410,8 @@
     {
         webserial_clear_error();
 
-        rptr_shift_t value0 = static_cast<rptr_shift_t>(arg0);
+        rptr_shift_t value0{};
+        if (!fromNumber(arg0, &value0)) { return failure<TextResult>(-RIG_EINVAL); }
 
         const auto returned = rig_strptrshift(value0);
         TextResult result = ok<TextResult>();
@@ -1387,7 +1423,8 @@
     {
         webserial_clear_error();
 
-        enum rig_status_e value0 = static_cast<enum rig_status_e>(arg0);
+        enum rig_status_e value0{};
+        if (!fromNumber(arg0, &value0)) { return failure<TextResult>(-RIG_EINVAL); }
 
         const auto returned = rig_strstatus(value0);
         TextResult result = ok<TextResult>();
@@ -1495,14 +1532,22 @@
     {
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
-            int value0 = static_cast<int>(arg0);
-            int value1 = static_cast<int>(arg1);
-            int value2 = static_cast<int>(arg2);
-            int value3 = static_cast<int>(arg3);
-            int value4 = static_cast<int>(arg4);
-            int value5 = static_cast<int>(arg5);
-            double value6 = static_cast<double>(arg6);
-            int value7 = static_cast<int>(arg7);
+            int value0{};
+            if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
+            int value1{};
+            if (!fromNumber(arg1, &value1)) { return failure<CodeResult>(-RIG_EINVAL); }
+            int value2{};
+            if (!fromNumber(arg2, &value2)) { return failure<CodeResult>(-RIG_EINVAL); }
+            int value3{};
+            if (!fromNumber(arg3, &value3)) { return failure<CodeResult>(-RIG_EINVAL); }
+            int value4{};
+            if (!fromNumber(arg4, &value4)) { return failure<CodeResult>(-RIG_EINVAL); }
+            int value5{};
+            if (!fromNumber(arg5, &value5)) { return failure<CodeResult>(-RIG_EINVAL); }
+            double value6{};
+            if (!fromNumber(arg6, &value6)) { return failure<CodeResult>(-RIG_EINVAL); }
+            int value7{};
+            if (!fromNumber(arg7, &value7)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_clock(rig, value0, value1, value2, value3, value4, value5, value6, value7);
 

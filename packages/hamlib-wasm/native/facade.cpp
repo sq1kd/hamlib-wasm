@@ -24,11 +24,14 @@
  */
 
 #include <algorithm>
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <emscripten/bind.h>
@@ -98,21 +101,34 @@ namespace
 
 const unsigned int kMaxHandle = 0x7fffffffU;
 
-/* `hamlib_token_t` is `long`, 32 bits in this build; JavaScript hands tokens
- * back as numbers, so a value outside the range - or a fraction - is refused
- * instead of being narrowed silently. */
-const double kMaxToken = 2147483647.0;
-
-bool tokenFromDouble(double value, hamlib_token_t *token)
+/*
+ * A JavaScript number as the native type T.  An integer type (an enum
+ * through its underlying type) takes only a whole number inside its range:
+ * a fraction would be truncated silently, and converting a value outside the
+ * range is undefined behaviour.  A floating type takes any number.
+ */
+template <typename T>
+bool fromNumber(double value, T *out)
 {
-    if (!(value >= 0.0) || value > kMaxToken) { return false; }
+    if constexpr (std::is_floating_point<T>::value)
+    {
+        *out = (T) value;
+        return true;
+    }
+    else
+    {
+        using Integer = typename std::conditional<std::is_enum<T>::value,
+              std::underlying_type<T>, std::common_type<T>>::type::type;
+        using Limits = std::numeric_limits<Integer>;
+        const double bound = std::ldexp(1.0, Limits::digits);
+        const double lowest = Limits::is_signed ? -bound : 0.0;
 
-    const long narrowed = (long) value;
+        /* NaN fails the first test, an infinity the second. */
+        if (std::trunc(value) != value || value >= bound || value < lowest) { return false; }
 
-    if ((double) narrowed != value) { return false; }
-
-    *token = (hamlib_token_t) narrowed;
-    return true;
+        *out = (T) (Integer) value;
+        return true;
+    }
 }
 
 std::string takeTransportError()
@@ -743,7 +759,7 @@ private:
         {
             hamlib_token_t tok;
 
-            if (!tokenFromDouble(token, &tok)) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (!fromNumber(token, &tok)) { return failure<NumberResult>(-RIG_EINVAL); }
 
             value_t value{};
             int rc = get(rig, tok, &value);
@@ -763,12 +779,12 @@ private:
         {
             hamlib_token_t tok;
 
-            if (!tokenFromDouble(token, &tok)) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (!fromNumber(token, &tok)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             value_t packed{};
 
             if (extValueIsFloat(rig, tok)) { packed.f = (float) value; }
-            else { packed.i = (int) value; }
+            else if (!fromNumber(value, &packed.i)) { return failure<CodeResult>(-RIG_EINVAL); }
 
             return status<CodeResult>(set(rig, tok, packed));
         });

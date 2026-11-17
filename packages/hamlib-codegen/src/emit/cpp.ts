@@ -179,8 +179,9 @@ function settingOf(binding: TypeBinding, context: Context): string {
 
 /**
  * Convert the boundary value `source` into the C value Hamlib takes.  A name
- * Hamlib does not know fails the call with `-RIG_EINVAL` before it reaches
- * Hamlib, wherever it appears, a struct member included.
+ * Hamlib does not know, or a number an integer type cannot hold exactly,
+ * fails the call with `-RIG_EINVAL` before it reaches Hamlib, wherever it
+ * appears, a struct member included.
  */
 function convertIn(binding: TypeBinding, source: string, target: Target, context: Context, charArray: number | null = null): string[] {
   if (binding.category === 'struct') {
@@ -212,10 +213,13 @@ function convertIn(binding: TypeBinding, source: string, target: Target, context
       throw new Error(`${context.symbol}: a value_t struct member is not supported`);
     }
 
-    const store = binding.valueAccess
-      ? `${target.name}.${binding.valueAccess} = (${binding.valueAccess === 'f' ? 'float' : 'int'}) ${source};`
-      : `if (${settingOf(binding, context)}) { ${target.name}.f = (float) ${source}; } `
-        + `else { ${target.name}.i = (int) ${source}; }`;
+    const float = `${target.name}.f = (float) ${source};`;
+    const integer = checkedNumber(source, `${target.name}.i`, context);
+    const store = binding.valueAccess === 'f'
+      ? float
+      : binding.valueAccess === 'i'
+        ? integer
+        : `if (${settingOf(binding, context)}) { ${float} } else ${integer}`;
 
     return [`value_t ${target.name}{};`, store];
   }
@@ -232,7 +236,19 @@ function convertIn(binding: TypeBinding, source: string, target: Target, context
     return [assign(target, binding.native, source)];
   }
 
-  return [assign(target, binding.native, `static_cast<${binding.native}>(${source})`)];
+  return [
+    ...(target.declare ? [`${binding.native} ${target.name}{};`] : []),
+    checkedNumber(source, target.name, context),
+  ];
+}
+
+/**
+ * Store a JavaScript number in `destination` through the facade's
+ * `fromNumber`, which refuses a fraction or an out-of-range value for an
+ * integer type instead of truncating it.
+ */
+function checkedNumber(source: string, destination: string, context: Context): string {
+  return `if (!fromNumber(${source}, &${destination})) { return failure<${context.result}>(-RIG_EINVAL); }`;
 }
 
 /**
