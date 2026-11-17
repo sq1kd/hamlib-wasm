@@ -34,7 +34,7 @@ into an emitted asset. Pass `locateFile` to load it from somewhere else.
 | `hamlib-wasm` | The [default surface](../guides/rig-api/): `createHamlib`, one rig object, state snapshots, events, booleans |
 | `hamlib-wasm/raw` | The [raw surface](../guides/raw-api/): `createRawHamlib` and a typed method per upstream Hamlib call |
 | `hamlib-wasm/react` | [React hooks](../guides/react/) over the default surface |
-| `hamlib-wasm/node` | The [`serialport` transport](../guides/node/): `nodeSerialTransport` and `listPorts()` |
+| `hamlib-wasm/node` | The [`serialport` transport](../guides/node/): `nodeSerialTransport()`, whose `listPorts()` lists the machine's ports |
 
 Start with `hamlib-wasm`. Anything it does not cover is one step away on the
 same rig, through `rig.raw`.

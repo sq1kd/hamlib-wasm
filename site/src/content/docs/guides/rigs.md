@@ -22,7 +22,8 @@ it is supported:
 Two radios on our desk run the opt-in hardware suite
 (`mise run test-hardware`): the **QRP Labs QMX+** and the **Yaesu FT-710**.
 It opens each one through the shipped Node transport and the real Wasm build,
-reads frequency, mode and PTT, and can round-trip a frequency write.
+reads frequency, mode and PTT, and can round-trip a frequency write. What we
+found on them is under [Notes from real radios](#notes-from-real-radios).
 :::
 
 :::caution
@@ -64,3 +65,55 @@ tried; `detectBaudRate()` searches the declared range. See
 - **Browser support.** Web Serial exists only in desktop Chromium-based
   browsers and Firefox 151+, in a secure context; see
   [Where it runs](../../getting-started/#where-it-runs).
+
+## Notes from real radios
+
+What we, and the people who send
+[rig reports](https://github.com/sq1kd/hamlib-wasm/issues/new?template=rig-report.yml),
+found on real radios, one section per radio in the same shape: how it was
+connected, what works, what is Hamlib's own behaviour, and how to work around
+it. Hamlib issues are noted as they are, not patched here.
+
+### QRP Labs QMX+
+
+**Tested** 2026-11-17, Node, USB (CDC, `0483:a34c`), Hamlib model `QMX`, 9600 baud.
+
+**Works:** frequency, mode and PTT, read and write; keying PTT; an unplugged
+cable fails the next call with `HAMLIB_ERROR`, and the rig reopens after it is
+plugged back in.
+
+**Hamlib's model data:**
+
+- Transmit is declared as 4-14 MHz, CW and data modes only, 5-100 W.
+  `powerToMilliwatts()` fails outside that and reports 100 W for full power.
+- The radio's DIGI mode reads as `PKTLSB`.
+- No Morse: `sendMorse()` is `UNSUPPORTED_OPERATION`. The radio itself keys
+  text sent with the Kenwood `KY` command, in CW mode:
+
+  ```ts
+  await rig.raw.sendRaw(new TextEncoder().encode('KY CQ TEST;'));
+  ```
+
+- No S-meter is advertised.
+
+### Yaesu FT-710
+
+**Tested** 2026-11-17, Node, USB (CP2105 dual UART, `10c4:ea70`; CAT is the
+first of its two ports), 38400 baud.
+
+**Works:** frequency, mode and PTT; the `STRENGTH`, `RFPOWER`,
+`RFPOWER_METER` and `SWR` levels; PTT keys the transmitter and `getPtt()`
+reports keyer transmission as `on` too; full break-in (`FBKIN`), which the
+radio only accepts in a CW mode.
+
+**Hamlib's backend:** `sendMorse()` stores the text in the radio's CW TEXT
+memory 1, overwriting it, then sends `KY6;`, which the FT-710 does not accept,
+so nothing is transmitted. Play the memory yourself:
+
+```ts
+await rig.sendMorse('CQ TEST');                               // stores TEXT memory 1
+await rig.raw.sendRaw(new TextEncoder().encode('KY01;'));     // plays it
+```
+
+The radio plays it only with its keyer on, and transmits it only with
+break-in on; otherwise it beeps. `KY00;` stops the playback.
