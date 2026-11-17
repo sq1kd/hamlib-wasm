@@ -269,8 +269,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
                     key={model.id}
                     value={String(model.id)}
                     data-model={model.model}
-                    data-min={model.serialRateMin}
-                    data-max={model.serialRateMax}
+                    data-rates={model.rates?.join(' ')}
                     data-limitation={model.limitation}
                   >
                     {`${manufacturer} ${model.model}`}

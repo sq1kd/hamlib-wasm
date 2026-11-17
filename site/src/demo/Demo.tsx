@@ -12,12 +12,13 @@
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
+import { baudRateCandidates } from 'hamlib-wasm';
 import type { HamlibOptions, RigState, SerialPortLike } from 'hamlib-wasm';
 import { HamlibProvider, useHamlibContext, useModels } from 'hamlib-wasm/react';
 
 import { DemoLoading } from '../components/DemoLoading';
 import { WEB_SERIAL_BROWSERS } from '../facts';
-import { baudRates, detectRate, rememberRate } from '../radio/detect';
+import { detectRate, rememberRate } from '../radio/detect';
 import { emulate } from '../radio/emulate';
 import { failureMessage } from '../radio/errors';
 import { defaultModel } from '../radio/models';
@@ -129,7 +130,7 @@ function App(): ReactElement {
   }, [modelId, models]);
 
   const selected = useMemo(() => models.find((model) => model.id === modelId), [models, modelId]);
-  const rates = useMemo(() => (selected === undefined ? [] : baudRates(selected)), [selected]);
+  const rates = useMemo(() => (selected === undefined ? [] : baudRateCandidates(selected)), [selected]);
   const connected = rig !== undefined;
   const busy = backend.connecting || detecting;
   const serial = typeof navigator !== 'undefined' && 'serial' in navigator;
@@ -176,7 +177,7 @@ function App(): ReactElement {
         log({ api, call: 'requestPort()' });
         port = await hamlib.requestPort();
         setDetecting(true);
-        found = await detectRate(hamlib, selected, port, (rate) => {
+        found = await detectRate(hamlib, selected.id, rates, port, (rate) => {
           setTrying(rate);
           log({ api, call: `detectBaudRate({ modelId: ${String(selected.id)}, rates: [${String(rate)}] })` });
         });

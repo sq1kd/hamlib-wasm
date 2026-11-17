@@ -4,8 +4,18 @@ import type { RigModel } from 'hamlib-wasm';
 import { EMULATED_MODEL } from './emulate';
 import { MODEL_KEY, recall } from './storage';
 
-/** What the panel needs of a model: its picker entry, why it cannot work, and its rates. */
-export type PanelModel = Pick<RigModel, 'id' | 'manufacturer' | 'model' | 'limitation' | 'serialRateMin' | 'serialRateMax'>;
+/** What the panel needs of a model: its picker entry, and why it cannot work. */
+export interface PanelModel extends Pick<RigModel, 'id' | 'manufacturer' | 'model' | 'limitation'> {
+  /**
+   * Its rates (`baudRateCandidates()`), when worked out at build time, so the
+   * landing page can offer them without loading the library.
+   */
+  readonly rates?: readonly number[];
+}
+
+export interface CatalogueModel extends PanelModel {
+  readonly rates: readonly number[];
+}
 
 /**
  * The emulator's model while emulating, else the reader's last pick, else the

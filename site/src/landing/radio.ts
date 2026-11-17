@@ -15,11 +15,11 @@ import type { Hamlib, Rig } from 'hamlib-wasm';
 
 import { WEB_SERIAL_BROWSERS } from '../facts';
 import { constrainedConnection } from '../network';
-import { baudRates, detectRate, rememberRate } from '../radio/detect';
+import { detectRate, rememberRate } from '../radio/detect';
 import { failureMessage } from '../radio/errors';
 import { MODES, PASSBANDS } from '../radio/format';
 import { defaultModel } from '../radio/models';
-import type { PanelModel } from '../radio/models';
+import type { CatalogueModel } from '../radio/models';
 import { paint } from '../radio/paint';
 import { PANEL_OPTIONS, watchPanel, writeAndRead } from '../radio/polling';
 import { bindPtt } from '../radio/ptt';
@@ -33,14 +33,13 @@ export interface MountOptions {
 }
 
 /** A picker entry, read back from the attributes `RadioPanel` renders. */
-function toModel(option: HTMLOptionElement): PanelModel {
+function toModel(option: HTMLOptionElement): CatalogueModel {
   return {
     id: Number(option.value),
     manufacturer: option.parentElement instanceof HTMLOptGroupElement ? option.parentElement.label : '',
     model: option.dataset.model ?? '',
     limitation: option.dataset.limitation,
-    serialRateMin: Number(option.dataset.min),
-    serialRateMax: Number(option.dataset.max),
+    rates: (option.dataset.rates ?? '').split(' ').filter(Boolean).map(Number),
   };
 }
 
@@ -71,7 +70,7 @@ export function mountRadio(root: HTMLElement, options: MountOptions = {}): void 
   let stopPolling: (() => void) | undefined;
   let stopSample: (() => void) | undefined;
 
-  const selected = (): PanelModel | undefined => models.find((entry) => String(entry.id) === model.value);
+  const selected = (): CatalogueModel | undefined => models.find((entry) => String(entry.id) === model.value);
 
   const load = (): Promise<Hamlib> => {
     hamlib ??= import('hamlib-wasm').then((module) => module.createHamlib(PANEL_OPTIONS));
@@ -102,7 +101,7 @@ export function mountRadio(root: HTMLElement, options: MountOptions = {}): void 
   const pickModel = (): void => {
     const picked = selected();
 
-    baud.replaceChildren(auto, ...(picked === undefined ? [] : baudRates(picked)).map((rate) => new Option(String(rate))));
+    baud.replaceChildren(auto, ...(picked?.rates ?? []).map((rate) => new Option(String(rate))));
     baud.value = 'auto';
 
     const reason = picked?.limitation;
@@ -143,7 +142,7 @@ export function mountRadio(root: HTMLElement, options: MountOptions = {}): void 
 
     const instance = await loading;
     const baudRate = baud.value === 'auto'
-      ? await detectRate(instance, target, port, (rate) => { connecting(`Trying ${String(rate)}`); })
+      ? await detectRate(instance, target.id, target.rates, port, (rate) => { connecting(`Trying ${String(rate)}`); })
       : Number(baud.value);
 
     connecting('Connecting');

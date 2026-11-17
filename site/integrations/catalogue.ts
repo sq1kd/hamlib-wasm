@@ -6,15 +6,15 @@
  * the same `hamlib-wasm` build the site ships and lists its models here; the
  * page then only fetches the Wasm when a reader connects a radio.
  */
-import { createHamlib } from 'hamlib-wasm';
+import { baudRateCandidates, createHamlib } from 'hamlib-wasm';
 
-import type { PanelModel } from '../src/radio/models';
+import type { CatalogueModel } from '../src/radio/models';
 
 export interface Catalogue {
   /** The upstream release, e.g. `X.Y.Z`. */
   readonly version: string;
   /** Only what the panel needs of each model, to keep the page small. */
-  readonly models: readonly PanelModel[];
+  readonly models: readonly CatalogueModel[];
 }
 
 export async function readCatalogue(): Promise<Catalogue> {
@@ -28,8 +28,7 @@ export async function readCatalogue(): Promise<Catalogue> {
         manufacturer: model.manufacturer,
         model: model.model,
         ...(model.limitation === undefined ? {} : { limitation: model.limitation }),
-        serialRateMin: model.serialRateMin,
-        serialRateMax: model.serialRateMax,
+        rates: baudRateCandidates(model),
       })),
     };
   } finally {
