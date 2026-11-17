@@ -3,6 +3,8 @@ title: Troubleshooting
 description: A rig that does not answer, a busy port, Linux permissions, and how to report a problem.
 ---
 
+import { FIREFOX_WEB_SERIAL } from '../../../facts';
+
 ## The rig does not answer
 
 `open()` checks that the rig answered and rejects with `HAMLIB_ERROR` when it
@@ -36,7 +38,7 @@ if udev gives the device another group or mode, add a udev rule for it.
 
 ## Firefox
 
-Web Serial needs Firefox 151 or later and a secure context: HTTPS or
+Web Serial needs Firefox {FIREFOX_WEB_SERIAL} or later and a secure context: HTTPS or
 `localhost`. See [Where it runs](../../getting-started/#where-it-runs).
 
 ## Icom: a non-default CI-V address

@@ -3,6 +3,9 @@ title: Getting started
 description: Install hamlib-wasm, pick an entry point and connect to a rig.
 ---
 
+import { megabytes } from '../../bytes';
+import { DEMO_DOWNLOAD, FIREFOX_WEB_SERIAL } from '../../facts';
+
 `hamlib-wasm` is [Hamlib](https://hamlib.github.io/) compiled to WebAssembly,
 with a serial transport for each runtime: the
 [Web Serial API](https://developer.mozilla.org/docs/Web/API/Web_Serial_API) in
@@ -22,8 +25,9 @@ Two peer dependencies are optional and only needed by the entry that uses them:
 - `serialport` (12 or later) for Node and Electron main processes, which also
   need Node 24 or later.
 
-The package runs no build step at install time. The Wasm binary (about 4.5 MB,
-1.1 MB gzip) ships inside it and is resolved next to the installed module with
+The package runs no build step at install time. The Wasm binary ships inside
+it - {megabytes(DEMO_DOWNLOAD.raw)}, {megabytes(DEMO_DOWNLOAD.gzip)} gzip, with
+its loader - and is resolved next to the installed module with
 `new URL(..., import.meta.url)`, the pattern bundlers such as Vite rewrite
 into an emitted asset. Pass `locateFile` to load it from somewhere else.
 
@@ -95,7 +99,7 @@ instead:
 
 ```ts
 if (!('serial' in navigator)) {
-  // Tell the user to use desktop Chrome, Edge or Firefox 151+.
+  // Tell the user which browsers have Web Serial: see "Where it runs" below.
 }
 ```
 
@@ -119,7 +123,7 @@ const rig = await hamlib.open({ modelId: model.id, port, baudRate: 9600 });
 ## Where it runs
 
 **Browsers.** Web Serial is available in desktop Chromium-based browsers
-(Chrome, Edge, Opera and others) and in Firefox 151 and later. It needs a
+(Chrome, Edge, Opera and others) and in Firefox {FIREFOX_WEB_SERIAL} and later. It needs a
 [secure context](https://developer.mozilla.org/docs/Web/Security/Secure_Contexts):
 the page must be served over HTTPS or from `localhost`. Mobile browsers and
 Safari do not offer Web Serial. Opening a port shows the browser's port

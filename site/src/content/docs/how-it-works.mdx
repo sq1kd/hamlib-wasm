@@ -5,9 +5,10 @@ description: Why hamlib-wasm wraps Hamlib instead of rewriting it, and how one c
 
 import Layers from '../../components/Layers.astro';
 import BuildSteps from '../../components/BuildSteps.astro';
+import { CATALOGUE } from '../../facts';
 import { REPOSITORY_URL } from '../../links';
 
-export const { version, models } = __CATALOGUE__;
+export const { version, models } = CATALOGUE;
 export const patch = `packages/hamlib-wasm/native/patches/hamlib-${version}-web.patch`;
 
 ## Why not write it from scratch?

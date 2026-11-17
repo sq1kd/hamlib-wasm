@@ -3,9 +3,12 @@ title: Supported rigs
 description: Which models work, what "verified" means, and the known limitations.
 ---
 
+import { VERIFIED_MODELS } from 'hamlib-wasm';
+
+import { CATALOGUE, FIREFOX_WEB_SERIAL, HARDWARE_TESTED, listParts, radioNames } from '../../../facts';
 import { repositoryPage } from '../../../links';
 
-Hamlib reports several hundred serial models, and every one of them is in the
+Hamlib reports {CATALOGUE.models.length} serial models, and every one of them is in the
 catalogue (`hamlib.models`). Being in the catalogue only says the backend goes
 through Hamlib's common serial port layer, so each `RigModel` also says how far
 it is supported:
@@ -21,8 +24,8 @@ it is supported:
 `UNUSABLE_MODELS` the models that cannot work in this build and why.
 
 :::note[Tested on real radios]
-Two radios on our desk run the opt-in hardware suite
-(`mise run test-hardware`): the **QRP Labs QMX+** and the **Yaesu FT-710**.
+The radios on our desk run the opt-in hardware suite
+(`mise run test-hardware`): {listParts(radioNames(HARDWARE_TESTED)).map((part) => (part.type === 'element' ? <strong>{part.value}</strong> : part.value))}.
 It opens each one through the shipped Node transport and the real Wasm build,
 reads frequency, mode and PTT, and can round-trip a frequency write. What we
 found on them is under [Notes from real radios](#notes-from-real-radios).
@@ -31,8 +34,7 @@ found on them is under [Notes from real radios](#notes-from-real-radios).
 :::caution
 `support: "verified"` is narrower than "works": it means a browser test in this
 repository drives the model through an emulated serial port, in Chromium and
-Firefox, on every change - the Kenwood TS-480, the Icom IC-703 over CI-V and the
-Yaesu FT-710 over newcat. Every other model is a candidate: worth trying, not
+Firefox, on every change: {listParts(radioNames(VERIFIED_MODELS)).map((part) => part.value)}. Every other model is a candidate: worth trying, not
 promised.
 :::
 
@@ -65,7 +67,7 @@ tried; `detectBaudRate()` searches the declared range. See
 - **No cancellation of a stuck call.** A call that overruns `callTimeoutMs`
   leaves the module unusable (`RIG_HUNG`); dispose it and create a new one.
 - **Browser support.** Web Serial exists only in desktop Chromium-based
-  browsers and Firefox 151+, in a secure context; see
+  browsers and Firefox {FIREFOX_WEB_SERIAL}+, in a secure context; see
   [Where it runs](../../getting-started/#where-it-runs).
 
 ## Notes from real radios

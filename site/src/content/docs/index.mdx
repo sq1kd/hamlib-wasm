@@ -16,6 +16,8 @@ hero:
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
+import { WEB_SERIAL_BROWSERS } from '../../facts';
+
 <CardGrid>
   <Card title="Same backends as rigctl" icon="approve-check">
     The rig backends are the pinned upstream Hamlib release, compiled with
@@ -27,7 +29,7 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
     same connection.
   </Card>
   <Card title="Browser, Node and Electron" icon="laptop">
-    Web Serial in desktop Chrome, Edge and Firefox 151+; the `serialport`
+    Web Serial in {WEB_SERIAL_BROWSERS}; the `serialport`
     package in Node and an Electron main process. One API in all three.
   </Card>
   <Card title="React hooks" icon="seti:react">

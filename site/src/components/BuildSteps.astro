@@ -5,7 +5,9 @@
  * names the mise task that runs it and what it takes from outside, and the
  * file it hands to the next step sits on the rail between the two.
  */
-const { version } = __CATALOGUE__;
+import { CATALOGUE } from '../facts';
+
+const { version } = CATALOGUE;
 
 interface Step {
   title: string;

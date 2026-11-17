@@ -7,12 +7,13 @@
 import type { ReactElement } from 'react';
 
 import { megabytes } from '../bytes';
+import { DEMO_DOWNLOAD } from '../facts';
 
 export function DemoLoading(): ReactElement {
   return (
     <div className="live-demo-loader not-content" data-testid="demo-loading" role="status" aria-live="polite">
       <span className="live-demo-spinner" aria-hidden="true" />
-      <p>Loading Hamlib… about {megabytes(__DEMO_DOWNLOAD__.gzip)}</p>
+      <p>Loading Hamlib… about {megabytes(DEMO_DOWNLOAD.gzip)}</p>
     </div>
   );
 }
