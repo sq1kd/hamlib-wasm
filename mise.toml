@@ -191,7 +191,7 @@ depends = ["build-package"]
 run = "node packages/hamlib-wasm/build/verify-package.ts --relink"
 
 [tasks.release-guard]
-description = "Fail when a Hamlib release-block change is not a feat/fix/perf commit"
+description = "Fail when a commit changes the Hamlib release block without releasing (mise run release-guard -- --from <rev> --to <rev>)"
 run = "node packages/hamlib-wasm/build/release-commit-guard.ts"
 
 [tasks.save-build-outputs]

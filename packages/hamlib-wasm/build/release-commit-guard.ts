@@ -4,93 +4,95 @@
 /**
  * Guard the one change semantic-release cannot classify on its own: editing
  * the `release:` block of hamlib.config.yaml.  That block pins the bundled
- * Hamlib release, so the commit is user-visible and must carry a feat, fix or
- * perf type instead of disappearing as a chore.
+ * Hamlib release, so every commit that changes it is user-visible and must
+ * release: a feat, fix or perf type, or a breaking-change marker, instead of
+ * disappearing as a chore.
  *
- * The comparison is against the merge base with main (or origin/main), so the
- * requirement is evaluated on HEAD's cumulative release pin rather than only
- * HEAD's own diff.  Everything is local Git + YAML: no network, no remote.
- *
- * Exits 1 when HEAD changes the block and its subject is not feat/fix/perf.
- * Skips with exit 0 when neither main nor origin/main is available, and on
- * any unexpected Git or YAML state: a local guard must not block unrelated
- * work.
+ * Checks every commit in `--from <rev>` .. `--to <rev>` (default HEAD).  CI
+ * passes a pull request's range; without `--from` the range starts at the
+ * merge base with main (or origin/main), and the guard skips when neither
+ * exists.
  */
-import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 import { isDeepStrictEqual } from 'node:util';
 import { parse } from 'yaml';
 
+import { assert, runMain } from './errors.ts';
+import { capture, log, parseFlag } from './exec.ts';
 import { CONFIG_PATH, REPO_ROOT } from './paths.ts';
 
-const SCOPE = 'release-commit-guard';
+const SCOPE = 'release-guard';
 const CONFIG = path.relative(REPO_ROOT, CONFIG_PATH);
-const SUBJECT_PATTERN = /^(feat|fix|perf)(\([^)]+\))?!?:/;
+const RELEASING_SUBJECT = /^(?:(?:feat|fix|perf)(?:\([^)]+\))?!?|\w+(?:\([^)]+\))?!):/;
+const BREAKING_FOOTER = /^BREAKING[ -]CHANGE:/m;
 
-function warn(message: string): void {
-  process.stderr.write(`[${SCOPE}] ${message}\n`);
+function git(args: readonly string[]): string {
+  return capture(SCOPE, 'git', args, { cwd: REPO_ROOT }).trim();
 }
 
-function git(args: readonly string[]): string | undefined {
+function gitOrUndefined(args: readonly string[]): string | undefined {
   try {
-    return execFileSync('git', args, {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
+    return git(args);
   } catch {
     return undefined;
   }
 }
 
-function releaseBlockAt(ref: string): unknown {
-  const content = git(['show', `${ref}:${CONFIG}`]);
+/** The `release:` block at a revision; undefined when the file is absent. */
+function releaseBlockAt(revision: string): unknown {
+  const content = gitOrUndefined(['show', `${revision}:${CONFIG}`]);
 
-  if (!content) { return undefined; }
-  return (parse(content) as { release?: unknown } | null)?.release;
+  return content === undefined
+    ? undefined
+    : (parse(content) as { release?: unknown } | null)?.release;
 }
 
-function mergeBase(): string | undefined {
-  for (const base of ['main', 'origin/main']) {
-    if (git(['rev-parse', '--verify', `${base}^{commit}`]) === undefined) { continue; }
-
-    const found = git(['merge-base', 'HEAD', base]);
-    if (found) { return found; }
+function defaultBase(): string | undefined {
+  for (const branch of ['main', 'origin/main']) {
+    if (gitOrUndefined(['rev-parse', '--verify', '--quiet', `${branch}^{commit}`])) {
+      return gitOrUndefined(['merge-base', 'HEAD', branch]);
+    }
   }
+
   return undefined;
 }
 
-/** Whether HEAD may carry its release pin under its current subject. */
-function allowed(): boolean {
-  const base = mergeBase();
+function releases(commit: string): boolean {
+  const subject = git(['log', '-1', '--format=%s', commit]);
+  const body = git(['log', '-1', '--format=%b', commit]);
 
-  if (!base) {
-    warn('neither main nor origin/main has a merge base with HEAD; skipping');
-    return true;
+  return RELEASING_SUBJECT.test(subject) || BREAKING_FOOTER.test(body);
+}
+
+function main(): void {
+  const args = process.argv.slice(2);
+  const from = parseFlag(args, '--from') ?? defaultBase();
+  const to = parseFlag(args, '--to') ?? 'HEAD';
+
+  if (from === undefined) {
+    log(SCOPE, 'neither main nor origin/main has a merge base with HEAD; skipping');
+    return;
   }
 
-  const head = releaseBlockAt('HEAD');
+  const commits = git(['rev-list', '--reverse', '--no-merges', `${from}..${to}`])
+    .split('\n')
+    .filter((commit) => commit.length > 0);
+  const offenders = commits.filter((commit) => (
+    !isDeepStrictEqual(releaseBlockAt(`${commit}^`), releaseBlockAt(commit))
+    && !releases(commit)
+  ));
 
-  /* No file at HEAD leaves nothing to compare; do not block unrelated work. */
-  if (head === undefined || isDeepStrictEqual(releaseBlockAt(base), head)) { return true; }
-
-  const subject = git(['log', '-1', '--pretty=%s', 'HEAD']) ?? '';
-
-  if (SUBJECT_PATTERN.test(subject)) { return true; }
-
-  warn(
-    `HEAD (${JSON.stringify(subject)}) changes the release: block of ${CONFIG}.\n`
-      + 'Use a feat, fix, or perf commit type so semantic-release publishes the new\n'
-      + 'bundled Hamlib release, for example:\n'
-      + '  feat(hamlib): update the pinned Hamlib release\n'
-      + '  fix(hamlib)!: update the pinned Hamlib release with a breaking API change',
+  assert(
+    offenders.length === 0,
+    `${offenders.map((commit) => git(['log', '-1', '--format=%h %s', commit])).join('\n')}\n`
+    + `changes the release: block of ${CONFIG} without releasing.\n`
+    + 'Use a feat, fix or perf commit type so semantic-release publishes the new\n'
+    + 'bundled Hamlib release, for example:\n'
+    + '  feat(hamlib): update the pinned Hamlib release\n'
+    + '  fix(hamlib)!: update the pinned Hamlib release with a breaking API change',
   );
-  return false;
+  log(SCOPE, `${commits.length} commit(s) checked`);
 }
 
-try {
-  process.exitCode = allowed() ? 0 : 1;
-} catch (error) {
-  warn(`internal error, skipping: ${error instanceof Error ? error.message : String(error)}`);
-}
+await runMain(SCOPE, main);
