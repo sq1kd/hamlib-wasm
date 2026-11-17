@@ -22,7 +22,7 @@ import { detectRate, rememberRate } from '../radio/detect';
 import { emulate } from '../radio/emulate';
 import { failureMessage } from '../radio/errors';
 import { defaultModel } from '../radio/models';
-import { PANEL_OPTIONS } from '../radio/polling';
+import { PANEL_OPTIONS, POLL_MS } from '../radio/polling';
 import { RadioPanel } from '../radio/RadioPanel';
 import { simulate } from '../radio/simulate';
 import { MODEL_KEY, remember } from '../radio/storage';
@@ -58,8 +58,8 @@ const APIS: readonly [ApiOption, ApiOption] = [
     note: 'one snapshot, passband filled in, polled for you',
     preview: [
       'open({ modelId, baudRate })',
-      "useRigState(rig, { pollMs: 1000 })",
-      "useRigState(rig, { pollMs: 250, fields: ['levels'] })",
+      `useRigState(rig, { pollMs: ${String(POLL_MS.telemetry)} })`,
+      `useRigState(rig, { pollMs: ${String(POLL_MS.meter)}, fields: ['levels'] })`,
       "setMode('USB')",
       'setPtt(true)',
     ],
