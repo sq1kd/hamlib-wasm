@@ -26,6 +26,7 @@
     "*.ts",
     "../browser/fixtures/rigs.ts",
     "../browser/fixtures/fake-port.ts",
+    "../browser/fixtures/helpers.ts",
     "../browser/fixtures/fixtures-globals.d.ts"
   ]
 }

@@ -5,9 +5,11 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     /* These specs read `process.env` and touch no DOM, unlike the browser
      * fixtures next to them. */
     "types": ["node"]
   },
-  "include": ["*.ts"]
+  /* The catalogue lookup is the browser fixtures' helper, through tests/node. */
+  "include": ["*.ts", "../browser/fixtures/helpers.ts", "../browser/fixtures/fixtures-globals.d.ts"]
 }
