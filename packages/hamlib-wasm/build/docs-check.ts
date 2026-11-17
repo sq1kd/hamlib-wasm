@@ -8,8 +8,8 @@
  * its old name in prose, and a moved directory left a Layout table pointing at
  * a missing path.  Both are mechanical to check:
  *
- *   1. every `mise run <task>` in the READMEs, RELEASING.md and the
- *      REBUILDING template is a task (or alias) this repository declares;
+ *   1. every `mise run <task>` in the READMEs, CONTRIBUTING.md, RELEASING.md
+ *      and the REBUILDING template is a task (or alias) this repository declares;
  *   2. every relative path in the root README's Layout table exists.
  *
  * The task list comes from `mise tasks ls --json`, so `[tasks.*]` tables and
@@ -53,11 +53,12 @@ function miseTasks(): ReadonlySet<string> {
 }
 
 /**
- * Documentation that promises tasks: the READMEs, the release guide and the
- * REBUILDING template the package build renders into the npm tarball.
+ * Documentation that promises tasks: the READMEs, the contributing and release
+ * guides and the REBUILDING template the package build renders into the npm tarball.
  */
 const DOCUMENTATION: readonly string[] = [
   'README.md',
+  'CONTRIBUTING.md',
   'RELEASING.md',
   path.join('packages', 'hamlib-wasm', 'README.md'),
   path.join('packages', 'hamlib-wasm', 'build', 'REBUILDING.md.in'),

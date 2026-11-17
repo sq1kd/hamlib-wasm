@@ -14,8 +14,9 @@ mise tasks                           # every other task, with its description
 
 The first build downloads the pinned Hamlib release, verifies its SHA-256,
 applies the patches `hamlib.config.yaml` lists and compiles it with Emscripten;
-later builds reuse `.cache`. `mise run check` is what CI runs; a pull request
-should pass it.
+later builds reuse `.cache`. CI runs `mise run check-release`, which adds the
+packed-tarball audit and the backend audit to `check`; a pull request should
+pass it.
 
 ## Commits
 
@@ -26,7 +27,8 @@ installs checks them. Scopes are limited to `hamlib`, `api`, `build`, `deps`,
 
 A change to the `release:` block of `packages/hamlib-wasm/hamlib.config.yaml`
 pins a different Hamlib release, so it must be `feat` or `fix` (with `!` when it
-breaks consumers); `mise run release-guard` checks this. See
+breaks consumers); `mise run release-guard` checks this locally and on every
+pull request. See
 [`RELEASING.md`](RELEASING.md).
 
 ## Testing on a real rig

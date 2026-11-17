@@ -25,14 +25,10 @@ package version.
   A `404` / `E404` means the name is unclaimed. If it is already owned, resolve
   ownership or choose the intended package name before wiring up automation.
 
-- **Repository URL.** `packages/hamlib-wasm/package.json` carries
-  `publishConfig: { access: "public", provenance: true }` but deliberately no
-  guessed `repository`: the repository has no remote until it is first pushed.
-  The release job stamps `repository`/`homepage`/`bugs` from
-  `GITHUB_REPOSITORY` before invoking semantic-release, so provenance links to
-  the real repository. Outside CI, `packages/hamlib-wasm/build/release-publish.ts` refuses to run
-  without a `repository` field (a dry run may set
-  `RELEASE_ALLOW_MISSING_REPOSITORY=1`).
+- **Repository URL.** `packages/hamlib-wasm/package.json` names the
+  repository, homepage and issue tracker, and `publishConfig` asks for
+  `provenance`; npm requires the provenance repository to match the package's
+  `repository`, so keep them in step if the repository moves.
 
 - **Node 24 and npm >= 11.5.1.** Trusted Publishing requires npm CLI `11.5.1`
   or newer on Node `22.14.0` or newer; the repository pins Node `24.21.0` in
@@ -48,8 +44,8 @@ package version.
   mise run verify-package
 
   cd packages/hamlib-wasm
-  npm login                       # account with 2FA enabled
-  npm publish --access public     # publishes the checked-in 0.1.0
+  npm login                                         # account with 2FA enabled
+  npm publish --access public --provenance=false    # publishes the checked-in 0.1.0
   ```
 
   Then tag that exact commit and push the tag:
@@ -59,9 +55,10 @@ package version.
   git push origin v0.1.0
   ```
 
-  The tag is important: without a previous release tag, semantic-release starts
-  its history at `1.0.0` rather than continuing from `0.1.0`. The next
-  automatic release is computed from `v0.1.0`.
+  Provenance can only be generated in CI, so this one manual publish turns
+  it off. The tag is important: without a previous release tag,
+  semantic-release starts its history at `1.0.0` rather than continuing from
+  `0.1.0`. The next automatic release is computed from `v0.1.0`.
 
 - **npm Trusted Publisher.** On npmjs.com, open the `hamlib-wasm` package
   settings and add a Trusted Publisher with:
@@ -107,7 +104,7 @@ A change to the `release:` block of
 is always user-visible, so its commit **must** be `feat` or `fix` (use `!` or a
 `BREAKING CHANGE:` footer when the consumer-facing API or behavior breaks).
 `chore(hamlib): bump the pinned release` will not publish and is rejected by
-the local guard. Use, for example:
+the release guard. Use, for example:
 
 ```text
 feat(hamlib): update the pinned Hamlib release to 4.8.0
@@ -120,7 +117,7 @@ Commit scopes are limited by `.commitlintrc.json` to `hamlib`, `api`, `build`,
 `chore(deps): update the release tooling`).
 
 No release is produced when the commits contain nothing releasable: the release
-job still succeeds, and `packages/hamlib-wasm/build/release-publish.ts` writes `released=false`.
+job still succeeds.
 
 ## Branches and the `next` prerelease flow
 
@@ -155,14 +152,16 @@ prerelease version stays on npm forever and remains installable through
 
 - `.github/workflows/ci.yml` runs `mise run check-release` (`check` +
   `verify-package` + `audit-backends`) through the shared
-  `.github/actions/setup` action. Pull requests run it directly and also lint
-  their commit messages.
+  `.github/actions/setup` action. Pull requests run it directly, lint their
+  commit messages and run `mise run release-guard` over their commits.
 - `.github/workflows/release.yml` runs on pushes to `main` and `next`. It calls
-  `ci.yml` once, then publishes and deploys that run's verified
-  `packages/hamlib-wasm/dist` without rebuilding it: the `release` job runs
-  `mise run release`, and the clean-room relink runs inside semantic-release
-  (`verifyReleaseCmd`) only when a version is published; the `pages` job
-  builds the site on `main` against the same package and deploys it.
+  `ci.yml` once, which archives the verified package build
+  (`mise run save-build-outputs`); the later jobs restore it
+  (`mise run restore-build-outputs`) instead of rebuilding. The `release` job
+  runs `mise run release`; semantic-release runs `mise run verify-release`
+  (the package audit and clean-room relink) only when a version is about to
+  be published. The `pages` job builds the site on `main` against the same
+  package and deploys it.
 
 Do not add separate build or test commands to the workflows: keep the release
 gate in the `mise` tasks so local and CI behavior stay identical.
@@ -176,17 +175,18 @@ git config core.hooksPath .githooks
 ```
 
 `.githooks/commit-msg` runs the pinned commitlint CLI and rejects malformed
-messages. The release-block guard is a separate local check and works offline:
+messages. The release-block guard works offline and also runs on every pull
+request:
 
 ```sh
 mise run release-guard
 ```
 
-It compares the `release:` block in `packages/hamlib-wasm/hamlib.config.yaml`
-between `HEAD` and the merge base with `main` (falling back to `origin/main`).
-If the block changed, `HEAD` must be a `feat`, `fix`, or `perf` commit;
-otherwise it exits 1 with the required type. If neither branch exists locally,
-the guard exits 0.
+Every commit since the merge base with `main` (or `origin/main`; pass
+`-- --from <rev> --to <rev>` for another range) that changes the `release:`
+block in `packages/hamlib-wasm/hamlib.config.yaml` must be a `feat`, `fix` or
+`perf` commit, or mark a breaking change; otherwise it exits 1 with the
+required type.
 
 ## Local dry run
 
@@ -201,23 +201,18 @@ cd /tmp/hamlib-wasm-dry-run
 git remote set-url origin git@github.com:<you>/hamlib-wasm-dry-run.git
 git push origin HEAD:main --tags
 
-npm ci
-mise run build-package          # or copy a matching packages/hamlib-wasm/dist
+mise run bootstrap
+mise run build-package
 
-GITHUB_TOKEN=<token with repo access to the scratch repository> \
-  npx semantic-release --dry-run --no-ci
+GITHUB_TOKEN=<token with repo access to the scratch repository> mise run release
 ```
 
-`--dry-run` does not publish to npm, push tags, or create a GitHub Release. It
+Outside CI, semantic-release runs as a dry run: it does not publish to npm,
+push tags, or create a GitHub Release. It runs `mise run verify-release` and
 prints the next version and the generated notes, including the
 `## Bundled components` section from `packages/hamlib-wasm/build/release-notes.ts`.
-`--no-ci` prevents semantic-release from requiring a CI environment. A dry run
-does not exercise OIDC or Trusted Publishing; only the real workflow does that.
-
-If `dist/` is absent, the notes script falls back to
-`packages/hamlib-wasm/hamlib.config.yaml` and `mise.toml` and still exits 0, but
-the tarball prepared by the npm plugin will not contain the built package.
-Always use a real build for a meaningful dry run.
+A dry run does not exercise OIDC or Trusted Publishing; only the real workflow
+does that.
 
 ## Recovery: npm published but the GitHub Release failed
 
@@ -270,7 +265,7 @@ delete or move the tag to "fix" it. Repair only the missing artifact.
 - [ ] Commit messages are conventional; the pinned Hamlib release change uses
       `feat` or `fix` (and `!` if consumer-breaking).
 - [ ] `mise run check-release` passes locally or in CI.
-- [ ] The push is on `main` or `next` (or a deliberate `workflow_dispatch`).
+- [ ] The push is on `main` or `next`.
 - [ ] `release.yml` is green and `npm view hamlib-wasm version` shows the new
       version on the expected dist-tag.
 - [ ] The GitHub Release exists for the matching `vX.Y.Z` tag.
