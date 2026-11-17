@@ -53,6 +53,16 @@ window.__hamlibHarness = {
   capabilitiesOf,
   fakeTransport,
   isHamlibError: (value: unknown): boolean => value instanceof hamlibWasm.HamlibError,
+  vocabularies: {
+    RIG_MODES: hamlibWasm.RIG_MODES,
+    VFOS: hamlibWasm.VFOS,
+    LEVELS: hamlibWasm.LEVELS,
+    FUNCS: hamlibWasm.FUNCS,
+    PARMS: hamlibWasm.PARMS,
+    VFO_OPS: hamlibWasm.VFO_OPS,
+    SCAN_OPS: hamlibWasm.SCAN_OPS,
+    RPTR_SHIFTS: hamlibWasm.RPTR_SHIFTS,
+  },
   nativeModule: (): Promise<MainModule> => {
     nativeModule ??= createNativeModule();
     return nativeModule;

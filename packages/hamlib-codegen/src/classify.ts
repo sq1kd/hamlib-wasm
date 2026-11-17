@@ -25,6 +25,7 @@ import type { ProjectionResolver } from './project.ts';
 import {
   bindType,
   bareType,
+  flagBinding,
   normalizeType,
   pointeeType,
   settingBinding,
@@ -293,17 +294,23 @@ const PURE_INT_SYMBOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Predicates whose enum *result* is a supported-bit mask rather than one
- * member: `rig_has_scan` returns `scan_ops & scan` and `rig_has_vfo_op`
- * returns `vfo_ops & op` (`src/rig.c`), so the result has to cross as its
- * number.  Re-stringifying a multi-bit mask through `rig_strscan`/
- * `rig_strvfop` would collapse it to one member or none.  The argument stays a
- * name, so this cannot be folded into the token-mode families.
+ * `int` parameters that are on/off flags, by symbol and C parameter name: a
+ * function's status, and whether a channel read may change the rig.  The type
+ * alone is just `int`; Hamlib documents these as booleans.
  */
-const MASK_RESULT_SYMBOLS: Readonly<Record<string, true>> = {
-  rig_has_scan: true,
-  rig_has_vfo_op: true,
+const FLAG_PARAMETERS: Readonly<Record<string, ReadonlySet<string>>> = {
+  rig_set_func: new Set(['status']),
+  rig_get_func: new Set(['status']),
+  rig_set_ext_func: new Set(['status']),
+  rig_get_ext_func: new Set(['status']),
+  rig_get_channel: new Set(['read_only']),
 };
+
+function flagOverride(symbol: string, parameter: string, binding: TypeBinding): TypeBinding {
+  return FLAG_PARAMETERS[symbol]?.has(parameter) && binding.native.replace(/\s*\*$/, '') === 'int'
+    ? flagBinding('int', '1', '0')
+    : binding;
+}
 
 /** `rig_get_rptr_offs` -> `getRptrOffs`; `rig_scan` -> `scan`. */
 function methodName(symbol: string): string {
@@ -512,9 +519,12 @@ export function classifyFunction(
       return { symbol, reason: `returns unmapped type ${fn.result || 'void'}` };
     }
 
-    /* A capability predicate's enum result is a mask, not one member, so it
-     * crosses as its number; its name argument is bound below, unchanged. */
-    const pure = MASK_RESULT_SYMBOLS[symbol] === true ? (asToken(bound) ?? bound) : bound;
+    /* A capability predicate answers for the one name it was given: the
+     * result is that bit or none (`scan_ops & scan`, `has_get_level & level`),
+     * so it crosses as a boolean, never re-stringified through the codec. */
+    const pure = symbol.startsWith('rig_has_')
+      ? flagBinding(normalizeType(fn.result), '1', '0')
+      : bound;
 
     const plan: ParameterPlan[] = [];
     const args: OperationArgument[] = [];
@@ -602,7 +612,7 @@ export function classifyFunction(
       }
 
       outputs.push(index);
-      bindings.set(index, binding);
+      bindings.set(index, flagOverride(symbol, param.name, binding));
       plan.push({ kind: 'out' });
       continue;
     }
@@ -619,7 +629,7 @@ export function classifyFunction(
       scalarInputs.push(index);
     }
 
-    bindings.set(index, binding);
+    bindings.set(index, flagOverride(symbol, param.name, binding));
     plan.push({ kind: 'value', argument: -1 });
   }
 

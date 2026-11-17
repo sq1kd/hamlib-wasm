@@ -52,7 +52,33 @@ export interface TypeBinding {
   readonly valueAccess?: 'i' | 'f';
   /** For a `struct` binding, the generated projection this value crosses as. */
   readonly projection?: ProjectionSpec;
+  /**
+   * For a `boolean` binding over a C type that is not `bool`: the constants
+   * `true` and `false` stand for.  An input becomes `value ? on : off`, an
+   * output `value != off`, so no enum value is assumed to be 0 or 1.
+   */
+  readonly flag?: { readonly on: string; readonly off: string };
 }
+
+/** A two-state C value that the public surface types as `boolean`. */
+export function flagBinding(native: string, on: string, off: string): TypeBinding {
+  return { category: 'boolean', boundary: 'bool', ts: 'boolean', native, flag: { on, off } };
+}
+
+/**
+ * Enums Hamlib has no codec for, by the union their constants become; the
+ * generator emits `parse<Type>`/`str<Type>` into the facade (see names.ts).
+ */
+const NAMED_ENUMS: Readonly<Record<string, string>> = {
+  powerstat_t: 'PowerStatus',
+  reset_t: 'ResetKind',
+};
+
+/** Two-member OFF/ON enums: their name is the only thing that is not a boolean. */
+const FLAG_ENUMS: Readonly<Record<string, { readonly on: string; readonly off: string }>> = {
+  split_t: { on: 'RIG_SPLIT_ON', off: 'RIG_SPLIT_OFF' },
+  dcd_t: { on: 'RIG_DCD_ON', off: 'RIG_DCD_OFF' },
+};
 
 /** One field of a projected C struct. */
 export interface ProjectionField {
@@ -88,9 +114,9 @@ export interface ProjectionSpec {
 export type SettingNamespace = 'level' | 'func' | 'parm';
 
 const SETTING_BINDINGS: Readonly<Record<SettingNamespace, EnumBinding>> = {
-  level: { enumStr: 'rig_strlevel', enumParse: 'rig_parse_level', enumNone: 'RIG_LEVEL_NONE' },
-  func: { enumStr: 'rig_strfunc', enumParse: 'rig_parse_func', enumNone: 'RIG_FUNC_NONE' },
-  parm: { enumStr: 'rig_strparm', enumParse: 'rig_parse_parm', enumNone: 'RIG_PARM_NONE' },
+  level: { ts: 'Level', enumStr: 'rig_strlevel', enumParse: 'rig_parse_level', enumNone: 'RIG_LEVEL_NONE' },
+  func: { ts: 'Func', enumStr: 'rig_strfunc', enumParse: 'rig_parse_func', enumNone: 'RIG_FUNC_NONE' },
+  parm: { ts: 'Parm', enumStr: 'rig_strparm', enumParse: 'rig_parse_parm', enumNone: 'RIG_PARM_NONE' },
 };
 
 /** How a `value_t` is stored for each namespace; `func` carries no value. */
@@ -128,7 +154,6 @@ export function settingBinding(namespace: SettingNamespace): TypeBinding {
   return {
     category: 'enum',
     boundary: 'string',
-    ts: 'string',
     native: 'setting_t',
     ...SETTING_BINDINGS[namespace],
   };
@@ -181,15 +206,11 @@ const NUMBER_NATIVE: ReadonlySet<string> = new Set([
   'shortfreq_t',
   'tone_t',
   'ant_t',
-  'split_t',
-  'powerstat_t',
   /* Mask and scalar-only types with no name vocabulary: they cross losslessly
    * as their underlying number.  (`setting_t` as a *value* is a bit mask; as a
    * parameter it is resolved per name space before this table is consulted.) */
   'setting_t',
   'rig_model_t',
-  'reset_t',
-  'dcd_t',
   'agc_level_e',
   /* Opaque backend token (`typedef long`) and enums with no name vocabulary of
    * their own: they cross losslessly as their underlying number, which is what
@@ -203,6 +224,11 @@ const NUMBER_NATIVE: ReadonlySet<string> = new Set([
 ]);
 
 interface EnumBinding {
+  /**
+   * The string-literal union the names form, emitted into
+   * `src/native/generated/names.ts` from the upstream table (see names.ts).
+   */
+  readonly ts: string;
   readonly enumStr: string;
   readonly enumParse: string;
   readonly enumNone: string;
@@ -214,23 +240,27 @@ interface EnumBinding {
  * integer types in this release; the rest are anonymous enums behind a typedef.
  */
 const ENUMS: Readonly<Record<string, EnumBinding>> = {
-  vfo_t: { enumStr: 'rig_strvfo', enumParse: 'rig_parse_vfo', enumNone: 'RIG_VFO_NONE' },
+  vfo_t: { ts: 'Vfo', enumStr: 'rig_strvfo', enumParse: 'rig_parse_vfo', enumNone: 'RIG_VFO_NONE' },
   rmode_t: {
+    ts: 'RigMode',
     enumStr: 'rig_strrmode',
     enumParse: 'rig_parse_mode',
     enumNone: 'RIG_MODE_NONE',
   },
   rptr_shift_t: {
+    ts: 'RptrShift',
     enumStr: 'rig_strptrshift',
     enumParse: 'rig_parse_rptr_shift',
     enumNone: 'RIG_RPT_SHIFT_NONE',
   },
   vfo_op_t: {
+    ts: 'VfoOp',
     enumStr: 'rig_strvfop',
     enumParse: 'rig_parse_vfo_op',
     enumNone: 'RIG_OP_NONE',
   },
   scan_t: {
+    ts: 'ScanOp',
     enumStr: 'rig_strscan',
     enumParse: 'rig_parse_scan',
     enumNone: 'RIG_SCAN_NONE',
@@ -277,13 +307,32 @@ export function bindType(qualType: string): TypeBinding | null {
     return { category: 'string', boundary: 'string', ts: 'string', native: 'const char *' };
   }
 
+  const named = NAMED_ENUMS[bare];
+
+  if (named) {
+    return {
+      category: 'enum',
+      boundary: 'string',
+      native: normalized,
+      ts: named,
+      enumStr: `str${named}`,
+      enumParse: `parse${named}`,
+      enumNone: `static_cast<${bare}>(-1)`,
+    };
+  }
+
+  const flagEnum = FLAG_ENUMS[bare];
+
+  if (flagEnum) {
+    return flagBinding(normalized, flagEnum.on, flagEnum.off);
+  }
+
   const enumBinding = ENUMS[bare];
 
   if (enumBinding) {
     return {
       category: 'enum',
       boundary: 'string',
-      ts: 'string',
       native: normalized,
       ...enumBinding,
     };

@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { HamlibError } from 'hamlib-wasm';
-import type { RigCapabilities, Rig, PttState, RigState, SerialPortLike } from 'hamlib-wasm';
+import type { RigCapabilities, Rig, PttState, RigMode, RigState, SerialPortLike } from 'hamlib-wasm';
 import type { RawRig } from 'hamlib-wasm/raw';
 import { useRig, useRigError, useRigState } from 'hamlib-wasm/react';
 
@@ -74,7 +74,7 @@ async function readRaw(rig: Rig, api: Api, log: Log): Promise<RigState> {
 }
 
 /** Hamlib's own passband helper for the requested width. */
-function passbandWidth(raw: RawRig, mode: string, kind: PassbandKind): Promise<number> {
+function passbandWidth(raw: RawRig, mode: RigMode, kind: PassbandKind): Promise<number> {
   switch (kind) {
     case 'narrow':
       return raw.passbandNarrow(mode);
@@ -94,7 +94,7 @@ export interface Backend {
   connect(modelId: number, baudRate?: number, port?: SerialPortLike): Promise<void>;
   disconnect(): Promise<void>;
   setFrequency(hz: number): void;
-  setMode(mode: string): void;
+  setMode(mode: RigMode): void;
   setPassband(kind: PassbandKind): void;
   setPtt(on: boolean): void;
 }

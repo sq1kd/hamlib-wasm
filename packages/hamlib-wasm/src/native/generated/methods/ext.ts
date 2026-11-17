@@ -9,7 +9,7 @@ import { CodecMethods } from './codec.js';
 /** Generated operations in the ext family. */
 export abstract class ExtMethods extends CodecMethods {
 
-  async setExtFunc(token: number, status: number): Promise<void> {
+  async setExtFunc(token: number, status: boolean): Promise<void> {
     this.available('setExtFunc');
     return this.serialized('setExtFunc', async () => {
       const result = await this.native().setExtFunc(this.handle(), token, status);
@@ -17,7 +17,7 @@ export abstract class ExtMethods extends CodecMethods {
     });
   }
 
-  async getExtFunc(token: number): Promise<number> {
+  async getExtFunc(token: number): Promise<boolean> {
     this.available('getExtFunc');
     return this.serialized('getExtFunc', async () => {
       const result = await this.native().getExtFunc(this.handle(), token);

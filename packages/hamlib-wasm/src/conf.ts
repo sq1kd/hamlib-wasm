@@ -15,13 +15,88 @@
 import { HamlibError } from './errors.js';
 
 /**
+ * Hamlib's frontend tokens (upstream `src/conf.c`) that work here, typed with
+ * the values Hamlib accepts.  Times are milliseconds, offsets hertz.
+ */
+export interface FrontendConf {
+  /** Delay between two bytes written. */
+  readonly write_delay?: number;
+  /** Delay after each command written. */
+  readonly post_write_delay?: number;
+  /** Delay after a PTT change. */
+  readonly post_ptt_delay?: number;
+  /** How long a reply may take. */
+  readonly timeout?: number;
+  /** Attempts per command. */
+  readonly retry?: number;
+  /** Extra read attempts after a timeout. */
+  readonly timeout_retry?: number;
+  /** Push-to-talk through CAT, or on the rig port's RTS/DTR line. */
+  readonly ptt_type?: 'RIG' | 'RIGMICDATA' | 'DTR' | 'RTS' | 'None';
+  /** Squelch status through CAT, or from the rig port's DSR/CTS/CD line. */
+  readonly dcd_type?: 'RIG' | 'DSR' | 'CTS' | 'CD' | 'None';
+  /** RTS while the port is open: some interfaces are powered from it. */
+  readonly rts_state?: 'Unset' | 'ON' | 'OFF';
+  /** DTR while the port is open. */
+  readonly dtr_state?: 'Unset' | 'ON' | 'OFF';
+  /** Override the backend's flow control (XON/XOFF is not supported). */
+  readonly serial_handshake?: 'None' | 'Hardware';
+  readonly data_bits?: 7 | 8;
+  readonly stop_bits?: 1 | 2;
+  readonly serial_parity?: 'None' | 'Odd' | 'Even';
+  /** VFO compensation, in parts per million. */
+  readonly vfo_comp?: number;
+  /** Local oscillator frequency of a transverter, in hertz. */
+  readonly lo_freq?: number;
+  readonly offset_vfoa?: number;
+  readonly offset_vfob?: number;
+  readonly twiddle_timeout?: number;
+  readonly twiddle_rit?: boolean;
+  readonly disable_yaesu_bandselect?: boolean;
+  readonly auto_disable_screensaver?: boolean;
+  readonly freq_skip?: boolean;
+  readonly range_list_number?: number;
+  readonly range_list_name?: string;
+  readonly device_id?: string;
+}
+
+/** Tokens hamlib-wasm sets itself or cannot honour; see {@link encodeConf}. */
+type RefusedToken =
+  | 'rig_pathname'
+  | 'serial_speed'
+  | 'async'
+  | 'poll_interval'
+  | 'cache_timeout'
+  | 'auto_power_on'
+  | 'auto_power_off'
+  | 'ptt_pathname'
+  | 'dcd_pathname'
+  | 'ptt_share'
+  | 'ptt_bitnum'
+  | 'tuner_control_pathname'
+  | 'flushx'
+  | 'multicast_data_addr'
+  | 'multicast_data_port'
+  | 'multicast_cmd_addr'
+  | 'multicast_cmd_port'
+  | 'client';
+
+/**
  * Hamlib configuration tokens to apply before the rig opens, by name.
+ *
+ * The frontend tokens are typed ({@link FrontendConf}); the ones hamlib-wasm
+ * refuses are `never`, so passing one is a compile error.  A backend's own
+ * tokens (`civaddr` on Icom, ...) differ per model - `RawRig.tokenForeach()`
+ * lists them - so any other name is accepted as a string, number or boolean,
+ * and Hamlib refuses an unknown one when the rig opens.
  *
  * ```ts
  * await hamlib.open({ modelId, port, conf: { civaddr: '0x94', ptt_type: 'RTS' } });
  * ```
  */
-export type RigConf = Readonly<Record<string, string | number | boolean>>;
+export type RigConf = FrontendConf
+  & { readonly [token in RefusedToken]?: never }
+  & { readonly [backendToken: string]: string | number | boolean | undefined };
 
 /** Tokens the facade sets itself, with what to use instead. */
 const OWNED: Readonly<Record<string, string>> = {
@@ -73,7 +148,12 @@ export function encodeConf(conf: RigConf | undefined, operation: string): string
   const lines: string[] = [];
 
   for (const [name, raw] of Object.entries(conf)) {
-    const value = String(raw);
+    if (raw === undefined) {
+      continue;
+    }
+
+    /* Hamlib reads its on/off tokens as integers. */
+    const value = typeof raw === 'boolean' ? (raw ? '1' : '0') : String(raw);
 
     if (!/^[a-z][a-z0-9_]*$/.test(name)) {
       refuse(`conf token "${name}" is not a Hamlib token name`, operation);

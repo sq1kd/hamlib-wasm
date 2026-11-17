@@ -32,6 +32,11 @@
     .field("ptt", &PttResult::ptt)
     .field("error", &PttResult::error);
 
+    emscripten::value_object<BoolResult>("BoolResult")
+    .field("code", &BoolResult::code)
+    .field("value", &BoolResult::value)
+    .field("error", &BoolResult::error);
+
     emscripten::value_object<GetAntResult>("GetAntResult")
     .field("code", &GetAntResult::code)
     .field("option", &GetAntResult::option)
@@ -433,7 +438,7 @@
         return facade().getSplitFreqMode(handle);
     });
 
-    emscripten::function("setSplitVfo", +[](int handle, double arg0, const std::string & arg1)
+    emscripten::function("setSplitVfo", +[](int handle, bool arg0, const std::string & arg1)
     {
         return facade().setSplitVfo(handle, arg0, arg1);
     });
@@ -503,7 +508,7 @@
         return facade().getParm(handle, arg0);
     });
 
-    emscripten::function("setPowerstat", +[](int handle, double arg0)
+    emscripten::function("setPowerstat", +[](int handle, const std::string & arg0)
     {
         return facade().setPowerstat(handle, arg0);
     });
@@ -513,12 +518,12 @@
         return facade().getPowerstat(handle);
     });
 
-    emscripten::function("reset", +[](int handle, double arg0)
+    emscripten::function("reset", +[](int handle, const std::string & arg0)
     {
         return facade().reset(handle, arg0);
     });
 
-    emscripten::function("setExtFunc", +[](int handle, double arg0, double arg1)
+    emscripten::function("setExtFunc", +[](int handle, double arg0, bool arg1)
     {
         return facade().setExtFunc(handle, arg0, arg1);
     });
@@ -578,7 +583,7 @@
         return facade().hasSetFunc(handle, arg0);
     });
 
-    emscripten::function("setFunc", +[](int handle, const std::string & arg0, double arg1)
+    emscripten::function("setFunc", +[](int handle, const std::string & arg0, bool arg1)
     {
         return facade().setFunc(handle, arg0, arg1);
     });
@@ -643,7 +648,7 @@
         return facade().setChannel(handle, arg0);
     });
 
-    emscripten::function("getChannel", +[](int handle, double arg0)
+    emscripten::function("getChannel", +[](int handle, bool arg0)
     {
         return facade().getChannel(handle, arg0);
     });

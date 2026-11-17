@@ -16,10 +16,6 @@ import type { Captured } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
 
-/** `RIG_SCAN_MEM` and `RIG_OP_CPY` from the pinned `hamlib/rig.h`. */
-const SCAN_MEM = 1;
-const VFO_OP_CPY = 1;
-
 function expectOk<T>(captured: Captured<T>): T {
   if (!captured.ok) {
     throw new Error(`expected success, got ${captured.error.code}: ${captured.error.message}`);
@@ -151,13 +147,12 @@ test('scan and VFO suboperations are distinguishable before use', async ({ page 
 
   const result = expectOk(captured);
 
-  /* The masks are the backend's own `scan_ops`/`vfo_ops`, not a callback
-   * presence boolean: `PLT` and `UP` are valid names the model does not
-   * implement, so they come back zero while `MEM`/`PROG`/`CPY` come back with
-   * their bit set. */
-  expect(result.scanMem).toBe(SCAN_MEM);
-  expect(result.scanProg).toBe(8);
-  expect(result.scanPlt).toBe(0);
-  expect(result.vfoCpy).toBe(VFO_OP_CPY);
-  expect(result.vfoUp).toBe(0);
+  /* The answers come from the backend's own `scan_ops`/`vfo_ops` masks, not
+   * from whether a callback exists: `PLT` and `UP` are valid names the model
+   * does not implement, so they are false while `MEM`/`PROG`/`CPY` are true. */
+  expect(result.scanMem).toBe(true);
+  expect(result.scanProg).toBe(true);
+  expect(result.scanPlt).toBe(false);
+  expect(result.vfoCpy).toBe(true);
+  expect(result.vfoUp).toBe(false);
 });

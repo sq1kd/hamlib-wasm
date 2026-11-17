@@ -43,6 +43,8 @@ export interface HamlibHarness {
   isHamlibError(value: unknown): boolean;
   /** Loads the built Emscripten module (a separate wasm instance). */
   nativeModule(): Promise<NativeModule>;
+  /** The generated name vocabularies, as the package exports them. */
+  vocabularies: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface TestHelpers {

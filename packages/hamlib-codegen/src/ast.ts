@@ -68,6 +68,7 @@ export interface AstIndex {
  * tests can build AST fixtures in clang's own shape instead of invoking clang.
  */
 export interface JsonNode {
+  readonly id?: string;
   readonly kind?: string;
   readonly name?: string;
   readonly type?: { readonly qualType?: string };
@@ -77,6 +78,14 @@ export interface JsonNode {
   readonly isImplicit?: boolean;
   /** Set by clang on a record definition, absent on a forward declaration. */
   readonly completeDefinition?: boolean;
+  /**
+   * On the type a `typedef enum { ... } name;` wraps, the anonymous enum it
+   * owns: `decl` with `isTagOwned` (an `EnumType`), or `ownedTagDecl` (an
+   * `ElaboratedType`), depending on the clang release.
+   */
+  readonly ownedTagDecl?: { readonly id?: string };
+  readonly decl?: { readonly id?: string };
+  readonly isTagOwned?: boolean;
 }
 
 function fail(message: string): never {
@@ -211,6 +220,9 @@ export function indexAst(root: JsonNode): AstIndex {
   const records = new Map<string, AstRecord>();
   const completeRecords = new Set<string>();
   const typedefs = new Map<string, string>();
+  /* `typedef enum { ... } powerstat_t;` declares an unnamed enum and names it
+   * through the typedef that follows; it is indexed under that name. */
+  const anonymousEnums = new Map<string, JsonNode>();
 
   walk(root, (node) => {
     switch (node.kind) {
@@ -228,6 +240,8 @@ export function indexAst(root: JsonNode): AstIndex {
       case 'EnumDecl': {
         if (node.name && !enums.has(node.name)) {
           enums.set(node.name, enumOf(node));
+        } else if (!node.name && node.id) {
+          anonymousEnums.set(node.id, node);
         }
 
         break;
@@ -265,6 +279,14 @@ export function indexAst(root: JsonNode): AstIndex {
       case 'TypedefDecl': {
         if (node.name && node.type?.qualType) {
           typedefs.set(node.name, node.type.qualType.trim());
+        }
+
+        const wrapped = node.inner?.[0];
+        const owned = wrapped?.ownedTagDecl?.id ?? (wrapped?.isTagOwned ? wrapped.decl?.id : undefined);
+        const anonymous = owned === undefined ? undefined : anonymousEnums.get(owned);
+
+        if (node.name && anonymous && !enums.has(node.name)) {
+          enums.set(node.name, { ...enumOf(anonymous), name: node.name });
         }
 
         break;

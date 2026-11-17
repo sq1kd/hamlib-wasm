@@ -7,13 +7,13 @@
  * breathes with FT8's 15-second slots.  Under reduced motion it holds one
  * reading.  None of the frequencies is one the test emulators report.
  */
-import type { RigState } from 'hamlib-wasm';
+import type { RigMode, RigState } from 'hamlib-wasm';
 
 import { POLL_MS } from './format';
 
 interface Stop {
   readonly hz: number;
-  readonly mode: string;
+  readonly mode: RigMode;
   readonly passband: number;
   /** Mean S-meter, dB over S9. */
   readonly db: number;

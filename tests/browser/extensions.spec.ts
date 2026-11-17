@@ -193,6 +193,7 @@ test('diagnostics carry the rigs, the port traffic, errors and debug lines', asy
     const rig = await hamlib.open({ modelId: ts480.id });
 
     await rig.refresh();
+    // @ts-expect-error -- not a Hamlib mode: the runtime refusal a plain-JS caller gets.
     await window.__testHelpers.capture(() => rig.setMode('NOT-A-MODE'));
 
     const report = JSON.parse(JSON.stringify(hamlib.diagnostics()));
@@ -217,4 +218,50 @@ test('diagnostics carry the rigs, the port traffic, errors and debug lines', asy
   expect(report.log.length).toBeGreaterThan(0);
   /* The hook saw every line the report kept (the buffer is not full yet). */
   expect(hooked).toBe(report.log.length);
+});
+
+test('every generated name is one the built module parses', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
+    const port = await hamlib.requestPort();
+    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
+
+    if (!ts480) { throw new Error('the TS-480 is missing'); }
+
+    const rig = await hamlib.open({ modelId: ts480.id, port });
+    const names = window.__hamlibHarness.vocabularies;
+    const parsers: Record<string, (name: string) => Promise<number>> = {
+      RIG_MODES: (name) => rig.parseMode(name),
+      VFOS: (name) => rig.parseVfo(name),
+      LEVELS: (name) => rig.parseLevel(name),
+      FUNCS: (name) => rig.parseFunc(name),
+      PARMS: (name) => rig.parseParm(name),
+      VFO_OPS: (name) => rig.parseVfoOp(name),
+      SCAN_OPS: (name) => rig.parseScan(name),
+      RPTR_SHIFTS: (name) => rig.parseRptrShift(name),
+    };
+    const unparsed: string[] = [];
+    let checked = 0;
+
+    for (const [vocabulary, parse] of Object.entries(parsers)) {
+      for (const name of names[vocabulary] ?? []) {
+        checked++;
+
+        /* "None" is a real name whose value is the NONE sentinel, 0. */
+        if (name !== 'None' && (await parse(name)) === 0) {
+          unparsed.push(`${vocabulary}:${name}`);
+        }
+      }
+    }
+
+    await rig.close();
+    await hamlib.dispose();
+
+    return { unparsed, checked };
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.unparsed).toEqual([]);
+  expect(result.checked).toBeGreaterThan(200);
 });

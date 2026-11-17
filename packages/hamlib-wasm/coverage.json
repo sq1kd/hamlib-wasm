@@ -134,7 +134,7 @@
       "symbol": "rig_get_dcd",
       "method": "getDcd",
       "shape": "get",
-      "result": "NumberResult",
+      "result": "BoolResult",
       "capability": "getDcd"
     },
     {
@@ -155,7 +155,7 @@
       "symbol": "rig_get_ext_func",
       "method": "getExtFunc",
       "shape": "get",
-      "result": "NumberResult",
+      "result": "BoolResult",
       "capability": "getExtFunc"
     },
     {
@@ -169,7 +169,7 @@
       "symbol": "rig_get_func",
       "method": "getFunc",
       "shape": "get",
-      "result": "NumberResult",
+      "result": "BoolResult",
       "capability": "getFunc"
     },
     {
@@ -211,7 +211,7 @@
       "symbol": "rig_get_powerstat",
       "method": "getPowerstat",
       "shape": "get",
-      "result": "NumberResult",
+      "result": "TextResult",
       "capability": "getPowerstat"
     },
     {

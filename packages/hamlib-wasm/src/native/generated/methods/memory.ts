@@ -3,6 +3,7 @@
 
 import type { RigChanList } from '../../hamlib-wasm.mjs';
 import type { RigChannel } from '../../hamlib-wasm.mjs';
+import type { RigMode, RptrShift, Vfo } from '../names.js';
 
 import { SettingsMethods } from './settings.js';
 
@@ -58,12 +59,12 @@ export abstract class MemoryMethods extends SettingsMethods {
     });
   }
 
-  async getChannel(readOnly: number): Promise<{ channelNum: number; bankNum: number; vfo: string; ant: number; freq: number; mode: string; width: number; txFreq: number; txMode: string; txWidth: number; split: number; txVfo: string; rptrShift: string; rptrOffs: number; tuningStep: number; rit: number; xit: number; funcs: number; ctcssTone: number; ctcssSql: number; dcsCode: number; dcsSql: number; scanGroup: number; flags: number; channelDesc: string; tag: string }> {
+  async getChannel(readOnly: boolean): Promise<{ channelNum: number; bankNum: number; vfo: Vfo; ant: number; freq: number; mode: RigMode; width: number; txFreq: number; txMode: RigMode; txWidth: number; split: boolean; txVfo: Vfo; rptrShift: RptrShift; rptrOffs: number; tuningStep: number; rit: number; xit: number; funcs: number; ctcssTone: number; ctcssSql: number; dcsCode: number; dcsSql: number; scanGroup: number; flags: number; channelDesc: string; tag: string }> {
     this.available('getChannel');
     return this.serialized('getChannel', async () => {
       const result = await this.native().getChannel(this.handle(), readOnly);
       if (result.code !== 0) { throw this.failed(result, 'getChannel'); }
-      return { channelNum: result.channelNum, bankNum: result.bankNum, vfo: String(result.vfo), ant: result.ant, freq: result.freq, mode: String(result.mode), width: result.width, txFreq: result.txFreq, txMode: String(result.txMode), txWidth: result.txWidth, split: result.split, txVfo: String(result.txVfo), rptrShift: String(result.rptrShift), rptrOffs: result.rptrOffs, tuningStep: result.tuningStep, rit: result.rit, xit: result.xit, funcs: result.funcs, ctcssTone: result.ctcssTone, ctcssSql: result.ctcssSql, dcsCode: result.dcsCode, dcsSql: result.dcsSql, scanGroup: result.scanGroup, flags: result.flags, channelDesc: String(result.channelDesc), tag: String(result.tag) };
+      return { channelNum: result.channelNum, bankNum: result.bankNum, vfo: String(result.vfo) as Vfo, ant: result.ant, freq: result.freq, mode: String(result.mode) as RigMode, width: result.width, txFreq: result.txFreq, txMode: String(result.txMode) as RigMode, txWidth: result.txWidth, split: result.split, txVfo: String(result.txVfo) as Vfo, rptrShift: String(result.rptrShift) as RptrShift, rptrOffs: result.rptrOffs, tuningStep: result.tuningStep, rit: result.rit, xit: result.xit, funcs: result.funcs, ctcssTone: result.ctcssTone, ctcssSql: result.ctcssSql, dcsCode: result.dcsCode, dcsSql: result.dcsSql, scanGroup: result.scanGroup, flags: result.flags, channelDesc: String(result.channelDesc), tag: String(result.tag) };
     });
   }
 

@@ -229,6 +229,7 @@ for (const action of ['close', 'dispose'] as const) {
       rig.on('error', () => { events.push('error:second'); });
 
       try {
+        // @ts-expect-error -- not a Hamlib mode: the runtime refusal a plain-JS caller gets.
         const failure = await window.__testHelpers.capture(() => rig.setMode('NOT_A_MODE'));
 
         await stopping;

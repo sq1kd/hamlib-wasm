@@ -45,8 +45,8 @@ await rig.passbandWide('USB');                // pure: no CAT traffic, still que
 The discovery surface `rigctl` uses is bound too, so a client can find out what
 a model offers without a hard-coded table: `tokenForeach()`,
 `extLevelForeach()`, `extFuncForeach()` and `extParmForeach()` walk the
-configuration and extension tables, and `hasScan()`/`hasVfoOp()` return the
-backend's own masks. Every walker returns plain `RigConfparam` objects.
+configuration and extension tables, and `hasScan()`/`hasVfoOp()` answer from
+the backend's own masks. Every walker returns plain `RigConfparam` objects.
 
 ## Gating and arguments
 
@@ -56,9 +56,11 @@ Each method is gated by `rig.model.capabilities`, derived from the backend's
 the catalogue's own flags instead, because a backend that keys PTT over the
 serial RTS/DTR line declares no `get_ptt`/`set_ptt` function.
 
-The library does not second-guess arguments. `RigMode` is a `string` parsed by
-Hamlib's `rig_parse_mode()`; an unknown name or unsupported width is Hamlib's
-error to report.
+Names are typed from Hamlib's own tables: `RigMode`, `Vfo`, `Level`, `Func`,
+`Parm`, `VfoOp`, `ScanOp`, `RptrShift`, `PowerStatus`, `ResetKind` and
+`PttState` are literal unions, each with its list (`RIG_MODES`, `VFOS`, ...),
+so a misspelt name does not compile. On/off values are `boolean`. Whether a
+particular rig accepts a name is still Hamlib's error to report.
 
 ## One queue
 

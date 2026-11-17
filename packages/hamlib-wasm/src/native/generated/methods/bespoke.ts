@@ -3,6 +3,7 @@
 
 import { collectConfparams } from '../../confparams.js';
 import type { RigConfparam } from '../../confparams.js';
+import type { PttState } from '../names.js';
 
 import { GeneratedRigBase } from './base.js';
 
@@ -14,21 +15,21 @@ import { GeneratedRigBase } from './base.js';
  */
 export abstract class BespokeMethods extends GeneratedRigBase {
 
-  async getPtt(): Promise<string> {
+  async getPtt(): Promise<PttState> {
     this.available('getPtt');
     return this.serialized('getPtt', async () => {
       const result = await this.native().getPtt(this.handle());
       if (result.code !== 0) { throw this.failed(result, 'getPtt'); }
-      return String(result.ptt);
+      return String(result.ptt) as PttState;
     });
   }
 
-  async setPtt(state: string): Promise<string> {
+  async setPtt(state: PttState): Promise<PttState> {
     this.available('setPtt');
     return this.serialized('setPtt', async () => {
       const result = await this.native().setPtt(this.handle(), state);
       if (result.code !== 0) { throw this.failed(result, 'setPtt'); }
-      return String(result.ptt);
+      return String(result.ptt) as PttState;
     });
   }
 

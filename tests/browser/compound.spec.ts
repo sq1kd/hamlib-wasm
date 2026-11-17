@@ -176,6 +176,7 @@ test('a failed operation does not poison the queue', async ({ page }) => {
 
     try {
       /* Hamlib rejects the mode it cannot parse, inside the compound slot. */
+      // @ts-expect-error -- not a Hamlib mode: the runtime refusal a plain-JS caller gets.
       const failed = await window.__testHelpers.capture(() => rig.setMode('NOPE'));
 
       const after = await rig.refresh();

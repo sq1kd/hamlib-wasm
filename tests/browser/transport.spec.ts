@@ -235,6 +235,7 @@ test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting inpu
     /* The library no longer validates arguments (Hamlib owns the semantics),
      * so an out-of-range frequency is Hamlib's to reject; a mode name it does
      * not know is a guaranteed -RIG_EINVAL from rig_parse_mode(). */
+    // @ts-expect-error -- not a Hamlib mode: the runtime refusal a plain-JS caller gets.
     const badMode = await window.__testHelpers.capture(() => rig.setMode('NOT-A-MODE', 0));
 
     await rig.close();

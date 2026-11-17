@@ -6,7 +6,7 @@
  * from here, so the two never disagree about what a reading looks like.
  */
 
-import type { RigCapabilities } from 'hamlib-wasm';
+import type { PttState, RigCapabilities, RigMode } from 'hamlib-wasm';
 
 /** Before a radio is connected: nothing can be set. */
 export const NO_CAPABILITIES: RigCapabilities = {
@@ -22,7 +22,8 @@ export const NO_CAPABILITIES: RigCapabilities = {
 };
 
 /** Whether a PTT reading means the radio is keyed. */
-export function keyed(ptt: string | undefined): boolean {
+/** The panel shows `'unknown'` before the first PTT read. */
+export function keyed(ptt: PttState | 'unknown' | undefined): boolean {
   return ptt !== undefined && ptt !== 'off' && ptt !== 'unknown';
 }
 
@@ -30,7 +31,7 @@ export function keyed(ptt: string | undefined): boolean {
 export const STEPS: readonly number[] = [10, 100, 1000, 10_000, 100_000];
 
 /** The modes the panel lists; the current mode is added when it is not one of them. */
-export const MODES: readonly string[] = ['LSB', 'USB', 'CW', 'CW-R', 'AM', 'FM', 'RTTY', 'DATA-USB'];
+export const MODES: readonly RigMode[] = ['LSB', 'USB', 'CW', 'CW-R', 'AM', 'FM', 'RTTY', 'PKTUSB'];
 
 /** S-meter cells: S0..S9 fill the first 13, +60 dB the rest. */
 export const METER_CELLS = 24;
@@ -92,6 +93,6 @@ export function passbandLabel(hz: number | undefined): string {
   return hz >= 1000 ? `${(hz / 1000).toFixed(1)} kHz` : `${String(hz)} Hz`;
 }
 
-export function modeList(current: string | undefined): readonly string[] {
+export function modeList(current: RigMode | undefined): readonly RigMode[] {
   return current === undefined || MODES.includes(current) ? MODES : [...MODES, current];
 }

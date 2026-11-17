@@ -16,7 +16,7 @@ import type { Hamlib, HamlibError, PassbandSelector, Rig, RigField, RigState } f
 
 import { detectRate, rememberRate } from '../radio/detect';
 import { EMULATED_MODEL } from '../radio/emulate';
-import { POLL_MS } from '../radio/format';
+import { MODES, POLL_MS } from '../radio/format';
 import { NOTHING, paint } from '../radio/paint';
 import { bindPtt } from '../radio/ptt';
 import type { Writable } from '../radio/paint';
@@ -282,8 +282,12 @@ export function mountRadio(root: HTMLElement, options: MountOptions = {}): void 
   root.querySelector('[data-radio-modes]')?.addEventListener('click', (event) => {
     const chip = (event.target as Element).closest('button');
 
-    if (chip !== null && !chip.disabled && chip.textContent !== '') {
-      write((target) => target.setMode(chip.textContent));
+    /* A chip carries one of the panel's own modes; anything else is not a
+     * mode this page offers. */
+    const mode = MODES.find((candidate) => candidate === chip?.textContent);
+
+    if (chip !== null && !chip.disabled && mode !== undefined) {
+      write((target) => target.setMode(mode));
     }
   });
 

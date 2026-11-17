@@ -4,6 +4,7 @@
 // pinned release; the code is MIT.
 // Do not edit: run `mise run generate` after changing the config.
 
+import type { BoolResult } from '../hamlib-wasm.mjs';
 import type { CodeResult } from '../hamlib-wasm.mjs';
 import type { GetAntResult } from '../hamlib-wasm.mjs';
 import type { GetChannelResult } from '../hamlib-wasm.mjs';
@@ -13,6 +14,7 @@ import type { GetSplitFreqModeResult } from '../hamlib-wasm.mjs';
 import type { GetSplitModeResult } from '../hamlib-wasm.mjs';
 import type { GetSplitVfoResult } from '../hamlib-wasm.mjs';
 import type { GetVfoInfoResult } from '../hamlib-wasm.mjs';
+import type { Func, Level, Parm, PowerStatus, PttState, ResetKind, RigMode, RptrShift, ScanOp, Vfo, VfoOp } from './names.js';
 import type { MainModule } from '../hamlib-wasm.mjs';
 import type { NumberResult } from '../hamlib-wasm.mjs';
 import type { OpenResult } from '../hamlib-wasm.mjs';
@@ -72,7 +74,7 @@ export interface NativeOperations {
   /** Bound to the bespoke facade body in native/facade.cpp. */
   getPtt(handle: number): Asyncify<PttResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
-  setPtt(handle: number, state: string): Asyncify<PttResult>;
+  setPtt(handle: number, state: PttState): Asyncify<PttResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
   getRigInfo(handle: number): Asyncify<TextResult>;
   /** Bound to the bespoke facade body in native/facade.cpp. */
@@ -96,19 +98,19 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   getFrequency(handle: number): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setMode(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
+  setMode(handle: number, arg0: RigMode, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getMode(handle: number): Asyncify<GetModeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setVfo(handle: number, arg0: string): Asyncify<CodeResult>;
+  setVfo(handle: number, arg0: Vfo): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getVfo(handle: number): Asyncify<TextResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getVfoInfo(handle: number): Asyncify<GetVfoInfoResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getDcd(handle: number): Asyncify<NumberResult>;
+  getDcd(handle: number): Asyncify<BoolResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setRptrShift(handle: number, arg0: string): Asyncify<CodeResult>;
+  setRptrShift(handle: number, arg0: RptrShift): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getRptrShift(handle: number): Asyncify<TextResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -136,15 +138,15 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   getSplitFreq(handle: number): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setSplitMode(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
+  setSplitMode(handle: number, arg0: RigMode, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getSplitMode(handle: number): Asyncify<GetSplitModeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setSplitFreqMode(handle: number, arg0: number, arg1: string, arg2: number): Asyncify<CodeResult>;
+  setSplitFreqMode(handle: number, arg0: number, arg1: RigMode, arg2: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getSplitFreqMode(handle: number): Asyncify<GetSplitFreqModeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setSplitVfo(handle: number, arg0: number, arg1: string): Asyncify<CodeResult>;
+  setSplitVfo(handle: number, arg0: boolean, arg1: Vfo): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getSplitVfo(handle: number): Asyncify<GetSplitVfoResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -160,27 +162,27 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   getTs(handle: number): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  powerToMilliwatts(handle: number, arg0: number, arg1: number, arg2: string): Asyncify<NumberResult>;
+  powerToMilliwatts(handle: number, arg0: number, arg1: number, arg2: RigMode): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  milliwattsToPower(handle: number, arg0: number, arg1: number, arg2: string): Asyncify<NumberResult>;
+  milliwattsToPower(handle: number, arg0: number, arg1: number, arg2: RigMode): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setLevel(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
+  setLevel(handle: number, arg0: Level, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getLevel(handle: number, arg0: string): Asyncify<NumberResult>;
+  getLevel(handle: number, arg0: Level): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setParm(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
+  setParm(handle: number, arg0: Parm, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getParm(handle: number, arg0: string): Asyncify<NumberResult>;
+  getParm(handle: number, arg0: Parm): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setPowerstat(handle: number, arg0: number): Asyncify<CodeResult>;
+  setPowerstat(handle: number, arg0: PowerStatus): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getPowerstat(handle: number): Asyncify<NumberResult>;
+  getPowerstat(handle: number): Asyncify<TextResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  reset(handle: number, arg0: number): Asyncify<CodeResult>;
+  reset(handle: number, arg0: ResetKind): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setExtFunc(handle: number, arg0: number, arg1: number): Asyncify<CodeResult>;
+  setExtFunc(handle: number, arg0: number, arg1: boolean): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getExtFunc(handle: number, arg0: number): Asyncify<NumberResult>;
+  getExtFunc(handle: number, arg0: number): Asyncify<BoolResult>;
   /** Pure computation: no transport access. */
   extLookup(handle: number, arg0: string): Asyncify<RigConfparams>;
   /** Pure computation: no transport access. */
@@ -190,21 +192,21 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   getAnt(handle: number, arg0: number): Asyncify<GetAntResult>;
   /** Pure computation: no transport access. */
-  hasGetLevel(handle: number, arg0: string): Asyncify<number>;
+  hasGetLevel(handle: number, arg0: Level): Asyncify<boolean>;
   /** Pure computation: no transport access. */
-  hasSetLevel(handle: number, arg0: string): Asyncify<number>;
+  hasSetLevel(handle: number, arg0: Level): Asyncify<boolean>;
   /** Pure computation: no transport access. */
-  hasGetParm(handle: number, arg0: string): Asyncify<number>;
+  hasGetParm(handle: number, arg0: Parm): Asyncify<boolean>;
   /** Pure computation: no transport access. */
-  hasSetParm(handle: number, arg0: string): Asyncify<number>;
+  hasSetParm(handle: number, arg0: Parm): Asyncify<boolean>;
   /** Pure computation: no transport access. */
-  hasGetFunc(handle: number, arg0: string): Asyncify<number>;
+  hasGetFunc(handle: number, arg0: Func): Asyncify<boolean>;
   /** Pure computation: no transport access. */
-  hasSetFunc(handle: number, arg0: string): Asyncify<number>;
+  hasSetFunc(handle: number, arg0: Func): Asyncify<boolean>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  setFunc(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
+  setFunc(handle: number, arg0: Func, arg1: boolean): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getFunc(handle: number, arg0: string): Asyncify<NumberResult>;
+  getFunc(handle: number, arg0: Func): Asyncify<BoolResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   sendDtmf(handle: number, arg0: string): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -218,17 +220,17 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   getMem(handle: number): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  vfoOp(handle: number, arg0: string): Asyncify<CodeResult>;
+  vfoOp(handle: number, arg0: VfoOp): Asyncify<CodeResult>;
   /** Pure computation: no transport access. */
-  hasVfoOp(handle: number, arg0: string): Asyncify<number>;
+  hasVfoOp(handle: number, arg0: VfoOp): Asyncify<boolean>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  scan(handle: number, arg0: string, arg1: number): Asyncify<CodeResult>;
+  scan(handle: number, arg0: ScanOp, arg1: number): Asyncify<CodeResult>;
   /** Pure computation: no transport access. */
-  hasScan(handle: number, arg0: string): Asyncify<number>;
+  hasScan(handle: number, arg0: ScanOp): Asyncify<boolean>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setChannel(handle: number, arg0: RigChannel): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getChannel(handle: number, arg0: number): Asyncify<GetChannelResult>;
+  getChannel(handle: number, arg0: boolean): Asyncify<GetChannelResult>;
   /** Pure computation: no transport access. */
   lookupMemCaps(handle: number, arg0: number): Asyncify<RigChanList>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -240,11 +242,11 @@ export interface NativeOperations {
   /** Pure computation: no transport access. */
   getInfo(handle: number): Asyncify<string>;
   /** Pure computation: no transport access. */
-  passbandNormal(handle: number, arg0: string): Asyncify<number>;
+  passbandNormal(handle: number, arg0: RigMode): Asyncify<number>;
   /** Pure computation: no transport access. */
-  passbandNarrow(handle: number, arg0: string): Asyncify<number>;
+  passbandNarrow(handle: number, arg0: RigMode): Asyncify<number>;
   /** Pure computation: no transport access. */
-  passbandWide(handle: number, arg0: string): Asyncify<number>;
+  passbandWide(handle: number, arg0: RigMode): Asyncify<number>;
   /** Pure computation: no transport access. */
   settingToIdx(arg0: number): Asyncify<number>;
   /** Pure computation: no transport access. */
@@ -359,7 +361,7 @@ export interface GeneratedPublicOperations {
    * @param width - The passband width to set to. In hertz.
    * @see {@link RawRig.getMode}
    */
-  setMode(mode: string, width: number): Promise<void>;
+  setMode(mode: RigMode, width: number): Promise<void>;
   /**
    * Get the mode of the target VFO.
    *
@@ -377,7 +379,7 @@ export interface GeneratedPublicOperations {
    * - `passband`: The current passband width. In hertz.
    * @see {@link RawRig.setMode}
    */
-  getMode(): Promise<{ mode: string; passband: number }>;
+  getMode(): Promise<{ mode: RigMode; passband: number }>;
   /**
    * Set the current VFO.
    *
@@ -391,7 +393,7 @@ export interface GeneratedPublicOperations {
    *   `RIG_VFO_A` is `"VFOA"`.
    * @see {@link RawRig.getVfo}
    */
-  setVfo(vfo: string): Promise<void>;
+  setVfo(vfo: Vfo): Promise<void>;
   /**
    * Get the current VFO.
    *
@@ -405,7 +407,7 @@ export interface GeneratedPublicOperations {
    *   `RIG_VFO_A` is `"VFOA"`.
    * @see {@link RawRig.setVfo}
    */
-  getVfo(): Promise<string>;
+  getVfo(): Promise<Vfo>;
   /**
    * Get freq/mode/width for requested VFO.
    *
@@ -424,7 +426,7 @@ export interface GeneratedPublicOperations {
    * - `split`
    * - `satmode`
    */
-  getVfoInfo(): Promise<{ freq: number; mode: string; width: number; split: number; satmode: number }>;
+  getVfoInfo(): Promise<{ freq: number; mode: RigMode; width: number; split: boolean; satmode: number }>;
   /**
    * Get the status of the DCD.
    *
@@ -434,7 +436,7 @@ export interface GeneratedPublicOperations {
    *
    * @returns The status of the DCD.
    */
-  getDcd(): Promise<number>;
+  getDcd(): Promise<boolean>;
   /**
    * Set the repeater shift.
    *
@@ -446,7 +448,7 @@ export interface GeneratedPublicOperations {
    *   {@link RawRig.strPtrShift} spells it: `RIG_RPT_SHIFT_PLUS` is `"+"`.
    * @see {@link RawRig.getRptrShift}
    */
-  setRptrShift(rptr_shift: string): Promise<void>;
+  setRptrShift(rptr_shift: RptrShift): Promise<void>;
   /**
    * Get the current repeater shift.
    *
@@ -458,7 +460,7 @@ export interface GeneratedPublicOperations {
    *   spells it: `RIG_RPT_SHIFT_PLUS` is `"+"`.
    * @see {@link RawRig.setRptrShift}
    */
-  getRptrShift(): Promise<string>;
+  getRptrShift(): Promise<RptrShift>;
   /**
    * Set the repeater offset.
    *
@@ -644,7 +646,7 @@ export interface GeneratedPublicOperations {
    *   current value or default for the mode determined by the rig. In hertz.
    * @see {@link RawRig.getSplitMode}
    */
-  setSplitMode(txMode: string, txWidth: number): Promise<void>;
+  setSplitMode(txMode: RigMode, txWidth: number): Promise<void>;
   /**
    * Get the current split modes.
    *
@@ -662,7 +664,7 @@ export interface GeneratedPublicOperations {
    * - `txWidth`: The current transmit split width. In hertz.
    * @see {@link RawRig.setSplitMode}
    */
-  getSplitMode(): Promise<{ txMode: string; txWidth: number }>;
+  getSplitMode(): Promise<{ txMode: RigMode; txWidth: number }>;
   /**
    * Set the split frequency and mode.
    *
@@ -684,7 +686,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.setSplitMode}
    * @see {@link RawRig.getSplitFreqMode}
    */
-  setSplitFreqMode(txFreq: number, txMode: string, txWidth: number): Promise<void>;
+  setSplitFreqMode(txFreq: number, txMode: RigMode, txWidth: number): Promise<void>;
   /**
    * Get the current split frequency and mode.
    *
@@ -710,7 +712,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.getSplitMode}
    * @see {@link RawRig.setSplitFreqMode}
    */
-  getSplitFreqMode(): Promise<{ txFreq: number; txMode: string; txWidth: number }>;
+  getSplitFreqMode(): Promise<{ txFreq: number; txMode: RigMode; txWidth: number }>;
   /**
    * Set the split mode.
    *
@@ -723,7 +725,7 @@ export interface GeneratedPublicOperations {
    *   `RIG_VFO_A` is `"VFOA"`.
    * @see {@link RawRig.getSplitVfo}
    */
-  setSplitVfo(split: number, txVfo: string): Promise<void>;
+  setSplitVfo(split: boolean, txVfo: Vfo): Promise<void>;
   /**
    * Get the current split mode.
    *
@@ -738,7 +740,7 @@ export interface GeneratedPublicOperations {
    *   `RIG_VFO_A` is `"VFOA"`.
    * @see {@link RawRig.setSplitVfo}
    */
-  getSplitVfo(): Promise<{ split: number; txVfo: string }>;
+  getSplitVfo(): Promise<{ split: boolean; txVfo: Vfo }>;
   /**
    * Set the RIT.
    *
@@ -824,7 +826,7 @@ export interface GeneratedPublicOperations {
    * @returns The converted power in mW.
    * @see {@link RawRig.milliwattsToPower}
    */
-  powerToMilliwatts(power: number, freq: number, mode: string): Promise<number>;
+  powerToMilliwatts(power: number, freq: number, mode: RigMode): Promise<number>;
   /**
    * Conversion utility from absolute in mW to relative range.
    *
@@ -844,7 +846,7 @@ export interface GeneratedPublicOperations {
    * @returns The converted relative power.
    * @see {@link RawRig.powerToMilliwatts}
    */
-  milliwattsToPower(milliwatts: number, freq: number, mode: string): Promise<number>;
+  milliwattsToPower(milliwatts: number, freq: number, mode: RigMode): Promise<number>;
   /**
    * Set a radio level setting.
    *
@@ -859,7 +861,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasSetLevel}
    * @see {@link RawRig.getLevel}
    */
-  setLevel(level: string, val: number): Promise<void>;
+  setLevel(level: Level, val: number): Promise<void>;
   /**
    * Get the value of a level.
    *
@@ -881,7 +883,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasGetLevel}
    * @see {@link RawRig.setLevel}
    */
-  getLevel(level: string): Promise<number>;
+  getLevel(level: Level): Promise<number>;
   /**
    * Set a radio parameter.
    *
@@ -896,7 +898,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasSetParm}
    * @see {@link RawRig.getParm}
    */
-  setParm(parm: string, val: number): Promise<void>;
+  setParm(parm: Parm, val: number): Promise<void>;
   /**
    * Get the value of a parameter.
    *
@@ -911,7 +913,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasGetParm}
    * @see {@link RawRig.setParm}
    */
-  getParm(parm: string): Promise<number>;
+  getParm(parm: Parm): Promise<number>;
   /**
    * Turn on/off the radio.
    *
@@ -923,7 +925,7 @@ export interface GeneratedPublicOperations {
    * @param status - The status to set to.
    * @see {@link RawRig.getPowerstat}
    */
-  setPowerstat(status: number): Promise<void>;
+  setPowerstat(status: PowerStatus): Promise<void>;
   /**
    * Get the on/off status of the radio.
    *
@@ -935,7 +937,7 @@ export interface GeneratedPublicOperations {
    * @returns The current status.
    * @see {@link RawRig.setPowerstat}
    */
-  getPowerstat(): Promise<number>;
+  getPowerstat(): Promise<PowerStatus>;
   /**
    * Reset the radio.
    *
@@ -946,7 +948,7 @@ export interface GeneratedPublicOperations {
    *
    * @param reset - The reset operation to perform.
    */
-  reset(reset: number): Promise<void>;
+  reset(reset: ResetKind): Promise<void>;
   /**
    * Set a radio function extra parameter.
    *
@@ -958,7 +960,7 @@ export interface GeneratedPublicOperations {
    * @param status - The value to set the parameter to.
    * @see {@link RawRig.getExtFunc}
    */
-  setExtFunc(token: number, status: number): Promise<void>;
+  setExtFunc(token: number, status: boolean): Promise<void>;
   /**
    * Get the value of a function extra parameter.
    *
@@ -970,7 +972,7 @@ export interface GeneratedPublicOperations {
    * @returns The value of `token`.
    * @see {@link RawRig.setExtFunc}
    */
-  getExtFunc(token: number): Promise<number>;
+  getExtFunc(token: number): Promise<boolean>;
   /**
    * Lookup ext token by its name, return pointer to confparams struct.
    *
@@ -1035,7 +1037,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasSetLevel}
    * @see {@link RawRig.getLevel}
    */
-  hasGetLevel(level: string): Promise<number>;
+  hasGetLevel(level: Level): Promise<boolean>;
   /**
    * Check settable ability of level settings.
    *
@@ -1051,7 +1053,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasGetLevel}
    * @see {@link RawRig.setLevel}
    */
-  hasSetLevel(level: string): Promise<number>;
+  hasSetLevel(level: Level): Promise<boolean>;
   /**
    * Check retrieval ability of parameter settings.
    *
@@ -1068,7 +1070,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasSetParm}
    * @see {@link RawRig.getParm}
    */
-  hasGetParm(parm: string): Promise<number>;
+  hasGetParm(parm: Parm): Promise<boolean>;
   /**
    * Check settable ability of parameter settings.
    *
@@ -1084,7 +1086,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasGetParm}
    * @see {@link RawRig.setParm}
    */
-  hasSetParm(parm: string): Promise<number>;
+  hasSetParm(parm: Parm): Promise<boolean>;
   /**
    * Check ability of radio functions.
    *
@@ -1099,7 +1101,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.hasSetFunc}
    * @see {@link RawRig.getFunc}
    */
-  hasGetFunc(func: string): Promise<number>;
+  hasGetFunc(func: Func): Promise<boolean>;
   /**
    * Check ability of radio functions.
    *
@@ -1114,7 +1116,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.setFunc}
    * @see {@link RawRig.hasGetFunc}
    */
-  hasSetFunc(func: string): Promise<number>;
+  hasSetFunc(func: Func): Promise<boolean>;
   /**
    * Activate/de-activate functions of radio.
    *
@@ -1127,7 +1129,7 @@ export interface GeneratedPublicOperations {
    * @param status - The status (on or off) to set to.
    * @see {@link RawRig.getFunc}
    */
-  setFunc(func: string, status: number): Promise<void>;
+  setFunc(func: Func, status: boolean): Promise<void>;
   /**
    * Get the status of functions of the radio.
    *
@@ -1138,7 +1140,7 @@ export interface GeneratedPublicOperations {
    * @returns The function status.
    * @see {@link RawRig.setFunc}
    */
-  getFunc(func: string): Promise<number>;
+  getFunc(func: Func): Promise<boolean>;
   /**
    * Send DTMF digits.
    *
@@ -1214,7 +1216,7 @@ export interface GeneratedPublicOperations {
    *   spells it: `RIG_OP_UP` is `"UP"`.
    * @see {@link RawRig.hasVfoOp}
    */
-  vfoOp(op: string): Promise<void>;
+  vfoOp(op: VfoOp): Promise<void>;
   /**
    * Check retrieval ability of VFO operations.
    *
@@ -1229,7 +1231,7 @@ export interface GeneratedPublicOperations {
    *   otherwise 0 if none supported.
    * @see {@link RawRig.vfoOp}
    */
-  hasVfoOp(op: string): Promise<number>;
+  hasVfoOp(op: VfoOp): Promise<boolean>;
   /**
    * Perform Memory/VFO operations.
    *
@@ -1242,7 +1244,7 @@ export interface GeneratedPublicOperations {
    * @param ch - Optional channel argument used for the scan.
    * @see {@link RawRig.hasScan}
    */
-  scan(scan: string, ch: number): Promise<void>;
+  scan(scan: ScanOp, ch: number): Promise<void>;
   /**
    * Check availability of scanning functions.
    *
@@ -1258,7 +1260,7 @@ export interface GeneratedPublicOperations {
    *   otherwise 0 if none supported.
    * @see {@link RawRig.scan}
    */
-  hasScan(scan: string): Promise<number>;
+  hasScan(scan: ScanOp): Promise<boolean>;
   /**
    * Set channel data.
    *
@@ -1296,7 +1298,7 @@ export interface GeneratedPublicOperations {
    * @returns The channel data.
    * @see {@link RawRig.setChannel}
    */
-  getChannel(readOnly: number): Promise<{ channelNum: number; bankNum: number; vfo: string; ant: number; freq: number; mode: string; width: number; txFreq: number; txMode: string; txWidth: number; split: number; txVfo: string; rptrShift: string; rptrOffs: number; tuningStep: number; rit: number; xit: number; funcs: number; ctcssTone: number; ctcssSql: number; dcsCode: number; dcsSql: number; scanGroup: number; flags: number; channelDesc: string; tag: string }>;
+  getChannel(readOnly: boolean): Promise<{ channelNum: number; bankNum: number; vfo: Vfo; ant: number; freq: number; mode: RigMode; width: number; txFreq: number; txMode: RigMode; txWidth: number; split: boolean; txVfo: Vfo; rptrShift: RptrShift; rptrOffs: number; tuningStep: number; rit: number; xit: number; funcs: number; ctcssTone: number; ctcssSql: number; dcsCode: number; dcsSql: number; scanGroup: number; flags: number; channelDesc: string; tag: string }>;
   /**
    * Lookup the memory type and capabilities.
    *
@@ -1367,7 +1369,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.passbandNarrow}
    * @see {@link RawRig.passbandWide}
    */
-  passbandNormal(mode: string): Promise<number>;
+  passbandNormal(mode: RigMode): Promise<number>;
   /**
    * Get the narrow passband of a mode.
    *
@@ -1384,7 +1386,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.passbandNormal}
    * @see {@link RawRig.passbandWide}
    */
-  passbandNarrow(mode: string): Promise<number>;
+  passbandNarrow(mode: RigMode): Promise<number>;
   /**
    * Get the wide passband of a mode.
    *
@@ -1401,7 +1403,7 @@ export interface GeneratedPublicOperations {
    * @see {@link RawRig.passbandNarrow}
    * @see {@link RawRig.passbandNormal}
    */
-  passbandWide(mode: string): Promise<number>;
+  passbandWide(mode: RigMode): Promise<number>;
   /**
    * Basically convert setting_t expressed 2^n to n.
    *
@@ -1572,7 +1574,7 @@ export interface GeneratedPublicOperations {
    * @returns The status of the PTT.
    * @see {@link RawRig.setPtt}
    */
-  getPtt(): Promise<string>;
+  getPtt(): Promise<PttState>;
   /**
    * Set PTT on/off.
    *
@@ -1583,7 +1585,7 @@ export interface GeneratedPublicOperations {
    * @param state - The PTT status to set to.
    * @see {@link RawRig.getPtt}
    */
-  setPtt(state: string): Promise<string>;
+  setPtt(state: PttState): Promise<PttState>;
   /**
    * Get freq/mode/width for requested VFO.
    *

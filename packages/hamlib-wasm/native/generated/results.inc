@@ -20,7 +20,7 @@ struct RigChannel
     double txFreq;
     std::string txMode;
     double txWidth;
-    double split;
+    bool split;
     std::string txVfo;
     std::string rptrShift;
     double rptrOffs;
@@ -48,6 +48,13 @@ struct RigConfparams
     double type;
 };
 
+struct BoolResult
+{
+    int code;
+    bool value;
+    std::string error;
+};
+
 struct GetAntResult
 {
     int code;
@@ -71,7 +78,7 @@ struct GetChannelResult
     double txFreq;
     std::string txMode;
     double txWidth;
-    double split;
+    bool split;
     std::string txVfo;
     std::string rptrShift;
     double rptrOffs;
@@ -132,7 +139,7 @@ struct GetSplitModeResult
 struct GetSplitVfoResult
 {
     int code;
-    double split;
+    bool split;
     std::string txVfo;
     std::string error;
 };
@@ -143,7 +150,7 @@ struct GetVfoInfoResult
     double freq;
     std::string mode;
     double width;
-    double split;
+    bool split;
     double satmode;
     std::string error;
 };

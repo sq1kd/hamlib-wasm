@@ -140,7 +140,7 @@ test('exposes the generated capability matrix and drives a generated operation',
   /* The token-side codec and the mask helpers. */
   expect(result.codec.vfo).toBe('VFOA');
   expect(result.codec.mode).toBe('USB');
-  expect(typeof result.codec.hasAgc).toBe('number');
+  expect(typeof result.codec.hasAgc).toBe('boolean');
 
   /* A struct projection crosses as a value object with plain string fields. */
   expect(typeof result.miss.name).toBe('string');

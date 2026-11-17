@@ -75,12 +75,12 @@ export interface RigModel extends RigModelCapabilities {
 }
 
 /**
- * A Hamlib mode name, e.g. `"USB"`, `"CW"`, `"FM"`.
- *
- * The accepted set evolves with upstream Hamlib, so this is a plain string:
- * every setter value is validated by Hamlib's own `rig_parse_mode()`.
+ * A Hamlib mode name, e.g. `"USB"`, `"CW"`, `"FM"`: one of `RIG_MODES`,
+ * generated from the pinned release's own table, so the set follows upstream
+ * on every bump.  Which modes a given rig accepts is still the rig's call.
  */
-export type RigMode = string;
+export type { RigMode } from './native/generated/names.js';
+import type { RigMode } from './native/generated/names.js';
 
 /** Serial parity a backend declares. */
 export type SerialParity = 'none' | 'odd' | 'even' | 'mark' | 'space';

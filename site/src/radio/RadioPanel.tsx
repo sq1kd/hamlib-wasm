@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
-import type { RigCapabilities, RigState } from 'hamlib-wasm';
+import type { RigCapabilities, RigMode, RigState } from 'hamlib-wasm';
 
 import { cellState, keyed, METER_CELLS, meterCells, modeList, passbandLabel, segments, STEPS } from './format';
 import { bindPtt } from './ptt';
@@ -45,7 +45,7 @@ export interface PanelControls {
   readonly capabilities: RigCapabilities;
   readonly busy: boolean;
   readonly onSetFrequency: (hz: number) => void;
-  readonly onSetMode: (mode: string) => void;
+  readonly onSetMode: (mode: RigMode) => void;
   readonly onSetPassband: (kind: PassbandKind) => void;
   /** Held: `true` on press, `false` on release. */
   readonly onSetPtt: (on: boolean) => void;

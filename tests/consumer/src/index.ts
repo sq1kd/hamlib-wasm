@@ -26,6 +26,7 @@ import type {
   OpenRawRigOptions,
   RawRig,
   RigModelCapabilities,
+  RigConf,
   RigConfparam,
   RigMode,
   RigModeState,
@@ -99,11 +100,33 @@ export async function runConsumerFlow(
     await rig.setExtLevel(extension.token, value);
 
     const codec: number = await rig.parseVfo(await rig.strVfo(0));
-    const mask: number = await rig.hasGetLevel('AGC');
+    const supported: boolean = await rig.hasGetLevel('AGC');
 
+    /* Hamlib's names are literal unions generated from its own tables: a
+     * typo is a compile error, and a read narrows to the same union. */
+    const current: RigMode = (await rig.getMode()).mode;
+    const split: boolean = (await rig.getSplitVfo()).split;
+    // @ts-expect-error -- not a Hamlib level name
+    await rig.getLevel('STRENGHT');
+    // @ts-expect-error -- not a Hamlib mode name
+    await rig.setMode('UBS', 0);
+
+    /* Frontend tokens are typed; the ones hamlib-wasm sets itself are not
+     * accepted at all, and backend tokens stay open-ended. */
+    const conf: RigConf = { ptt_type: 'RTS', post_write_delay: 5, freq_skip: true, civaddr: '0x94' };
+    // @ts-expect-error -- set by hamlib-wasm itself: pass baudRate instead
+    const owned: RigConf = { serial_speed: 9600 };
+    // @ts-expect-error -- CM108 PTT is not reachable from here
+    const unreachable: RigConf = { ptt_type: 'CM108' };
+
+    void conf;
+    void owned;
+    void unreachable;
     void rigInfo;
     void codec;
-    void mask;
+    void supported;
+    void current;
+    void split;
 
     summary = {
       version,

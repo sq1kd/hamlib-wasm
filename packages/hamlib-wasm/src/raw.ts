@@ -88,6 +88,31 @@ export type {
 } from './browser-support.js';
 export type { RigConfparam } from './native/confparams.js';
 export type { RigConf } from './conf.js';
+export {
+  FUNCS,
+  LEVELS,
+  PARMS,
+  POWER_STATUSES,
+  PTT_STATES,
+  RESET_KINDS,
+  RIG_MODES,
+  RPTR_SHIFTS,
+  SCAN_OPS,
+  VFOS,
+  VFO_OPS,
+} from './native/generated/names.js';
+export type {
+  Func,
+  Level,
+  Parm,
+  PowerStatus,
+  PttState,
+  ResetKind,
+  RptrShift,
+  ScanOp,
+  Vfo,
+  VfoOp,
+} from './native/generated/names.js';
 export type {
   DebugLevel,
   DebugOptions,

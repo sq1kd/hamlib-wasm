@@ -175,7 +175,7 @@ What it adds, and what it deliberately does not:
 
 ```ts
 import { createRawHamlib, HamlibError } from 'hamlib-wasm/raw';
-import type { RawHamlib, RawRig, RigModel, RigMode, RigModeState } from 'hamlib-wasm/raw';
+import type { PttState, RawHamlib, RawRig, RigModel, RigModeState } from 'hamlib-wasm/raw';
 
 const hamlib: RawHamlib = await createRawHamlib();
 const port = await hamlib.requestPort();          // requires a user gesture
@@ -190,7 +190,7 @@ const mode: RigModeState = await rig.getMode();   // { mode, passband }
 await rig.setFrequency(7_074_000);
 await rig.setMode('CW', 500);                     // the width is the caller's
 await rig.setPtt('on');
-const ptt: string = await rig.getPtt();           // the rig's own state name
+const ptt: PttState = await rig.getPtt();         // 'off' | 'on' | 'on-mic' | 'on-data'
 
 await rig.close();                                // idempotent
 await hamlib.dispose();                           // closes every rig and port
@@ -213,8 +213,8 @@ out what a model offers without a hardcoded model table: `tokenForeach()` walks
 the configuration parameters (the frontend's plus the model's serial ones),
 `extLevelForeach()`, `extFuncForeach()` and `extParmForeach()` walk the model's
 three extension tables, and `hasScan()`/`hasVfoOp()` return the backend's own
-`scan_ops`/`vfo_ops` masks (so a suboperation that is a valid name but not
-implemented comes back zero). Every walker returns plain
+`scan_ops`/`vfo_ops` masks as a boolean (so a suboperation that is a valid
+name but not implemented comes back `false`). Every walker returns plain
 `RigConfparam` objects - one projected entry per parameter, with the native
 vector freed - never an Embind-owned value.
 
@@ -231,10 +231,14 @@ gated on the catalogue entry's own flags instead, because a backend that drives
 push-to-talk over the serial RTS/DTR line declares no `get_ptt`/`set_ptt`
 function pointer.
 
-`RigMode` is a `string`: the accepted names evolve with upstream Hamlib and
-every setter value is parsed by Hamlib's own `rig_parse_mode()`. The library
-does not second-guess arguments — an unknown name or an unsupported width is
-Hamlib's error to report.
+Hamlib's names are typed. The generator reads the pinned release's own name
+tables (`mode_str[]`, `vfo_str[]`, `rig_level_str[]`, ... in `src/misc.c`) and
+emits each as a literal union with its list - `RigMode`/`RIG_MODES`, `Vfo`,
+`Level`, `Func`, `Parm`, `VfoOp`, `ScanOp`, `RptrShift`, `PowerStatus`,
+`ResetKind`, `PttState` - so `rig.setMode('UBS', 0)` is a compile error, and
+reads come back as the same unions. On/off values (`split`, a function's
+status, `getDcd()`, the `has*` predicates) are `boolean`. Whether a given rig
+accepts a name is still the rig's call, reported as Hamlib's error.
 
 ## React
 

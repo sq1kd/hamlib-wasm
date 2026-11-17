@@ -17,13 +17,21 @@ import process from 'node:process';
 import { parse } from 'yaml';
 
 import type { OperationOverride } from './classify.ts';
+import { VOCABULARY_TYPES } from './names.ts';
 
 /** How a value object field crosses the Embind boundary. */
 const BOUNDARY_TYPES: ReadonlySet<string> = new Set(['int', 'double', 'bool', 'string']);
 
+/**
+ * A `["name", "type"]` pair, optionally narrowed: `["state", "string",
+ * "PttState"]` crosses Embind as a string and is typed with the vocabulary
+ * named third (see names.ts).
+ */
+export type ConfigPair = readonly [string, string, string?];
+
 export interface ModelResult {
   readonly binding?: string;
-  readonly fields: readonly (readonly [string, string])[];
+  readonly fields: readonly ConfigPair[];
 }
 
 /**
@@ -38,7 +46,7 @@ export type OperationScope = 'rig' | 'module';
 export interface ModelOperation {
   readonly name: string;
   readonly scope: OperationScope;
-  readonly args: readonly (readonly [string, string])[];
+  readonly args: readonly ConfigPair[];
   readonly result: string;
   /**
    * The upstream symbols the bespoke facade body calls.  They are excluded
@@ -112,11 +120,11 @@ function asString(file: string, value: unknown, what: string): string {
  * A `["name", "type"]` pair.  The types are the Embind boundary types, so a
  * typo is caught here rather than becoming `number` in the emitted contract.
  */
-function asPair(file: string, value: unknown, what: string): readonly [string, string] {
+function asPair(file: string, value: unknown, what: string): ConfigPair {
   const pair = asArray(file, value, what);
 
-  if (pair.length !== 2) {
-    fail(file, `${what} must be a ["name", "type"] pair`);
+  if (pair.length !== 2 && pair.length !== 3) {
+    fail(file, `${what} must be a ["name", "type"] pair or ["name", "string", "<Vocabulary>"]`);
   }
 
   const name = asString(file, pair[0], `${what}[0]`);
@@ -124,6 +132,16 @@ function asPair(file: string, value: unknown, what: string): readonly [string, s
 
   if (!BOUNDARY_TYPES.has(type)) {
     fail(file, `${what} has unknown type "${type}"`);
+  }
+
+  if (pair.length === 3) {
+    const narrowed = asString(file, pair[2], `${what}[2]`);
+
+    if (type !== 'string' || !VOCABULARY_TYPES.has(narrowed)) {
+      fail(file, `${what}: only a string can be narrowed, to one of ${[...VOCABULARY_TYPES].join(', ')}`);
+    }
+
+    return [name, type, narrowed];
   }
 
   return [name, type];

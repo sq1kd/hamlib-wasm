@@ -55,9 +55,11 @@ import type {
   SerialPortLike,
 } from './raw.js';
 import type { DetectBaudRateOptions, RigMode, RigModeState, RigModel } from './catalogue.js';
+import type { Level } from './native/generated/names.js';
 import type { CompoundHost } from './native/seam.js';
 
 export {
+  RIG_MODES,
   UNUSABLE_MODELS,
   VERIFIED_MODELS,
   describeLineSettingsLimitation,
@@ -98,14 +100,16 @@ export type {
 } from './raw.js';
 
 /**
- * Push-to-talk states Hamlib reports.
+ * Push-to-talk states Hamlib reports, generated from the facade's own
+ * mapping.
  *
  * `'on'` is plain transmit, and what {@link Rig.setPtt} with `true` sends.
  * `'on-mic'` and `'on-data'` are transmit with the audio taken from the
  * microphone or from the data (rear/USB audio) input, on radios that tell the
  * two apart.  Anything other than `'off'` means the rig is transmitting.
  */
-export type PttState = 'off' | 'on' | 'on-mic' | 'on-data';
+export type { PttState } from './native/generated/names.js';
+import type { PttState } from './native/generated/names.js';
 
 const PTT_STATES: readonly PttState[] = ['off', 'on', 'on-mic', 'on-data'];
 
@@ -129,7 +133,7 @@ export type PassbandSelector = 'normal' | 'narrow' | 'wide';
  * {@link HamlibOptions.levels}) and the model advertises it, so a page that
  * shows no meters pays no CAT traffic for them.
  */
-export type LevelName = 'STRENGTH' | 'SWR' | 'ALC' | 'RFPOWER' | 'RFPOWER_METER';
+export type LevelName = Extract<Level, 'STRENGTH' | 'SWR' | 'ALC' | 'RFPOWER' | 'RFPOWER_METER'>;
 
 const LEVEL_NAMES: readonly LevelName[] = ['STRENGTH', 'SWR', 'ALC', 'RFPOWER', 'RFPOWER_METER'];
 
@@ -1243,7 +1247,7 @@ async function advertisedLevels(
   const advertised: LevelName[] = [];
 
   for (const name of configured) {
-    if ((await rig.hasGetLevel(name)) !== 0) {
+    if (await rig.hasGetLevel(name)) {
       advertised.push(name);
     }
   }

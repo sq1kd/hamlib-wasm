@@ -68,7 +68,7 @@ results:
   PttResult:
     fields:
       - [ code, int ]
-      - [ ptt, string ]
+      - [ ptt, string, PttState ]
       - [ error, string ]
 
 # Embind vector registrations.  `ModelInfo` is a C++ struct declared in
@@ -241,7 +241,7 @@ operations:
     capability: canSetPtt
     args:
       - [ handle, int ]
-      - [ state, string ]
+      - [ state, string, PttState ]
     result: PttResult
     calls:
       - rig_set_ptt
