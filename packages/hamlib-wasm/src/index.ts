@@ -142,14 +142,22 @@ export type PassbandSelector = 'normal' | 'narrow' | 'wide';
  * {@link HamlibOptions.levels}) and the model advertises it, so a page that
  * shows no meters pays no CAT traffic for them.
  */
-export type LevelName = Extract<Level, 'STRENGTH' | 'SWR' | 'ALC' | 'RFPOWER' | 'RFPOWER_METER'>;
+export type LevelName = (typeof LEVEL_NAMES)[number];
 
-const LEVEL_NAMES: readonly LevelName[] = ['STRENGTH', 'SWR', 'ALC', 'RFPOWER', 'RFPOWER_METER'];
+/** Every {@link LevelName}, in the order a UI would list them. */
+export const LEVEL_NAMES = [
+  'STRENGTH',
+  'SWR',
+  'ALC',
+  'RFPOWER',
+  'RFPOWER_METER',
+] as const satisfies readonly Level[];
 
 /** The telemetry a {@link Rig.watch} registration can read. */
-export type RigField = 'frequency' | 'mode' | 'ptt' | 'levels';
+export type RigField = (typeof RIG_FIELDS)[number];
 
-const RIG_FIELDS: readonly RigField[] = ['frequency', 'mode', 'ptt', 'levels'];
+/** Every {@link RigField}. */
+export const RIG_FIELDS = ['frequency', 'mode', 'ptt', 'levels'] as const;
 
 /** What a watch registration reads when it names no fields. */
 const DEFAULT_WATCH_FIELDS: readonly RigField[] = ['frequency', 'mode', 'ptt'];
