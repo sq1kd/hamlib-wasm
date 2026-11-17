@@ -45,32 +45,11 @@
 #include "generated/codecs.h"
 #include "web_serial.h"
 
-/* --- JavaScript transport imports (see native/web_serial.ts) ------------- */
-
-extern int hamlibWsOpenPort(const char *path, int rate, int data_bits,
-                            int stop_bits, const char *parity,
-                            const char *flow_control);
-extern int hamlibWsClosePort(int handle);
-extern int hamlibWsMatchesOpenOptions(int handle, int rate, int data_bits,
-                                      int stop_bits, const char *parity,
-                                      const char *flow_control);
-extern int hamlibWsRead(int handle, void *buf, int len);
-extern int hamlibWsBytesReceived(int handle);
-extern int hamlibWsWrite(int handle, const void *buf, int len);
-extern int hamlibWsWaitReadable(int handle, int timeout_ms);
-extern int hamlibWsFlush(int handle);
-extern int hamlibWsSetSignals(int handle, int rts, int dtr, int brk);
-extern int hamlibWsGetSignals(int handle);
-extern int hamlibWsLastRts(int handle);
-extern int hamlibWsLastDtr(int handle);
-extern int hamlibWsWriteLastError(char *buf, int len);
-extern int hamlibWsClearLastError(void);
-
 /* --- error mapping ------------------------------------------------------ */
 
-static int ws_map_error(int rc, int fallback)
+int webserial_map_error(int status)
 {
-    switch (rc)
+    switch (status)
     {
     case WS_OK:
         return RIG_OK;
@@ -85,16 +64,12 @@ static int ws_map_error(int rc, int fallback)
         return -RIG_ETIMEOUT;
 
     case WS_ERR_ACCESS:
-        return -RIG_EACCESS;
-
     case WS_ERR_BUSY:
         return -RIG_EACCESS;
 
     case WS_ERR_IO:
-        return -RIG_EIO;
-
     default:
-        return fallback;
+        return -RIG_EIO;
     }
 }
 
@@ -310,7 +285,7 @@ int HAMLIB_API serial_open(hamlib_port_t *rp)
 
         rig_debug(RIG_DEBUG_ERR, "%s: cannot open %s (%s)\n", __func__,
                   rp->pathname, why ? why : "transport error");
-        return ws_map_error(handle, -RIG_EIO);
+        return webserial_map_error(handle);
     }
 
     status = webserial_register_handle(handle, rp->pathname);
@@ -362,7 +337,7 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
 
     if (matches < 0)
     {
-        return ws_map_error(matches, -RIG_EIO);
+        return webserial_map_error(matches);
     }
 
     if (matches)
@@ -385,7 +360,7 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
     if (status < 0)
     {
         rp->fd = -1;
-        return ws_map_error(status, -RIG_EIO);
+        return webserial_map_error(status);
     }
 
     rp->fd = -1;
@@ -398,7 +373,7 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
 
     if (handle <= 0)
     {
-        return ws_map_error(handle, -RIG_EIO);
+        return webserial_map_error(handle);
     }
 
     status = webserial_register_handle(handle, rp->pathname);
@@ -434,7 +409,7 @@ int HAMLIB_API serial_flush(hamlib_port_t *p)
 
     if (status < 0)
     {
-        return ws_map_error(status, -RIG_EIO);
+        return webserial_map_error(status);
     }
 
     return RIG_OK;
@@ -491,7 +466,7 @@ int ser_close(hamlib_port_t *p)
 
     if (status < 0)
     {
-        return ws_map_error(status, -RIG_EIO);
+        return webserial_map_error(status);
     }
 
     return RIG_OK;
@@ -507,8 +482,7 @@ int HAMLIB_API ser_set_rts(hamlib_port_t *p, int state)
         return -RIG_EIO;
     }
 
-    return ws_map_error(hamlibWsSetSignals(p->fd, state ? 1 : 0, -1, -1),
-                        -RIG_EIO);
+    return webserial_map_error(hamlibWsSetSignals(p->fd, state ? 1 : 0, -1, -1));
 }
 
 /**
@@ -527,7 +501,7 @@ int HAMLIB_API ser_get_rts(hamlib_port_t *p, int *state)
 
     if (value < 0)
     {
-        return ws_map_error(value, -RIG_EIO);
+        return webserial_map_error(value);
     }
 
     *state = value ? 1 : 0;
@@ -544,8 +518,7 @@ int HAMLIB_API ser_set_dtr(hamlib_port_t *p, int state)
         return -RIG_EIO;
     }
 
-    return ws_map_error(hamlibWsSetSignals(p->fd, -1, state ? 1 : 0, -1),
-                        -RIG_EIO);
+    return webserial_map_error(hamlibWsSetSignals(p->fd, -1, state ? 1 : 0, -1));
 }
 
 /**
@@ -564,7 +537,7 @@ int HAMLIB_API ser_get_dtr(hamlib_port_t *p, int *state)
 
     if (value < 0)
     {
-        return ws_map_error(value, -RIG_EIO);
+        return webserial_map_error(value);
     }
 
     *state = value ? 1 : 0;
@@ -581,8 +554,7 @@ int HAMLIB_API ser_set_brk(const hamlib_port_t *p, int state)
         return -RIG_EIO;
     }
 
-    return ws_map_error(hamlibWsSetSignals(p->fd, -1, -1, state ? 1 : 0),
-                        -RIG_EIO);
+    return webserial_map_error(hamlibWsSetSignals(p->fd, -1, -1, state ? 1 : 0));
 }
 
 static int ws_get_input_signal(hamlib_port_t *p, int *state, int bit,
@@ -601,7 +573,7 @@ static int ws_get_input_signal(hamlib_port_t *p, int *state, int bit,
     {
         rig_debug(RIG_DEBUG_ERR, "%s: cannot read %s - %s\n", __func__, what,
                   webserial_last_error() ? webserial_last_error() : "I/O error");
-        return ws_map_error(signals, -RIG_EIO);
+        return webserial_map_error(signals);
     }
 
     *state = (signals & bit) ? 1 : 0;

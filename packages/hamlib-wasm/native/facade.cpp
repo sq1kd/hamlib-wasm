@@ -94,18 +94,9 @@ struct PttResult
  * is the only layer able to hold a real JavaScript value (an Embind `val`
  * cannot be handed to JavaScript library code).  The bridge therefore
  * exchanges an opaque token: the TypeScript layer stores the object and the
- * facade binds the token to a logical path.
+ * facade binds the token to a logical path (hamlibWsRegisterPort in
+ * web_serial.h).
  */
-extern "C"
-{
-    int hamlibWsRegisterPort(const char *path, int token);
-    int hamlibWsUnregisterPort(const char *path);
-    /* Release every registered port from JavaScript; used by destroy() and by
-     * the TypeScript layer when a native call is stuck. */
-    int hamlibWsForceCloseAll(void);
-    /* One formatted Hamlib debug line, handed to the JavaScript log hook. */
-    void hamlibWsLog(int level, const char *message);
-}
 
 namespace
 {
@@ -351,7 +342,7 @@ public:
 
         int rc = hamlibWsRegisterPort(logicalPath.c_str(), portToken);
 
-        if (rc != WS_OK) { return failure<CodeResult>(mapTransport(rc)); }
+        if (rc != WS_OK) { return failure<CodeResult>(webserial_map_error(rc)); }
 
         CodeResult result;
         result.code = RIG_OK;
@@ -366,7 +357,7 @@ public:
 
         int rc = hamlibWsUnregisterPort(logicalPath.c_str());
 
-        if (rc != WS_OK) { return failure<CodeResult>(mapTransport(rc)); }
+        if (rc != WS_OK) { return failure<CodeResult>(webserial_map_error(rc)); }
 
         CodeResult result;
         result.code = RIG_OK;
@@ -1185,31 +1176,6 @@ private:
         result.code = code;
         result.error = message;
         return result;
-    }
-
-    static int mapTransport(int rc)
-    {
-        switch (rc)
-        {
-        case WS_ERR_CONF:
-            return -RIG_ECONF;
-
-        case WS_ERR_INVAL:
-            return -RIG_EINVAL;
-
-        case WS_ERR_TIMEOUT:
-            return -RIG_ETIMEOUT;
-
-        case WS_ERR_ACCESS:
-            return -RIG_EACCESS;
-
-        case WS_ERR_BUSY:
-            return -RIG_EACCESS;
-
-        case WS_ERR_IO:
-        default:
-            return -RIG_EIO;
-        }
     }
 
     RIG *lookupRig(int handle) const

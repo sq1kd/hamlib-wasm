@@ -9,7 +9,7 @@
 import { expect, expectOk, readFakeSerial, test } from './fixtures';
 
 interface PrimitiveResults {
-  /** Error sentinels published by the transport (see web_serial.h). */
+  /** The transport status codes (enum ws_status in web_serial.h). */
   errors: {
     ok: number;
     inval: number;
@@ -52,12 +52,8 @@ test('drives the serial registry, queue, flush and signals', async ({ harnessPag
       const glue = module.HamlibWs;
       const serial = window.__fakeSerial;
       const port = serial.port;
-      const errors = {
-        ok: glue.WS_OK,
-        inval: glue.WS_ERR_INVAL,
-        busy: glue.WS_ERR_BUSY,
-        io: glue.WS_ERR_IO,
-      };
+      /* enum ws_status in native/web_serial.h. */
+      const errors = { ok: 0, inval: -3, busy: -6, io: -1 };
 
       /* Registry ------------------------------------------------------- */
       const token = glue.storePort(port);
@@ -66,15 +62,15 @@ test('drives the serial registry, queue, flush and signals', async ({ harnessPag
       const registerPath = glue.registerPort('serial/1', token);
       const registerKnownPathAgain = glue.registerPort('serial/1', glue.storePort(port));
       const registerConsumedToken = glue.registerPort('serial/3', token);
-      const openUnregisteredPath = await glue.openPort('serial/42', 9600, 8, 1, 0, 0);
+      const openUnregisteredPath = await glue.openPort('serial/42', 9600, 8, 1, 'none', 'none');
 
       /* Open ----------------------------------------------------------- */
-      const handle = await glue.openPort('serial/1', 9600, 8, 1, 0, 0);
-      const matchesSameOptions = glue.matchesOpenOptions(handle, 9600, 8, 1, 0, 0);
-      const matchesDifferentOptions = glue.matchesOpenOptions(handle, 19200, 8, 1, 0, 0);
+      const handle = await glue.openPort('serial/1', 9600, 8, 1, 'none', 'none');
+      const matchesSameOptions = glue.matchesOpenOptions(handle, 9600, 8, 1, 'none', 'none');
+      const matchesDifferentOptions = glue.matchesOpenOptions(handle, 19200, 8, 1, 'none', 'none');
 
       /* A rig may open its CAT and PTT lines on one physical port. */
-      const secondHandle = await glue.openPort('serial/1', 9600, 8, 1, 0, 0);
+      const secondHandle = await glue.openPort('serial/1', 9600, 8, 1, 'none', 'none');
       const unregisterWhileOpen = glue.unregisterPort('serial/1');
 
       /* Receive queue and flush ---------------------------------------- */
@@ -102,7 +98,7 @@ test('drives the serial registry, queue, flush and signals', async ({ harnessPag
       const errorToken = glue.storePort(port);
       glue.registerPort('serial/2', errorToken);
 
-      const errorHandle = await glue.openPort('serial/2', 9600, 8, 1, 0, 0);
+      const errorHandle = await glue.openPort('serial/2', 9600, 8, 1, 'none', 'none');
       serial.errorReadable('NetworkError');
       const waitAfterError = await glue.waitReadable(errorHandle, 2000);
       await glue.closePort(errorHandle);

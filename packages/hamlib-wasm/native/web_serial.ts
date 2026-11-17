@@ -42,14 +42,6 @@
 
 addToLibrary({
   $HamlibWs: {
-    WS_OK: 0,
-    WS_ERR_IO: -1,
-    WS_ERR_CONF: -2,
-    WS_ERR_INVAL: -3,
-    WS_ERR_TIMEOUT: -4,
-    WS_ERR_ACCESS: -5,
-    WS_ERR_BUSY: -6,
-
     /* Bytes the pump may buffer before the reader is treated as stuck.
      * Hamlib's own read loop keeps the queue near empty; a rig that far ahead
      * of the CAT exchange means nothing is draining it, and buffering without
@@ -103,22 +95,22 @@ addToLibrary({
       if (name === 'TypeError' || name === 'NotSupportedError') {
         /* A transport rejects settings it cannot express - port.open() with a
          * parity mode outside none/even/odd, for instance - with a TypeError. */
-        return this.WS_ERR_CONF;
+        return WsStatus.ERR_CONF;
       }
 
       if (name === 'SecurityError') {
-        return this.WS_ERR_ACCESS;
+        return WsStatus.ERR_ACCESS;
       }
 
       if (name === 'NotFoundError') {
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       if (name === 'InvalidStateError') {
-        return this.WS_ERR_BUSY;
+        return WsStatus.ERR_BUSY;
       }
 
-      return this.WS_ERR_IO;
+      return WsStatus.ERR_IO;
     },
 
     lastErrorText(): string {
@@ -153,25 +145,25 @@ addToLibrary({
     registerPort(path: string, token: number): number {
       if (!path) {
         this.recordError('TypeError', 'logical path is required', 'registerPort');
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       const port = this.pendingPorts.get(token);
 
       if (!port) {
         this.recordError('InvalidStateError', `unknown serial port token ${token}`, 'registerPort');
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       this.pendingPorts.delete(token);
 
       if (this.ports.has(path)) {
         this.recordError('InvalidStateError', `logical path ${path} is already registered`, 'registerPort');
-        return this.WS_ERR_BUSY;
+        return WsStatus.ERR_BUSY;
       }
 
       this.ports.set(path, { path, port, openCount: 0, state: null });
-      return this.WS_OK;
+      return WsStatus.OK;
     },
 
     /* Idempotent: removing an unknown path succeeds. */
@@ -179,16 +171,16 @@ addToLibrary({
       const record = this.ports.get(path);
 
       if (!record) {
-        return this.WS_OK;
+        return WsStatus.OK;
       }
 
       if (record.state) {
         this.recordError('InvalidStateError', `logical path ${path} is still open`, 'unregisterPort');
-        return this.WS_ERR_BUSY;
+        return WsStatus.ERR_BUSY;
       }
 
       this.ports.delete(path);
-      return this.WS_OK;
+      return WsStatus.OK;
     },
 
     /*
@@ -423,7 +415,7 @@ addToLibrary({
         return this.fail(error, 'close');
       }
 
-      return this.WS_OK;
+      return WsStatus.OK;
     },
 
     /* --- transport primitives called from C ----------------------------- */
@@ -440,7 +432,7 @@ addToLibrary({
 
       if (!record) {
         this.recordError('NotFoundError', `serial port ${path} is not registered`, 'open');
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       if (record.state) {
@@ -479,7 +471,7 @@ addToLibrary({
       if (!state.reader) {
         await this.teardown(record, state);
         this.recordError('InvalidStateError', 'serial port has no readable stream', 'open');
-        return this.WS_ERR_IO;
+        return WsStatus.ERR_IO;
       }
 
       state.pumpPromise = this.startPump(state, record.path);
@@ -491,7 +483,7 @@ addToLibrary({
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return this.WS_OK;
+        return WsStatus.OK;
       }
 
       this.handles.delete(handle);
@@ -500,13 +492,13 @@ addToLibrary({
       record.openCount--;
 
       if (record.openCount > 0) {
-        return this.WS_OK;
+        return WsStatus.OK;
       }
 
       const state = record.state;
 
       if (!state) {
-        return this.WS_OK;
+        return WsStatus.OK;
       }
 
       return this.teardown(record, state);
@@ -523,7 +515,7 @@ addToLibrary({
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       const options = entry.state.options;
@@ -545,7 +537,7 @@ addToLibrary({
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       if (entry.state.queue.length === 0) {
@@ -576,7 +568,7 @@ addToLibrary({
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       return entry.state.rxBytes;
@@ -586,7 +578,7 @@ addToLibrary({
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return Promise.resolve(this.WS_ERR_INVAL);
+        return Promise.resolve(WsStatus.ERR_INVAL);
       }
 
       if (len <= 0) {
@@ -605,7 +597,7 @@ addToLibrary({
 
           if (!state.writer) {
             this.recordError('InvalidStateError', 'serial port has no writable stream', 'write');
-            return this.WS_ERR_IO;
+            return WsStatus.ERR_IO;
           }
 
           await state.writer.write(chunk);
@@ -628,7 +620,7 @@ addToLibrary({
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return Promise.resolve(this.WS_ERR_INVAL);
+        return Promise.resolve(WsStatus.ERR_INVAL);
       }
 
       const state = entry.state;
@@ -639,12 +631,12 @@ addToLibrary({
 
       if (state.failure) {
         this.recordError(state.failure.name, state.failure.message, 'read');
-        return Promise.resolve(this.WS_ERR_IO);
+        return Promise.resolve(WsStatus.ERR_IO);
       }
 
       if (state.closed) {
         this.recordError('InvalidStateError', 'serial port is closed', 'read');
-        return Promise.resolve(this.WS_ERR_IO);
+        return Promise.resolve(WsStatus.ERR_IO);
       }
 
       return new Promise<WakeReason>((resolve) => {
@@ -688,7 +680,7 @@ addToLibrary({
           this.recordError('InvalidStateError', 'serial port is closed', 'read');
         }
 
-        return this.WS_ERR_IO;
+        return WsStatus.ERR_IO;
       });
     },
 
@@ -696,18 +688,18 @@ addToLibrary({
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       this.queueClear(entry.state.queue);
-      return this.WS_OK;
+      return WsStatus.OK;
     },
 
     async setSignals(handle: number, rts: number, dtr: number, brk: number): Promise<number> {
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       const state = entry.state;
@@ -741,14 +733,14 @@ addToLibrary({
         state.lastDtr = dtr !== 0 ? 1 : 0;
       }
 
-      return this.WS_OK;
+      return WsStatus.OK;
     },
 
     async getSignals(handle: number): Promise<number> {
       const entry = this.handles.get(handle);
 
       if (!entry) {
-        return this.WS_ERR_INVAL;
+        return WsStatus.ERR_INVAL;
       }
 
       try {
@@ -756,19 +748,19 @@ addToLibrary({
         let mask = 0;
 
         if (signals.clearToSend) {
-          mask |= 0x1;
+          mask |= WsSignal.CTS;
         }
 
         if (signals.dataSetReady) {
-          mask |= 0x2;
+          mask |= WsSignal.DSR;
         }
 
         if (signals.dataCarrierDetect) {
-          mask |= 0x4;
+          mask |= WsSignal.DCD;
         }
 
         if (signals.ringIndicator) {
-          mask |= 0x8;
+          mask |= WsSignal.RI;
         }
 
         return mask;
@@ -781,12 +773,12 @@ addToLibrary({
      * state we requested.  A freshly opened port has both lines deasserted. */
     lastRts(handle: number): number {
       const entry = this.handles.get(handle);
-      return entry ? entry.state.lastRts : this.WS_ERR_INVAL;
+      return entry ? entry.state.lastRts : WsStatus.ERR_INVAL;
     },
 
     lastDtr(handle: number): number {
       const entry = this.handles.get(handle);
-      return entry ? entry.state.lastDtr : this.WS_ERR_INVAL;
+      return entry ? entry.state.lastDtr : WsStatus.ERR_INVAL;
     },
 
     writeLastError(ptr: number, len: number): number {

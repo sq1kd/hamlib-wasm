@@ -149,7 +149,8 @@ export function constantNames(
 
   return {
     record,
-    source: `the \`${declared.spelling}\` constants in Hamlib's rig.h`,
+    /* The transport's own enums are the ones the JS library reads. */
+    source: `the \`${declared.spelling}\` constants in ${record.constEnum ? 'native/web_serial.h' : "Hamlib's rig.h"}`,
     names,
     constants,
     spelling: declared.spelling,

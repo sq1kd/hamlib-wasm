@@ -53,6 +53,12 @@ export interface EnumRecord {
   readonly names?: { readonly type: string; readonly constant: string };
   /** An exported `{ name: value }` map of the constants, and the union of its values. */
   readonly values?: { readonly type: string; readonly constant: string };
+  /**
+   * An ambient `const enum` in `native/generated/transport.d.ts`, for the
+   * Emscripten JS library, which cannot import a module; `tsc` inlines its
+   * members.
+   */
+  readonly constEnum?: string;
   readonly source: NameSource;
   /**
    * How a name crosses into C: an upstream pair, `'generated'` for the
@@ -161,6 +167,18 @@ export const ENUMS: readonly EnumRecord[] = [
     enumName: 'rig_conf_e',
     values: { type: 'RigConfType', constant: 'RIG_CONF_TYPES' },
     source: { prefix: 'RIG_CONF_', upper: true },
+    codec: null,
+  },
+  {
+    enumName: 'ws_status',
+    constEnum: 'WsStatus',
+    source: { prefix: 'WS_', upper: true },
+    codec: null,
+  },
+  {
+    enumName: 'ws_signal',
+    constEnum: 'WsSignal',
+    source: { prefix: 'WEBSERIAL_SIGNAL_', upper: true },
     codec: null,
   },
 ];

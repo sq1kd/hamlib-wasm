@@ -70,6 +70,7 @@ export const BRIDGE_INPUTS: readonly string[] = [
   'native/generated/embind.inc',
   'native/generated/operations.inc',
   'native/generated/results.inc',
+  'native/generated/transport.d.ts',
   'native/emscripten-globals.d.ts',
   'native/tsconfig.library.json',
   'dist/native/library/web_serial.js',

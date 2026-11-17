@@ -48,7 +48,7 @@ import { operationFacts } from './emit/common.ts';
 import { emitContract } from './emit/contract.ts';
 import { emitCapabilities, emitCodecs, emitEmbind, emitOperations, emitResults } from './emit/cpp.ts';
 import { emitMethodFiles } from './emit/methods.ts';
-import { emitNames } from './emit/names.ts';
+import { emitNames, emitTransportTypes } from './emit/names.ts';
 import { loadVocabularies } from './names.ts';
 import type { NameVocabulary } from './names.ts';
 import { createProjectionResolver, staleProjectionRenames } from './project.ts';
@@ -128,6 +128,7 @@ interface GeneratedPaths {
   readonly coverage: string;
   readonly embind: string;
   readonly codecs: string;
+  readonly transport: string;
   readonly results: string;
   readonly operations: string;
   readonly capabilities: string;
@@ -144,6 +145,7 @@ function outputPaths(packageDir: string): GeneratedPaths {
     coverage: path.join(packageDir, 'coverage.json'),
     embind: path.join(generated, 'embind.inc'),
     codecs: path.join(generated, 'codecs.h'),
+    transport: path.join(generated, 'transport.d.ts'),
     results: path.join(generated, 'results.inc'),
     operations: path.join(generated, 'operations.inc'),
     capabilities: path.join(generated, 'capabilities.inc'),
@@ -477,6 +479,7 @@ function render(
   const files: (readonly [string, string])[] = [
     [paths.results, emitResults(model, facts)],
     [paths.codecs, emitCodecs(vocabularies)],
+    [paths.transport, emitTransportTypes(vocabularies)],
     [paths.operations, emitOperations(facts)],
     [paths.capabilities, emitCapabilities(model, facts)],
     [paths.embind, emitEmbind(model, facts)],
@@ -509,7 +512,7 @@ function main(): void {
   const packageDir = path.resolve(options.packageDir);
   const paths = outputPaths(packageDir);
   const { model, release } = loadConfig(path.resolve(options.config));
-  const ast = loadAst(path.resolve(options.headers));
+  const ast = loadAst(path.resolve(options.headers), [path.join(packageDir, 'native', 'web_serial.h')]);
   const upstream = loadUpstreamDocs(path.resolve(options.sources));
   const vocabularies = loadVocabularies(path.resolve(options.sources), ast.enums);
   const built = render(paths, options, model, release, ast, upstream, vocabularies);

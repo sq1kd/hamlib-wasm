@@ -322,13 +322,15 @@ export function indexAst(root: JsonNode): AstIndex {
 }
 
 /**
- * Dump and index the AST of `hamlib/rig.h` from the pinned headers.
+ * Dump and index the AST of `hamlib/rig.h` from the pinned headers, plus any
+ * project header whose declarations the generator also reads (the serial
+ * transport's status codes).
  *
  * A scratch translation unit is created so clang is invoked exactly as it
  * would be for a real source file; the JSON is then parsed and reduced to the
  * declarations the generator reasons about.
  */
-export function loadAst(includeDir: string): AstIndex {
+export function loadAst(includeDir: string, projectHeaders: readonly string[] = []): AstIndex {
   const rigHeader = path.join(includeDir, 'hamlib', 'rig.h');
 
   if (!existsSync(rigHeader)) {
@@ -340,7 +342,9 @@ export function loadAst(includeDir: string): AstIndex {
 
   try {
     const tu = path.join(scratch, 'tu.cpp');
-    writeFileSync(tu, '#include <hamlib/rig.h>\n');
+    writeFileSync(tu, ['<hamlib/rig.h>', ...projectHeaders.map((header) => JSON.stringify(header))]
+      .map((header) => `#include ${header}\n`)
+      .join(''));
 
     let stdout: string;
 

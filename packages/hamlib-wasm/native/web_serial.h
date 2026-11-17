@@ -4,16 +4,20 @@
  * Serial transport for the Hamlib WebAssembly build (Web Serial in the
  * browser, node-serialport in Node; see native/web_serial.ts).
  *
- * This header is Hamlib-free on purpose: it is included both by the
- * project-owned replacement of Hamlib's `src/serial.c` and by the small
- * link-time shims in `native/wrapped_io.c`.  Keeping it free of Hamlib types
- * means the shims can be compiled and reasoned about without the upstream
- * include path.
+ * This header is Hamlib-free on purpose: it is included by the project-owned
+ * replacement of Hamlib's `src/serial.c`, by the facade and by the link-time
+ * shims in `native/wrapped_io.cpp`.  Keeping it free of Hamlib types means the
+ * shims can be compiled and reasoned about without the upstream include path.
  *
  * The heavy lifting lives in `native/web_serial.ts`, which owns the logical
- * path registry, the port streams, the RX byte queue and the signal state.  `native/web_serial.c` adapts Hamlib's ordinary serial contract onto
- * those primitives, and `native/wrapped_io.c` redirects the POSIX calls
- * Hamlib's `src/iofunc.c` and `src/sleep.c` make for a serial port to them.
+ * path registry, the port streams, the RX byte queue and the signal state.
+ * `native/web_serial.c` adapts Hamlib's ordinary serial contract onto those
+ * primitives, and `native/wrapped_io.cpp` redirects the POSIX calls Hamlib's
+ * `src/iofunc.c` and `src/sleep.c` make for a serial port to them.
+ *
+ * The status codes and signal bits below are the whole contract between the
+ * two languages: the generator reads them from this header and hands them to
+ * `native/web_serial.ts` as `WsStatus`/`WsSignal`.
  *
  * Provenance: project-owned code, MIT.
  */
@@ -43,21 +47,69 @@ extern "C" {
  * most one shared PTT/DCD port, so this is generous. */
 #define WEBSERIAL_MAX_HANDLES 16
 
-/* Error sentinels returned by the JavaScript transport.  They are translated
- * into Hamlib error codes by ws_map_error(). */
-#define WS_OK          0
-#define WS_ERR_IO     -1
-#define WS_ERR_CONF   -2
-#define WS_ERR_INVAL  -3
-#define WS_ERR_TIMEOUT -4
-#define WS_ERR_ACCESS -5
-#define WS_ERR_BUSY   -6
+/* What the JavaScript transport returns on failure; webserial_map_error()
+ * translates it into a Hamlib error code. */
+enum ws_status
+{
+    WS_OK = 0,
+    WS_ERR_IO = -1,
+    WS_ERR_CONF = -2,
+    WS_ERR_INVAL = -3,
+    WS_ERR_TIMEOUT = -4,
+    WS_ERR_ACCESS = -5,
+    WS_ERR_BUSY = -6
+};
 
 /* Bit layout of the modem status word returned by hamlibWsGetSignals(). */
-#define WEBSERIAL_SIGNAL_CTS 0x1
-#define WEBSERIAL_SIGNAL_DSR 0x2
-#define WEBSERIAL_SIGNAL_DCD 0x4
-#define WEBSERIAL_SIGNAL_RI  0x8
+enum ws_signal
+{
+    WEBSERIAL_SIGNAL_CTS = 0x1,
+    WEBSERIAL_SIGNAL_DSR = 0x2,
+    WEBSERIAL_SIGNAL_DCD = 0x4,
+    WEBSERIAL_SIGNAL_RI = 0x8
+};
+
+/* --- JavaScript transport imports (native/web_serial.ts) ---------------- */
+
+/* Bind a port the TypeScript layer stored under `token` to a logical path. */
+int hamlibWsRegisterPort(const char *path, int token);
+int hamlibWsUnregisterPort(const char *path);
+/* Release every registered port from JavaScript; used by destroy() and by the
+ * TypeScript layer when a native call is stuck. */
+int hamlibWsForceCloseAll(void);
+/* One formatted Hamlib debug line, handed to the JavaScript log hook. */
+void hamlibWsLog(int level, const char *message);
+
+/* A positive handle, or a WS_ERR_* status.  `parity` and `flow_control` are
+ * Hamlib's names for the line settings (see generated/codecs.h). */
+int hamlibWsOpenPort(const char *path, int rate, int data_bits, int stop_bits,
+                     const char *parity, const char *flow_control);
+int hamlibWsClosePort(int handle);
+/* 1 when the open handle already runs these settings, 0 when not. */
+int hamlibWsMatchesOpenOptions(int handle, int rate, int data_bits,
+                               int stop_bits, const char *parity,
+                               const char *flow_control);
+/* Buffered bytes copied (0 when none), never blocking. */
+int hamlibWsRead(int handle, void *buf, int len);
+int hamlibWsBytesReceived(int handle);
+int hamlibWsWrite(int handle, const void *buf, int len);
+/* 1 when bytes are buffered, 0 on timeout; `timeout_ms` -1 waits forever. */
+int hamlibWsWaitReadable(int handle, int timeout_ms);
+int hamlibWsFlush(int handle);
+/* -1 leaves a line as it is. */
+int hamlibWsSetSignals(int handle, int rts, int dtr, int brk);
+/* A ws_signal mask. */
+int hamlibWsGetSignals(int handle);
+int hamlibWsLastRts(int handle);
+int hamlibWsLastDtr(int handle);
+int hamlibWsWriteLastError(char *buf, int len);
+int hamlibWsClearLastError(void);
+
+/* --- status ------------------------------------------------------------- */
+
+/* The Hamlib error code for a transport status: RIG_OK for WS_OK, -RIG_EIO
+ * for a status it has no closer code for. */
+int webserial_map_error(int status);
 
 /* --- handle registry ---------------------------------------------------- */
 
@@ -82,13 +134,14 @@ long webserial_rx_bytes(const char *path);
 
 /* --- byte primitives ---------------------------------------------------- */
 
-/* Read already-buffered bytes; never blocks.  Returns the byte count, sets
- * errno to EAGAIN and returns -1 when nothing is buffered, or returns a
- * negative WS_ERR_* sentinel on a transport failure. */
+/* Read already-buffered bytes; never blocks.  Returns the byte count, or -1
+ * with errno EAGAIN when nothing is buffered and EIO on a transport failure,
+ * as read() would. */
 ssize_t webserial_read_fd(int fd, void *buf, size_t count);
 
 /* Write the whole buffer, awaiting the transport's writer.  Returns the byte
- * count, or a negative WS_ERR_* sentinel. */
+ * count, or -1 with errno set (EIO, or EINVAL for an oversized buffer), as
+ * write() would. */
 ssize_t webserial_write_fd(int fd, const void *buf, size_t count);
 
 /* select()-style readiness check for the handle in readfds.

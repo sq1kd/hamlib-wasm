@@ -134,14 +134,6 @@ interface ErrorRecord {
  * global and other Emscripten globals - never a module-scope closure.
  */
 interface HamlibWsApi {
-  WS_OK: number;
-  WS_ERR_IO: number;
-  WS_ERR_CONF: number;
-  WS_ERR_INVAL: number;
-  WS_ERR_TIMEOUT: number;
-  WS_ERR_ACCESS: number;
-  WS_ERR_BUSY: number;
-
   /** Bytes the RX pump may buffer before a read is overdue and the port fails. */
   RX_QUEUE_LIMIT: number;
 

@@ -17,5 +17,5 @@
     "sourceMap": false,
     "outDir": "../dist/native/library"
   },
-  "include": ["web_serial.ts", "emscripten-globals.d.ts"]
+  "include": ["web_serial.ts", "emscripten-globals.d.ts", "generated/transport.d.ts"]
 }
