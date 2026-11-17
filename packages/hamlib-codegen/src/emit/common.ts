@@ -95,8 +95,10 @@ export interface ValueField {
 
 /** One JavaScript argument of a generated operation. */
 export interface Parameter {
-  /** The public parameter name, from the C parameter. */
+  /** The public parameter name, from the C parameter, or the field name within `object`. */
   readonly name: string;
+  /** The public object parameter this value is a field of, if any. */
+  readonly object?: string;
   /** The C++ parameter of the Embind function. */
   readonly local: string;
   readonly binding: TypeBinding;
@@ -243,7 +245,8 @@ function gateOf(operation: GeneratedOperation, capsMembers: ReadonlySet<string>)
 
 export function operationFacts(operation: GeneratedOperation, capsMembers: ReadonlySet<string>): OperationFacts {
   const fields = valueFields(operation);
-  const names = parameterNames(operation.arguments.map((argument) => argument.field));
+  const publicNames = [...new Set(operation.arguments.map((argument) => argument.member?.object ?? argument.field))];
+  const names = new Map(parameterNames(publicNames).map((name, index) => [publicNames[index] as string, name]));
   const pure = operation.shape === 'pure' ? (operation.pure as TypeBinding) : null;
 
   return {
@@ -253,7 +256,9 @@ export function operationFacts(operation: GeneratedOperation, capsMembers: Reado
     fields,
     unwrapsValue: fields.length === 1 && fields[0]?.name === 'value',
     parameters: operation.arguments.map((argument, index) => ({
-      name: names[index] as string,
+      ...(argument.member === undefined
+        ? { name: names.get(argument.field) as string }
+        : { name: argument.field, object: names.get(argument.member.object) as string }),
       local: `arg${index}`,
       binding: argument.binding,
     })),

@@ -45,6 +45,11 @@ export interface DocumentedValue {
   /** The JavaScript name: an argument name or a result field. */
   readonly js: string;
   readonly binding: TypeBinding | null;
+  /**
+   * For an object argument that seeds a struct upstream reads: its fields,
+   * by the C member each one sets.
+   */
+  readonly members?: ReadonlyMap<string, string>;
 }
 
 /** What the renderer needs to know about one bound method. */
@@ -266,13 +271,18 @@ function callReference(symbol: string, methods: MethodNames): string {
  * own syntax is escaped first, so the links and code spans added afterwards
  * survive.
  */
-function inline(text: string, names: ReadonlyMap<string, string>, methods: MethodNames): string {
+function inline(text: string, names: ReadonlyMap<string, DocumentedValue>, methods: MethodNames): string {
   return text
     .replace(/[{}@]/g, (character) => `\\${character}`)
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\\a\s+([A-Za-z_]\w*)((?:-&gt;\w+)*)/g, (_, name: string, fields: string) =>
-      `\`${names.get(name) ?? name}${fields.replace(/-&gt;/g, '.')}\``)
+    .replace(/\\a\s+([A-Za-z_]\w*)((?:-&gt;\w+)*)/g, (_, name: string, fields: string) => {
+      const value = names.get(name);
+      const path = fields.split('-&gt;').slice(1).map((field, depth) =>
+        (depth === 0 ? value?.members?.get(field) ?? field : field));
+
+      return `\`${[value?.js ?? name, ...path].join('.')}\``;
+    })
     .replace(/(?<![\w`])#([A-Za-z_]\w*)/g, '`$1`')
     .replace(/(?<![\w`])(rig_\w+)(?:\(\))?/g, (_, symbol: string) => callReference(symbol, methods))
     .replace(/(?<![\w`])(RIG_[A-Z0-9_]+(?:\?+)?)(?![\w`])/g, '`$1`')
@@ -319,7 +329,8 @@ export function renderDoc(
     ...(target.result.kind === 'value' && target.result.value !== null ? [target.result.value] : []),
     ...(target.result.kind === 'object' ? target.result.fields : []),
   ];
-  const names = new Map(values.map((value) => [value.c, value.js]));
+  /* An argument's entry wins over a result field of the same C parameter. */
+  const names = new Map([...values].reverse().map((value) => [value.c, value]));
   const text = (prose: string): string => inline(prose, names, methods);
   const lines: string[] = [];
   const paragraph = (content: string): void => {
@@ -350,8 +361,13 @@ export function renderDoc(
   for (const argument of target.arguments) {
     const description = doc.params.get(argument.c);
     const hint = namedValueHint(argument.binding, methods);
+    const members = argument.members === undefined ? undefined : [...argument.members.values()];
 
-    const described = `${sentence(text(description ?? ''))}${hint}`.trim();
+    /* Upstream describes the struct as a place to store into; this argument
+     * only carries what Hamlib reads from it first. */
+    const described = members === undefined
+      ? `${sentence(text(description ?? ''))}${hint}`.trim()
+      : `What Hamlib reads to choose the data: ${members.map((member) => `\`${argument.js}.${member}\``).join(', ')}.`;
 
     if (described !== '') {
       lines.push(`@param ${argument.js} - ${described}`);

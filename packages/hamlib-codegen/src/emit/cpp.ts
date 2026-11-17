@@ -343,17 +343,31 @@ function operationBody(facts: OperationFacts, sentinels: ReadonlyMap<string, str
     sentinels,
   };
   const lines: string[] = [];
+  const seeds: string[] = [];
 
-  for (const parameter of facts.parameters) {
-    const index = facts.parameters.indexOf(parameter);
-    lines.push(...convertIn(parameter.binding, parameter.local, { name: valueName(index), declare: true }, context));
+  for (const [index, parameter] of facts.parameters.entries()) {
+    const member = operation.arguments[index]?.member;
+
+    if (member === undefined) {
+      lines.push(...convertIn(parameter.binding, parameter.local, { name: valueName(index), declare: true }, context));
+      continue;
+    }
+
+    /* A struct output upstream reads before it fills: the input lands in its member. */
+    const output = operation.outputs.findIndex((candidate) => candidate.parameter === operation.arguments[index]?.parameter);
+    seeds.push(...convertIn(parameter.binding, parameter.local, { name: `${outName(output)}.${member.name}`, declare: false }, context));
   }
 
   for (const [index, output] of operation.outputs.entries()) {
     lines.push(`${output.binding.native} ${outName(index)}{};`);
   }
 
+  lines.push(...seeds);
+
   const call = `${operation.symbol}(${callArguments(operation).join(', ')})`;
+  /* The projection never reads a freed member, so it goes before any return. */
+  const frees = operation.outputs.flatMap((output, index) =>
+    (output.frees ?? []).map((member) => `std::free(${outName(index)}.${member});`));
   const pack = facts.fields.flatMap((field) =>
     convertOut(field.binding, field.source, `result.${field.name}`, context, field.charArray));
 
@@ -362,7 +376,7 @@ function operationBody(facts: OperationFacts, sentinels: ReadonlyMap<string, str
   }
 
   if (operation.shape !== 'pure') {
-    lines.push(`int rc = ${call};`, '', `if (rc != RIG_OK) { return failure<${result}>(rc); }`, '');
+    lines.push(`int rc = ${call};`, ...frees, '', `if (rc != RIG_OK) { return failure<${result}>(rc); }`, '');
     lines.push(`${result} result = ok<${result}>();`, ...pack);
   } else if (operation.pure?.category === 'struct') {
     /* A lookup returns NULL when nothing matches. */

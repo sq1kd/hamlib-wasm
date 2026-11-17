@@ -210,7 +210,7 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   setChannel(handle: number, arg0: RigChannel): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
-  getChannel(handle: number, arg0: boolean): Asyncify<RigChannelResult>;
+  getChannel(handle: number, arg0: Vfo, arg1: number, arg2: boolean): Asyncify<RigChannelResult>;
   /** Pure computation: no transport access. */
   lookupMemCaps(handle: number, arg0: number): Asyncify<RigChanListResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -1264,7 +1264,7 @@ export interface GeneratedPublicOperations {
    *
    * Retrieves the data associated with a channel. This channel can either be the
    * state of a VFO specified by `chan.vfo`, or a memory channel specified with
-   * `chan.vfo` = `RIG_VFO_MEM` and `chan.channel_num`. See `channel_t` for more
+   * `chan.vfo` = `RIG_VFO_MEM` and `chan.channelNum`. See `channel_t` for more
    * information.
    *
    * The {@link RawRig.getChannel} is supposed to have no impact on the current
@@ -1273,12 +1273,14 @@ export interface GeneratedPublicOperations {
    *
    * From Hamlib's documentation of `rig_get_channel()`.
    *
+   * @param chan - What Hamlib reads to choose the data: `chan.vfo`,
+   *   `chan.channelNum`.
    * @param readOnly - If true chan info will be filled but rig will not change,
    *   if false rig will update to chan info.
    * @returns The channel data.
    * @see {@link RawRig.setChannel}
    */
-  getChannel(readOnly: boolean): Promise<{ channelNum: number; bankNum: number; vfo: Vfo; ant: number; freq: number; mode: RigMode; width: number; txFreq: number; txMode: RigMode; txWidth: number; split: boolean; txVfo: Vfo; rptrShift: RptrShift; rptrOffs: number; tuningStep: number; rit: number; xit: number; funcs: number; ctcssTone: number; ctcssSql: number; dcsCode: number; dcsSql: number; scanGroup: number; flags: number; channelDesc: string; tag: string }>;
+  getChannel(chan: { vfo: Vfo; channelNum: number }, readOnly: boolean): Promise<{ channelNum: number; bankNum: number; vfo: Vfo; ant: number; freq: number; mode: RigMode; width: number; txFreq: number; txMode: RigMode; txWidth: number; split: boolean; txVfo: Vfo; rptrShift: RptrShift; rptrOffs: number; tuningStep: number; rit: number; xit: number; funcs: number; ctcssTone: number; ctcssSql: number; dcsCode: number; dcsSql: number; scanGroup: number; flags: number; channelDesc: string; tag: string }>;
   /**
    * Lookup the memory type and capabilities.
    *

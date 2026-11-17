@@ -5,6 +5,7 @@ import type { AstFunction } from '../../packages/hamlib-codegen/src/ast.ts';
 import { classifyFunction } from '../../packages/hamlib-codegen/src/classify.ts';
 import { operationFacts } from '../../packages/hamlib-codegen/src/emit/common.ts';
 import { emitOperations } from '../../packages/hamlib-codegen/src/emit/cpp.ts';
+import { bindType, type ProjectionSpec, type TypeBinding } from '../../packages/hamlib-codegen/src/types.ts';
 
 function declaration(
   name: string,
@@ -117,5 +118,49 @@ describe('emitOperations result conversion', () => {
 
     expect(code).toContain('TextResult getInfo(int handle)');
     expect(code).toContain('result.value = textOrEmpty(returned);');
+  });
+});
+
+describe('emitOperations struct outputs', () => {
+  const channel: ProjectionSpec = {
+    type: 'channel_t',
+    tag: 'channel',
+    cpp: 'RigChannel',
+    fields: [
+      { name: 'channelNum', member: 'channel_num', binding: bindType('int') as TypeBinding, charArray: null },
+      { name: 'vfo', member: 'vfo', binding: bindType('vfo_t') as TypeBinding, charArray: null },
+    ],
+    dropped: [{ name: 'ext_levels', reason: 'field type struct ext_list * is not mappable' }],
+  };
+  const getChannel = declaration('rig_get_channel', [
+    ['rig', 'RIG *'],
+    ['vfox', 'vfo_t'],
+    ['chan', 'channel_t *'],
+    ['read_only', 'int'],
+  ]);
+
+  function code(): string {
+    const classified = classifyFunction(getChannel, new Set<string>(), (type) => (type === 'channel_t' ? channel : null), {
+      chan: { reads: ['vfo', 'channel_num'], frees: ['ext_levels'] },
+    });
+
+    if ('reason' in classified) {
+      throw new Error(classified.reason);
+    }
+
+    return emitOperations([operationFacts(classified, new Set<string>())], SENTINELS);
+  }
+
+  it('seeds the members upstream reads before the call', () => {
+    expect(code()).toContain([
+      'channel_t out0{};',
+      '            out0.vfo = rig_parse_vfo(arg0.c_str());',
+      '            if (out0.vfo == RIG_VFO_NONE) { return failure<RigChannelResult>(-RIG_EINVAL); }',
+      '            if (!fromNumber(arg1, &out0.channel_num)) { return failure<RigChannelResult>(-RIG_EINVAL); }',
+    ].join('\n'));
+  });
+
+  it('frees what upstream allocates for the caller on every path after the call', () => {
+    expect(code()).toContain('int rc = rig_get_channel(rig, RIG_VFO_CURR, &out0, value2);\n            std::free(out0.ext_levels);\n');
   });
 });

@@ -47,6 +47,14 @@ export interface OperationArgument {
   readonly binding: TypeBinding;
   /** The parameter this value came from, for the emitted call. */
   readonly parameter: number;
+  /**
+   * For an input that seeds a member of a struct output (`chan->vfo` of
+   * `rig_get_channel`): the C member, and the public object parameter the
+   * value is a field of.
+   */
+  readonly member?: { readonly name: string; readonly object: string };
+  /** For a struct output: the pointer members upstream allocates for the caller. */
+  readonly frees?: readonly string[];
 }
 
 /** How one C parameter is supplied when the generated body calls Hamlib. */
@@ -136,10 +144,27 @@ function applyOverride(
   };
 }
 
+/**
+ * A struct pointer a getter fills, as the config describes what its signature
+ * cannot: the members upstream reads before filling it, which the generated
+ * method takes as inputs, and the pointer members upstream allocates and
+ * leaves to the caller, which the generated body frees.
+ */
+export interface StructOutput {
+  readonly reads: readonly string[];
+  readonly frees: readonly string[];
+}
+
+/** Struct outputs by symbol, then by C parameter name. */
+export type StructOutputs = Readonly<Record<string, Readonly<Record<string, StructOutput>>>>;
+
 export interface Classification {
   readonly operations: readonly GeneratedOperation[];
   readonly rejections: readonly Rejection[];
-  /** Overrides that name nothing generated, or rename nothing; generation fails on any. */
+  /**
+   * Overrides and struct outputs that name nothing generated, or rename
+   * nothing; generation fails on any.
+   */
   readonly staleOverrides: readonly string[];
 }
 
@@ -501,6 +526,7 @@ export function classifyFunction(
   fn: AstFunction,
   manualSymbols: ReadonlySet<string>,
   resolveProjection: ProjectionResolver,
+  structOutputs: Readonly<Record<string, StructOutput>> = {},
 ): GeneratedOperation | Rejection {
   const symbol = fn.name;
   const namespace = settingNamespaceFor(symbol);
@@ -596,6 +622,7 @@ export function classifyFunction(
   const scalarInputs: number[] = [];
   const vfoInputs: number[] = [];
   const bindings = new Map<number, TypeBinding>();
+  const seeded = new Map<number, StructOutput>();
 
   for (let index = 0; index < fn.params.length; index++) {
     const param = fn.params[index] as { name: string; qualType: string };
@@ -633,6 +660,18 @@ export function classifyFunction(
         return { symbol, reason: `output of type ${type} is not mappable` };
       }
 
+      const described = structOutputs[param.name];
+
+      if (described !== undefined) {
+        const problem = structOutputProblem(binding, described);
+
+        if (problem !== null) {
+          throw new Error(`${symbol}: struct output ${param.name} ${problem}`);
+        }
+
+        seeded.set(index, described);
+      }
+
       outputs.push(index);
       bindings.set(index, flagOverride(symbol, param.name, binding));
       plan.push({ kind: 'out' });
@@ -655,28 +694,48 @@ export function classifyFunction(
     plan.push({ kind: 'value', argument: -1 });
   }
 
+  const unseeded = Object.keys(structOutputs)
+    .filter((name) => ![...seeded.keys()].some((index) => fn.params[index]?.name === name));
+
+  if (unseeded.length > 0) {
+    throw new Error(`${symbol}: struct outputs ${unseeded.join(', ')} name no struct pointer the getter fills`);
+  }
+
   if (outputs.length >= 1 && vfoInputs.length <= 1) {
     if (vfoInputs.length === 1) {
       plan[vfoInputs[0] as number] = { kind: 'target-vfo' };
     }
 
-    const inputArguments: OperationArgument[] = scalarInputs.map((index, position) => {
-      const param = fn.params[index] as { name: string; qualType: string };
+    const inputArguments: OperationArgument[] = [...scalarInputs, ...seeded.keys()]
+      .sort((a, b) => a - b)
+      .flatMap((index, position) => {
+        const param = fn.params[index] as { name: string; qualType: string };
+        const field = fieldName(param.name, position);
+        const binding = bindings.get(index) as TypeBinding;
+        const struct = seeded.get(index);
 
-      return {
-        field: fieldName(param.name, position),
-        binding: bindings.get(index) as TypeBinding,
-        parameter: index,
-      };
-    });
+        if (struct === undefined) {
+          return [{ field, binding, parameter: index }];
+        }
+
+        const members = binding.projection?.fields ?? [];
+
+        return struct.reads.map((name) => {
+          const member = members.find((candidate) => candidate.member === name) as (typeof members)[number];
+
+          return { field: member.name, binding: member.binding, parameter: index, member: { name, object: field } };
+        });
+      });
 
     const outputArguments: OperationArgument[] = outputs.map((index, position) => {
       const param = fn.params[index] as { name: string; qualType: string };
+      const frees = seeded.get(index)?.frees ?? [];
 
       return {
         field: fieldName(param.name, position),
         binding: bindings.get(index) as TypeBinding,
         parameter: index,
+        ...(frees.length === 0 ? {} : { frees }),
       };
     });
 
@@ -685,7 +744,7 @@ export function classifyFunction(
         return entry;
       }
 
-      const position = inputArguments.findIndex((argument) => argument.parameter === index);
+      const position = inputArguments.findIndex((argument) => argument.parameter === index && !argument.member);
 
       return position >= 0 ? { kind: 'value' as const, argument: position } : entry;
     });
@@ -771,12 +830,36 @@ export function classifyFunction(
   };
 }
 
+/** Why a struct output description does not fit the projection, or `null`. */
+function structOutputProblem(binding: TypeBinding, described: StructOutput): string | null {
+  const projection = binding.projection;
+
+  if (projection === undefined) {
+    return `is a ${binding.native}, not a projected struct`;
+  }
+
+  const read = described.reads.find((name) => !projection.fields.some((field) => field.member === name));
+
+  if (read !== undefined) {
+    return `reads ${read}, which ${projection.type} does not project`;
+  }
+
+  const freed = described.frees.find((name) => !projection.dropped.some((field) => field.name === name));
+
+  if (freed !== undefined) {
+    return `frees ${freed}, which is not a member ${projection.type} drops`;
+  }
+
+  return null;
+}
+
 /** Classify every declaration the AST knows, dropping duplicate method names. */
 export function classifyAll(
   functions: ReadonlyMap<string, readonly AstFunction[]>,
   manualSymbols: ReadonlySet<string>,
   resolveProjection: ProjectionResolver,
   overrides: Readonly<Record<string, OperationOverride>> = {},
+  structOutputs: StructOutputs = {},
 ): Classification {
   const operations: GeneratedOperation[] = [];
   const rejections: Rejection[] = [];
@@ -792,6 +875,7 @@ export function classifyAll(
       canonicalDeclaration(declarations),
       manualSymbols,
       resolveProjection,
+      structOutputs[symbol],
     );
 
     if ('reason' in outcome) {
@@ -826,6 +910,12 @@ export function classifyAll(
     if (!generated.has(symbol)) {
       const refused = rejections.find((rejection) => rejection.symbol === symbol);
       staleOverrides.push(`${symbol}: not generated${refused ? ` (${refused.reason})` : ''}`);
+    }
+  }
+
+  for (const symbol of Object.keys(structOutputs)) {
+    if (!generated.has(symbol)) {
+      staleOverrides.push(`structOutputs.${symbol}: not generated`);
     }
   }
 

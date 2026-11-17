@@ -26,11 +26,43 @@ export interface Signature {
   readonly result: string;
 }
 
+/**
+ * The public parameters of a generated operation, `name: Type` each: the
+ * Embind arguments that seed one struct are gathered into one object.
+ */
+function publicParameters(facts: OperationFacts, imports: Imports): string[] {
+  const entries: { name: string; type: string | string[] }[] = [];
+
+  for (const parameter of facts.parameters) {
+    const type = imports.ts(parameter.binding);
+
+    if (parameter.object === undefined) {
+      entries.push({ name: parameter.name, type });
+      continue;
+    }
+
+    const group = entries.find((entry) => entry.name === parameter.object);
+    const field = `${parameter.name}: ${type}`;
+
+    if (Array.isArray(group?.type)) {
+      group.type.push(field);
+    } else {
+      entries.push({ name: parameter.object, type: [field] });
+    }
+  }
+
+  return entries.map(({ name, type }) => `${name}: ${Array.isArray(type) ? `{ ${type.join('; ')} }` : type}`);
+}
+
+/** How the method body passes each Embind argument on. */
+export function nativeArguments(facts: OperationFacts): string[] {
+  return facts.parameters.map((parameter) =>
+    (parameter.object === undefined ? parameter.name : `${parameter.object}.${parameter.name}`));
+}
+
 /** What a generated operation's public method takes and resolves to. */
 export function generatedSignature(facts: OperationFacts, imports: Imports): Signature {
-  const parameters = facts.parameters
-    .map((parameter) => `${parameter.name}: ${imports.ts(parameter.binding)}`)
-    .join(', ');
+  const parameters = publicParameters(facts, imports).join(', ');
 
   if (facts.operation.shape === 'set') {
     return { parameters, result: 'void' };

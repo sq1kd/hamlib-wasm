@@ -368,6 +368,21 @@ operations:
     calls:
       - rig_ext_parm_foreach
 
+# Struct pointers a getter fills that its signature types as output only.
+# `reads` are the members upstream consults first to choose what to fetch; the
+# generated method takes them as an input object.  `frees` are the pointer
+# members upstream allocates and leaves to the caller; the generated body
+# frees them, since the projection never carries them.
+structOutputs:
+  rig_get_channel:
+    chan:
+      # src/mem.c rig_get_channel(): "the state of a VFO specified by
+      # chan->vfo, or a memory channel specified with chan->vfo = RIG_VFO_MEM
+      # and chan->channel_num"; "chan->ext_levels is a pointer to a newly
+      # allocated memory. This is the responsibility of the caller".
+      reads: [ vfo, channel_num ]
+      frees: [ ext_levels ]
+
 # Renames for the mechanically generated surface.  The generated names are
 # the upstream symbols and parameters in camelCase (rig_get_split_freq ->
 # getSplitFreq, tx_freq -> txFreq); a public name that still reads badly is

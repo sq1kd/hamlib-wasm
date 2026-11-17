@@ -9,7 +9,7 @@
  * file must stay erasable (no enums, namespaces or parameter properties).
  */
 import type { Model, ModelOperation } from '../config.ts';
-import { commentBlock, renderDoc, type DocTarget, type UpstreamDoc } from '../docs.ts';
+import { commentBlock, renderDoc, type DocTarget, type DocumentedValue, type UpstreamDoc } from '../docs.ts';
 import {
   bespokeOperations,
   CONFIG_PATH,
@@ -52,13 +52,25 @@ function generatedDocTarget(facts: OperationFacts, parameters: readonly string[]
     binding: output.binding,
   }));
 
+  /* The fields seeding one struct are documented once, as their object. */
+  const documented = operation.arguments.flatMap((argument, index): DocumentedValue[] => {
+    const parameter = facts.parameters[index];
+
+    if (parameter?.object === undefined) {
+      return [{ c: cName(argument.parameter), js: parameter?.name ?? '', binding: argument.binding }];
+    }
+
+    const members = new Map(operation.arguments.flatMap((other) =>
+      (other.parameter === argument.parameter && other.member ? [[other.member.name, other.field] as const] : [])));
+
+    return operation.arguments.findIndex((other) => other.parameter === argument.parameter) === index
+      ? [{ c: cName(argument.parameter), js: parameter.object, binding: null, members }]
+      : [];
+  });
+
   return {
     symbol: operation.symbol,
-    arguments: operation.arguments.map((argument, index) => ({
-      c: cName(argument.parameter),
-      js: facts.parameters[index]?.name ?? '',
-      binding: argument.binding,
-    })),
+    arguments: documented,
     result: operation.shape === 'set'
       ? { kind: 'void' }
       : operation.shape === 'pure'

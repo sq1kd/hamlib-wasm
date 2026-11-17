@@ -23,6 +23,7 @@ import {
   bespokeValue,
   bespokeVector,
   generatedSignature,
+  nativeArguments,
   publicString,
 } from './surface.ts';
 
@@ -74,7 +75,7 @@ function familyMatch(symbol: string): { readonly family: string; readonly patter
 function methodLines(facts: OperationFacts, imports: Imports): string[] {
   const { method } = facts.operation;
   const signature = generatedSignature(facts, imports);
-  const args = [...(facts.needsHandle ? ['this.handle()'] : []), ...facts.parameters.map((parameter) => parameter.name)];
+  const args = [...(facts.needsHandle ? ['this.handle()'] : []), ...nativeArguments(facts)];
   const lines = [`  async ${method}(${signature.parameters}): Promise<${signature.result}> {`];
 
   if (facts.gate !== null) {

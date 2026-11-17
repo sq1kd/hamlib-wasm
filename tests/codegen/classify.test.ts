@@ -8,6 +8,7 @@ import {
   classifyFunction,
   type GeneratedOperation,
 } from '../../packages/hamlib-codegen/src/classify.ts';
+import { bindType, type ProjectionSpec, type TypeBinding } from '../../packages/hamlib-codegen/src/types.ts';
 
 /** A declaration in the shape `classifyFunction` consumes. */
 function declaration(
@@ -163,5 +164,62 @@ describe('classifyAll overrides', () => {
   it('reports an override that renames nothing', () => {
     expect(stale({ rig_set_split_freq: { method: 'setSplitFreq' } })).toHaveLength(1);
     expect(stale({ rig_set_split_freq: { fields: { tx_freq: 'txFreq' } } })).toHaveLength(1);
+  });
+});
+
+describe('classifyFunction struct outputs', () => {
+  const vfo = bindType('vfo_t') as TypeBinding;
+  const int = bindType('int') as TypeBinding;
+  const channel: ProjectionSpec = {
+    type: 'channel_t',
+    tag: 'channel',
+    cpp: 'RigChannel',
+    fields: [
+      { name: 'channelNum', member: 'channel_num', binding: int, charArray: null },
+      { name: 'vfo', member: 'vfo', binding: vfo, charArray: null },
+      { name: 'freq', member: 'freq', binding: int, charArray: null },
+    ],
+    dropped: [{ name: 'ext_levels', reason: 'field type struct ext_list * is not mappable' }],
+  };
+  const getChannel: AstFunction = {
+    name: 'rig_get_channel',
+    result: 'int',
+    variadic: false,
+    params: [
+      { name: 'rig', qualType: 'RIG *' },
+      { name: 'vfox', qualType: 'vfo_t' },
+      { name: 'chan', qualType: 'channel_t *' },
+      { name: 'read_only', qualType: 'int' },
+    ],
+  };
+  const resolve = (type: string): ProjectionSpec | null => (type === 'channel_t' ? channel : null);
+
+  function classified(described: Parameters<typeof classifyFunction>[3]): GeneratedOperation {
+    const outcome = classifyFunction(getChannel, manualSymbols, resolve, described);
+
+    if ('reason' in outcome) {
+      throw new Error(outcome.reason);
+    }
+
+    return outcome;
+  }
+
+  it('treats a struct pointer as output only when the config says nothing', () => {
+    expect(classified({}).arguments.map((argument) => argument.field)).toEqual(['readOnly']);
+  });
+
+  it('takes the members upstream reads as inputs seeding the output', () => {
+    const operation = classified({ chan: { reads: ['vfo', 'channel_num'], frees: ['ext_levels'] } });
+
+    expect(operation.arguments.map((argument) => [argument.field, argument.member?.name, argument.member?.object]))
+      .toEqual([['vfo', 'vfo', 'chan'], ['channelNum', 'channel_num', 'chan'], ['readOnly', undefined, undefined]]);
+    expect(operation.outputs[0]?.frees).toEqual(['ext_levels']);
+    expect(operation.plan).toEqual([{ kind: 'rig' }, { kind: 'target-vfo' }, { kind: 'out' }, { kind: 'value', argument: 2 }]);
+  });
+
+  it('fails on a member the projection does not carry, or does not drop', () => {
+    expect(() => classified({ chan: { reads: ['levels'], frees: [] } })).toThrow(/reads levels/);
+    expect(() => classified({ chan: { reads: [], frees: ['freq'] } })).toThrow(/frees freq/);
+    expect(() => classified({ read_only: { reads: [], frees: [] } })).toThrow(/name no struct pointer/);
   });
 });

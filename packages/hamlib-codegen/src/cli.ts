@@ -431,11 +431,12 @@ function render(
     new Set(model.operations.flatMap((operation) => operation.calls)),
     createProjectionResolver(ast, projectionRenames),
     model.overrides?.operations ?? {},
+    model.structOutputs,
   );
   const stale = [...staleOverrides, ...staleProjectionRenames(projectionRenames, projections(operations))];
 
   if (stale.length > 0) {
-    fail(`overrides in ${path.basename(options.config)} that rename nothing:\n  - ${stale.join('\n  - ')}`);
+    fail(`overrides or struct outputs in ${path.basename(options.config)} that name nothing:\n  - ${stale.join('\n  - ')}`);
   }
 
   const facts = operations.map((operation) => operationFacts(operation, members));

@@ -136,6 +136,41 @@ test('exposes the generated capability matrix and drives a generated operation',
   expect(gated.operation).toBe('getParm');
 });
 
+test('getChannel reads the memory channel the caller selects', async ({ harnessPage: page }) => {
+  await useRig(page, 'yaesu-ft710');
+
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
+    const port = await hamlib.requestPort();
+    const ft710 = window.__testHelpers.catalogueModel(hamlib.models, 'Yaesu', 'FT-710');
+    const rig = await hamlib.open({ modelId: ft710.id, port, baudRate: 38400 });
+
+    const before = window.__fakeSerial.commands.length;
+    const channel = await rig.getChannel({ vfo: 'MEM', channelNum: 5 }, true);
+    const commands = window.__fakeSerial.commands.slice(before);
+
+    await rig.close();
+    await hamlib.dispose();
+
+    return { channel, commands };
+  }));
+
+  const result = expectOk(captured);
+
+  /* newcat_get_channel() reads chan->channel_num; the emulator rejects the
+   * empty channel with `?;`, which Hamlib reports as an empty channel. */
+  expect(result.commands).toContain('MT005;');
+  expect(result.channel.channelNum).toBe(5);
+  expect(result.channel.vfo).toBe('MEM');
+  expect(result.channel.freq).toBe(0);
+  /* An empty channel's modes, transmit VFO and shift are the NONE values,
+   * which the vocabularies name 'None'. */
+  expect(result.channel.mode).toBe('None');
+  expect(result.channel.txMode).toBe('None');
+  expect(result.channel.txVfo).toBe('None');
+  expect(result.channel.rptrShift).toBe('None');
+});
+
 test('the NONE repeater shift is a setting, while an unknown name is refused', async ({ harnessPage: page }) => {
   await useRig(page, 'icom-ic746');
 

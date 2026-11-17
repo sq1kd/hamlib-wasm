@@ -16,7 +16,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { parse } from 'yaml';
 
-import type { OperationOverride } from './classify.ts';
+import type { OperationOverride, StructOutput, StructOutputs } from './classify.ts';
 import { VOCABULARY_TYPES } from './enums.ts';
 
 /** How a value object field crosses the Embind boundary. */
@@ -99,6 +99,8 @@ export interface Model {
   readonly ownedConf: Readonly<Record<string, string>>;
   /** Configuration tokens that need a device or a thread this build cannot reach, with why. */
   readonly unreachableConf: Readonly<Record<string, string>>;
+  /** Struct pointers a getter fills, with what upstream reads from them and allocates into them. */
+  readonly structOutputs: StructOutputs;
   /** Declarative renames for the mechanically generated surface. */
   readonly overrides?: {
     /** Per-symbol method/field renames for generated operations. */
@@ -307,6 +309,22 @@ function readOverrides(file: string, value: unknown): Model['overrides'] {
   };
 }
 
+function readStructOutputs(file: string, value: unknown): StructOutputs {
+  const members = (entry: Record<string, unknown>, key: string, where: string): readonly string[] =>
+    asArray(file, entry[key] ?? [], `${where}.${key}`).map((member, index) => asString(file, member, `${where}.${key}[${index}]`));
+
+  return Object.fromEntries(Object.entries(asObject(file, value, 'structOutputs')).map(([symbol, parameters]) => [
+    symbol,
+    Object.fromEntries(Object.entries(asObject(file, parameters, `structOutputs.${symbol}`)).map(([name, entry]) => {
+      const where = `structOutputs.${symbol}.${name}`;
+      const described = asObject(file, entry, where);
+      const output: StructOutput = { reads: members(described, 'reads', where), frees: members(described, 'frees', where) };
+
+      return [name, output];
+    })),
+  ]));
+}
+
 function readLineSettings(file: string, value: unknown): LineSettings {
   const settings = asObject(file, value, 'lineSettings');
   const numbers = (key: string): readonly number[] =>
@@ -365,6 +383,7 @@ export function loadConfig(file: string): CodegenConfig {
       lineSettings: readLineSettings(file, root.lineSettings),
       ownedConf: readTokens(file, root.ownedConf, 'ownedConf'),
       unreachableConf: readTokens(file, root.unreachableConf, 'unreachableConf'),
+      structOutputs: readStructOutputs(file, root.structOutputs ?? {}),
       overrides: readOverrides(file, root.overrides ?? {}),
     },
   };

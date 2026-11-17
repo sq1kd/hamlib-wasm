@@ -1190,14 +1190,18 @@
         });
     }
 
-    RigChannelResult getChannel(int handle, bool arg0)
+    RigChannelResult getChannel(int handle, const std::string & arg0, double arg1, bool arg2)
     {
         return withRig<RigChannelResult>(handle, [&](RIG *rig)
         {
-            int value0 = arg0 ? 1 : 0;
+            int value2 = arg2 ? 1 : 0;
             channel_t out0{};
+            out0.vfo = rig_parse_vfo(arg0.c_str());
+            if (out0.vfo == RIG_VFO_NONE && arg0 != "None") { return failure<RigChannelResult>(-RIG_EINVAL); }
+            if (!fromNumber(arg1, &out0.channel_num)) { return failure<RigChannelResult>(-RIG_EINVAL); }
 
-            int rc = rig_get_channel(rig, RIG_VFO_CURR, &out0, value0);
+            int rc = rig_get_channel(rig, RIG_VFO_CURR, &out0, value2);
+            std::free(out0.ext_levels);
 
             if (rc != RIG_OK) { return failure<RigChannelResult>(rc); }
 

@@ -663,9 +663,9 @@
         return facade().setChannel(handle, arg0);
     });
 
-    emscripten::function("getChannel", +[](int handle, bool arg0)
+    emscripten::function("getChannel", +[](int handle, const std::string & arg0, double arg1, bool arg2)
     {
-        return facade().getChannel(handle, arg0);
+        return facade().getChannel(handle, arg0, arg1, arg2);
     });
 
     emscripten::function("lookupMemCaps", +[](int handle, double arg0)
