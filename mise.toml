@@ -135,7 +135,7 @@ depends = ["build-package"]
 run = "vitest run --config tests/node/vitest.config.ts"
 
 [tasks.test-hardware]
-description = "Run the read-only checks against a real rig (HAMLIB_WASM_HARDWARE_DEVICE=qmx|ft-710, or HAMLIB_WASM_HARDWARE_PORT=<path>; HAMLIB_WASM_HARDWARE_WRITE=1 adds the frequency round-trip)"
+description = "Run the read-only checks against a real rig (HAMLIB_WASM_HARDWARE_DEVICE=qmx|ft-710, or HAMLIB_WASM_HARDWARE_PORT=<path>; HAMLIB_WASM_HARDWARE_WRITE=1 adds the frequency round-trip, HAMLIB_WASM_HARDWARE_TRANSMIT=dummy-load the PTT test)"
 depends = ["build-package"]
 run = "vitest run --config tests/hardware/vitest.config.ts"
 

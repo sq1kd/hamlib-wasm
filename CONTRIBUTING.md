@@ -34,16 +34,19 @@ breaks consumers); `mise run release-guard` checks this. See
 The hardware suite in `tests/hardware` is opt-in and read-only by default. A
 new rig is a new profile in `tests/hardware/devices.ts`, never a change to the
 tests: its catalogue manufacturer and model, the USB ids `listPorts()` reports,
-the rate set in the rig's menu (omit it to let `detectBaudRate()` search) and a
-frequency for the write test.
+the rate set in the rig's menu (omit it to let `detectBaudRate()` search), a
+frequency for the write test and, optionally, a mode in which PTT alone keys a
+carrier.
 
 ```sh
 HAMLIB_WASM_HARDWARE_DEVICE=qmx mise run test-hardware
-HAMLIB_WASM_HARDWARE_DEVICE=ft-710 HAMLIB_WASM_HARDWARE_PORT=/dev/ttyUSB0 mise run test-hardware
+HAMLIB_WASM_HARDWARE_DEVICE=ft-710 HAMLIB_WASM_HARDWARE_WRITE=1 HAMLIB_WASM_HARDWARE_TRANSMIT=dummy-load mise run test-hardware
 ```
 
-`HAMLIB_WASM_HARDWARE_PORT` is needed when the profile has no `usb` block, and
-`HAMLIB_WASM_HARDWARE_WRITE=1` adds the frequency round-trip.
+`HAMLIB_WASM_HARDWARE_PORT=<path>` is needed when the profile has no `usb`
+block. `HAMLIB_WASM_HARDWARE_WRITE=1` adds the frequency round-trip.
+`HAMLIB_WASM_HARDWARE_TRANSMIT=dummy-load` adds a one-second PTT test at low
+power: set it only with a dummy load connected.
 
 ## Reporting rig problems
 

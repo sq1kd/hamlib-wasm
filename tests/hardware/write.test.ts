@@ -2,10 +2,9 @@
  * The frequency round-trip, the one place this project writes to a rig.
  *
  * It writes back what it found, so the operator's frequency is restored before
- * the test ends, and it writes nothing else - no PTT, no mode, no level, here or
- * anywhere else in the hardware project, so a failing run can never mean an
- * accidental transmission.  CAT PTT stays covered by the browser emulator and
- * `tests/node`.
+ * the test ends, and it writes nothing else - no PTT, no mode, no level.  The
+ * only transmitting test is `transmit.test.ts`, behind its own switch, so a
+ * write run can never mean an accidental transmission.
  *
  * Opt-in twice over: a selected profile *and* `HAMLIB_WASM_HARDWARE_WRITE=1`, so
  * a default run of the hardware task cannot move a dial.

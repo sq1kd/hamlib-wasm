@@ -11,8 +11,9 @@
  * one CDC interface and a wrong one must not read as a code defect, so every
  * attempt is remembered and a run that finds nothing reports all of them.
  *
- * Nothing here writes to a rig.  The frequency round-trip in `write.test.ts` is
- * the only writing call in this project, and only when asked for.
+ * Nothing here writes to a rig.  `write.test.ts` (the frequency round-trip) and
+ * `transmit.test.ts` (PTT into a dummy load) are the only tests that do, each
+ * behind its own switch.
  */
 import { createRawHamlib } from 'hamlib-wasm/raw';
 import type { RawHamlib, RigModel } from 'hamlib-wasm/raw';
@@ -28,6 +29,9 @@ const DEVICE_VARIABLE = 'HAMLIB_WASM_HARDWARE_DEVICE';
 const PORT_VARIABLE = 'HAMLIB_WASM_HARDWARE_PORT';
 const BAUD_VARIABLE = 'HAMLIB_WASM_HARDWARE_BAUD';
 const WRITE_VARIABLE = 'HAMLIB_WASM_HARDWARE_WRITE';
+const TRANSMIT_VARIABLE = 'HAMLIB_WASM_HARDWARE_TRANSMIT';
+/** The one value that enables transmitting: the operator's statement of what is connected. */
+const TRANSMIT_ACKNOWLEDGEMENT = 'dummy-load';
 
 /** What the environment selects.  `none` is what makes the suite skip. */
 export type HardwareSelection =
@@ -84,6 +88,33 @@ export function selectDevice(env: Environment = process.env): HardwareSelection 
 /** True when the environment asks for the frequency round-trip. */
 export function writesEnabled(env: Environment = process.env): boolean {
   return (env[WRITE_VARIABLE] ?? '').trim() === '1';
+}
+
+/** Whether the operator asked for transmitting, said what into, or got it wrong. */
+export type TransmitSelection =
+  | { readonly kind: 'off' }
+  | { readonly kind: 'on' }
+  | { readonly kind: 'invalid'; readonly reason: string };
+
+/**
+ * Read the transmit switch.  It is not a boolean on purpose: the value states
+ * that a dummy load is connected, and anything else - `1`, `yes`, a typo -
+ * fails the run instead of keying a transmitter on whatever is attached.
+ */
+export function selectTransmit(env: Environment = process.env): TransmitSelection {
+  const value = (env[TRANSMIT_VARIABLE] ?? '').trim();
+
+  if (value === '') {
+    return { kind: 'off' };
+  }
+
+  return value === TRANSMIT_ACKNOWLEDGEMENT
+    ? { kind: 'on' }
+    : {
+      kind: 'invalid',
+      reason: `${TRANSMIT_VARIABLE} must be "${TRANSMIT_ACKNOWLEDGEMENT}" - the rig transmits `
+        + `into what is connected - not "${value}"`,
+    };
 }
 
 /**

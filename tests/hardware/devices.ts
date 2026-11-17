@@ -10,6 +10,8 @@
  * its port then comes from `HAMLIB_WASM_HARDWARE_PORT`.
  */
 
+import type { RigMode } from 'hamlib-wasm';
+
 export interface HardwareDevice {
   /** The `HAMLIB_WASM_HARDWARE_DEVICE` value. */
   readonly id: string;
@@ -23,6 +25,13 @@ export interface HardwareDevice {
   readonly baudRate?: number;
   /** The frequency the write test round-trips, inside the range the backend declares. */
   readonly writeFrequency: number;
+  /**
+   * A mode in which keying PTT alone puts out a carrier, for a rig whose
+   * backend reads a forward-power meter: the transmit test then checks the
+   * meter, not only the PTT state.  Absent when PTT alone emits nothing to
+   * measure - a data mode waits for audio - or nothing can measure it.
+   */
+  readonly carrierMode?: RigMode;
 }
 
 export const DEVICES: Readonly<Record<string, HardwareDevice>> = {
@@ -40,6 +49,7 @@ export const DEVICES: Readonly<Record<string, HardwareDevice>> = {
     baudRate: 9600,
     /* Inside the 4-14 MHz receive list the backend declares. */
     writeFrequency: 7_074_000,
+    /* No carrierMode: the backend reads no power meter for the QMX. */
   },
   'ft-710': {
     id: 'ft-710',
@@ -54,5 +64,8 @@ export const DEVICES: Readonly<Record<string, HardwareDevice>> = {
      * the run one open instead of a scan through the silent rates above it. */
     baudRate: 38_400,
     writeFrequency: 7_074_000,
+    /* AM keys a carrier, and `RFPOWER_METER` reads it (measured: 0.05 idle,
+     * 0.17 keyed at 10% power). */
+    carrierMode: 'AM',
   },
 };
