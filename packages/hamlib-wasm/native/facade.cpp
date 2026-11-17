@@ -96,25 +96,14 @@ bool fromNumber(double value, T *out)
 
 std::string takeTransportError()
 {
-    const char *why = webserial_last_error();
-
-    if (!why) { return std::string(); }
-
-    return std::string(why);
+    return textOrEmpty(webserial_last_error());
 }
 
-/* A serial RTS/DTR PTT line and a serial DSR/CTS/CAR DCD line are driven by
- * the browser transport, not by a backend callback, so the corresponding
- * capabilities have to be reported as available. */
+/* A serial RTS/DTR PTT line is driven by the transport, not by a backend
+ * callback, so a model that keys it has PTT without get_ptt/set_ptt. */
 bool serialPttCapable(ptt_type_t ptt)
 {
     return ptt == RIG_PTT_SERIAL_RTS || ptt == RIG_PTT_SERIAL_DTR;
-}
-
-bool serialDcdCapable(dcd_type_t dcd)
-{
-    return dcd == RIG_DCD_SERIAL_DSR || dcd == RIG_DCD_SERIAL_CTS
-           || dcd == RIG_DCD_SERIAL_CAR;
 }
 
 int collectModel(const struct rig_caps *caps, void *data)
@@ -128,9 +117,9 @@ int collectModel(const struct rig_caps *caps, void *data)
 
     ModelInfo info;
     info.id = (int) caps->rig_model;
-    info.manufacturer = caps->mfg_name ? caps->mfg_name : "";
-    info.model = caps->model_name ? caps->model_name : "";
-    info.backendVersion = caps->version ? caps->version : "";
+    info.manufacturer = textOrEmpty(caps->mfg_name);
+    info.model = textOrEmpty(caps->model_name);
+    info.backendVersion = textOrEmpty(caps->version);
     info.status = (int) caps->status;
     info.serialRateMin = caps->serial_rate_min;
     info.serialRateMax = caps->serial_rate_max;
@@ -982,11 +971,6 @@ private:
         return result;
     }
 
-    /*
-     * The prologue every rig operation shares: forget the last transport
-     * error, resolve the handle, and fail with -RIG_EINVAL when it names no
-     * open rig.  `body` runs with the rig and returns the result.
-     */
     /* The result of a call that only reports a Hamlib code. */
     template <typename T>
     T status(int code) const
@@ -994,6 +978,11 @@ private:
         return code == RIG_OK ? ok<T>() : failure<T>(code);
     }
 
+    /*
+     * The prologue every rig operation shares: forget the last transport
+     * error, resolve the handle, and fail with -RIG_EINVAL when it names no
+     * open rig.  `body` runs with the rig and returns the result.
+     */
     template <typename T, typename Body>
     T withRig(int handle, Body body)
     {

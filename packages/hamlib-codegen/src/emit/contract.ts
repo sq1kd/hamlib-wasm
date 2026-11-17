@@ -114,10 +114,10 @@ export function emitContract(model: Model, facts: readonly OperationFacts[], doc
   body.push('');
   body.push('/**');
   body.push(' * The low-level operation surface of the Wasm module, derived from the');
-  body.push(' * allowlist and the upstream AST rather than from the emitted declaration.');
+  body.push(' * config and the upstream AST rather than from the emitted declaration.');
   body.push(' *');
   body.push(' * `src/raw.ts` asserts that the built module satisfies this contract, so a');
-  body.push(' * binding that drifts from the allowlist fails the typecheck.');
+  body.push(' * binding that drifts from the generator fails the typecheck.');
   body.push(' */');
   body.push('export interface NativeOperations {');
 
@@ -148,7 +148,7 @@ export function emitContract(model: Model, facts: readonly OperationFacts[], doc
   body.push('');
   body.push('/**');
   body.push(' * Compile-time proof that the module Emscripten emitted still matches the');
-  body.push(' * allowlist.  The generator guarantees every operation is present, so this');
+  body.push(' * generated surface.  The generator guarantees every operation is present, so this');
   body.push(' * only has to keep the two views in step.');
   body.push(' */');
   body.push('export type NativeContractCheck = Expect<MainModule extends NativeOperations ? true : false>;');

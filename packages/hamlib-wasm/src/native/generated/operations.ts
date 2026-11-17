@@ -17,10 +17,10 @@ export type Asyncify<T> = T | Promise<T>;
 
 /**
  * The low-level operation surface of the Wasm module, derived from the
- * allowlist and the upstream AST rather than from the emitted declaration.
+ * config and the upstream AST rather than from the emitted declaration.
  *
  * `src/raw.ts` asserts that the built module satisfies this contract, so a
- * binding that drifts from the allowlist fails the typecheck.
+ * binding that drifts from the generator fails the typecheck.
  */
 export interface NativeOperations {
   /** Bound to the bespoke facade body in native/facade.cpp. */
@@ -271,7 +271,7 @@ export interface NativeOperations {
 
 /**
  * Compile-time proof that the module Emscripten emitted still matches the
- * allowlist.  The generator guarantees every operation is present, so this
+ * generated surface.  The generator guarantees every operation is present, so this
  * only has to keep the two views in step.
  */
 export type NativeContractCheck = Expect<MainModule extends NativeOperations ? true : false>;

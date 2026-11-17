@@ -3,7 +3,7 @@
 /**
  * `struct confparams` as the binding surface sees it.
  *
- * The C++ struct is declared in `native/facade.cpp`; the value object crosses
+ * The generator projects the C++ struct from upstream; the value object crosses
  * with every field typed `EmbindString`, so this is the one place that narrows
  * one to the public shape.  It lives outside `src/index.ts` because the
  * generated method classes call it and must not import the public entry point.

@@ -28,7 +28,7 @@
  *
  * Run with `--update` to rewrite the generated files; run with `--check` to
  * fail when they are stale; pass `--emitted` to additionally prove the linked
- * module still exposes the allowlist.
+ * module still exposes every configured and generated operation.
  *
  * Authored as TypeScript and run directly by Node's type stripping, so this
  * file must stay erasable (no enums, namespaces or parameter properties).
