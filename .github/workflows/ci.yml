@@ -51,6 +51,15 @@ jobs:
       - name: Run the release gate
         run: mise run check-release
 
+      - name: Keep the Playwright traces of failed specs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-traces
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
       # release.yml publishes and deploys this exact build instead of
       # rebuilding it.
       - name: Archive the verified package build
