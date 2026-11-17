@@ -1287,89 +1287,49 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     const { modelId, port, baudRate } = options;
     const conf = encodeConf(options.conf, 'open');
-
-    const model = this.#modelsById.get(modelId);
-
-    if (!model) {
-      throw new HamlibError(
-        `unknown rig model id ${String(modelId)}; use an id from hamlib.models`,
-        { code: 'INVALID_ARGUMENT', operation: 'open' },
-      );
-    }
+    const model = this.#requireModel(modelId, 'open');
 
     if (baudRate !== undefined) {
       assertBaudRate(baudRate, model);
     }
 
-    assertSerialPort(port, 'open');
+    /* The rig keeps the path it was opened on. */
+    const rig = await this.#withBorrowedPort('open', port, { keep: true }, async (path) => {
+      const opened = await this.#native.openRig(modelId, path, baudRate ?? 0, conf);
 
-    const path = `serial/${++this.#portCounter}`;
-    const token = this.#registry.storePort(port);
-
-    if (token <= 0) {
-      throw new HamlibError('the selected port could not be registered', {
-        code: 'TRANSPORT_FAILURE',
-        operation: 'open',
-      });
-    }
-
-    /* Track the path before queueing so dispose() can always see and release
-     * an accepted open, even when disposal races with it. */
-    this.#paths.add(path);
-
-    try {
-      const rig = await this.queue.enqueue<RawRigHandle>('open', async () => {
-        const registered = await this.#native.registerPort(path, token);
-
-        if (registered.code !== RIG_OK) {
-          throw hamlibError(registered, 'open');
-        }
-
-        const opened = await this.#native.openRig(modelId, path, baudRate ?? 0, conf);
-
-        if (opened.code !== RIG_OK) {
-          throw hamlibError(opened, 'open');
-        }
-
-        /* Register inside the queued work: dispose() drains the chain before
-         * it snapshots the live rigs, so this rig is always reachable. */
-        const rig = new RawRigHandle(
-          this,
-          path,
-          model,
-          opened.handle,
-          /* The rate the port was actually opened at: Hamlib's default is the
-           * model's declared maximum (src/rig.c sets `serial_rate_max`), and
-           * the facade has just verified the rig answers at it. */
-          baudRate ?? model.serialRateMax,
-          port,
-          /* PTT moved onto the port's RTS/DTR line works whatever the backend
-           * declares. */
-          confKeysPttLine(options.conf) ? new Set(['getPtt', 'setPtt']) : new Set(),
-        );
-        this.#rigs.add(rig);
-        return rig;
-      });
-
-      if (this.#disposed) {
-        /* Disposal was accepted while this open waited in the queue.  Hand
-         * the rig over closed instead of letting an open survive it. */
-        await rig.close();
-        throw disposedError('open');
+      if (opened.code !== RIG_OK) {
+        throw hamlibError(opened, 'open');
       }
 
+      /* Register inside the queued work: dispose() drains the chain before it
+       * snapshots the live rigs, so this rig is always reachable. */
+      const rig = new RawRigHandle(
+        this,
+        path,
+        model,
+        opened.handle,
+        /* The rate the port was actually opened at: Hamlib's default is the
+         * model's declared maximum (src/rig.c sets `serial_rate_max`), and the
+         * facade has just verified the rig answers at it. */
+        baudRate ?? model.serialRateMax,
+        port,
+        /* PTT moved onto the port's RTS/DTR line works whatever the backend
+         * declares. */
+        confKeysPttLine(options.conf) ? new Set(['getPtt', 'setPtt']) : new Set(),
+      );
+      this.#rigs.add(rig);
       return rig;
-    } catch (error) {
-      /* Opening failed: the logical path must not stay registered.  The
-       * original failure is the one the caller needs. */
-      try {
-        await this.#releasePath(path);
-      } catch {
-        /* dispose() reports leftover registrations. */
-      }
+    });
 
-      throw error;
+    if (this.#disposed) {
+      /* Disposal was accepted while this open waited in the queue.  Hand the
+       * rig over closed instead of letting an open survive it; dispose()
+       * releases its path with the others. */
+      await rig.close();
+      throw disposedError('open');
     }
+
+    return rig;
   }
 
   async detectBaudRate(options: DetectBaudRateOptions): Promise<number> {
@@ -1378,18 +1338,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     const { modelId, port, rates } = options;
     const conf = encodeConf(options.conf, 'detectBaudRate');
-
-    const model = this.#modelsById.get(modelId);
-
-    if (!model) {
-      throw new HamlibError(
-        `unknown rig model id ${String(modelId)}; use an id from hamlib.models`,
-        { code: 'INVALID_ARGUMENT', operation: 'detectBaudRate' },
-      );
-    }
-
-    assertSerialPort(port, 'detectBaudRate');
-
+    const model = this.#requireModel(modelId, 'detectBaudRate');
     const candidates = baudRateCandidates(model, rates);
 
     if (candidates.length === 0) {
@@ -1399,70 +1348,44 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       );
     }
 
-    const path = `serial/${++this.#portCounter}`;
-    const token = this.#registry.storePort(port);
+    /* The port is only borrowed for the search: the caller opens the rig for
+     * real, and dispose() must not inherit a leftover registration. */
+    return this.#withBorrowedPort('detectBaudRate', port, { keep: false }, async (path) => {
+      /* Each candidate is a complete open under a shortened port budget: the
+       * facade reports success only when the rig answered, and closes again
+       * whatever it opened, so a silent rate simply moves on.  A refusal that
+       * is not silence - a setting the port rejects, a port the OS denies -
+       * ends the search instead of being retried at every rate. */
+      let lastFailure: NativeResult | undefined;
 
-    if (token <= 0) {
-      throw new HamlibError('the selected port could not be registered', {
-        code: 'TRANSPORT_FAILURE',
-        operation: 'detectBaudRate',
-      });
-    }
+      for (const rate of candidates) {
+        const probed = await this.#native.probeBaudRate(modelId, path, rate, conf);
 
-    this.#paths.add(path);
-
-    try {
-      return await this.queue.enqueue<number>('detectBaudRate', async () => {
-        const registered = await this.#native.registerPort(path, token);
-
-        if (registered.code !== RIG_OK) {
-          throw hamlibError(registered, 'detectBaudRate');
+        if (probed.code === RIG_OK) {
+          return rate;
         }
 
-        /* Each candidate is a complete open under a shortened port budget: the
-         * facade reports success only when the rig answered, and closes again
-         * whatever it opened, so a silent rate simply moves on.  A refusal that
-         * is not silence - a setting the port rejects, a port the OS denies -
-         * ends the search instead of being retried at every rate. */
-        let lastFailure: NativeResult | undefined;
-
-        for (const rate of candidates) {
-          const probed = await this.#native.probeBaudRate(modelId, path, rate, conf);
-
-          if (probed.code === RIG_OK) {
-            return rate;
-          }
-
-          if (FATAL_PROBE_CODES.has(Math.abs(probed.code))) {
-            throw hamlibError(probed, `detectBaudRate(${rate})`);
-          }
-
-          lastFailure ??= probed;
+        if (FATAL_PROBE_CODES.has(Math.abs(probed.code))) {
+          throw hamlibError(probed, `detectBaudRate(${rate})`);
         }
 
-        const detail = typeof lastFailure?.error === 'string' && lastFailure.error
-          ? ` (last failure: ${lastFailure.error})`
-          : '';
-
-        throw new HamlibError(
-          `${model.manufacturer} ${model.model} did not answer at any of `
-          + `${candidates.join(', ')} baud${detail}`,
-          {
-            code: 'RIG_UNRESPONSIVE',
-            operation: 'detectBaudRate',
-            ...(lastFailure === undefined ? {} : { cause: lastFailure }),
-          },
-        );
-      });
-    } finally {
-      /* The port is only borrowed for the search: the caller opens the rig for
-       * real, and dispose() must not inherit a leftover registration. */
-      try {
-        await this.#releasePath(path);
-      } catch {
-        /* dispose() reports leftover registrations. */
+        lastFailure ??= probed;
       }
-    }
+
+      const detail = typeof lastFailure?.error === 'string' && lastFailure.error
+        ? ` (last failure: ${lastFailure.error})`
+        : '';
+
+      throw new HamlibError(
+        `${model.manufacturer} ${model.model} did not answer at any of `
+        + `${candidates.join(', ')} baud${detail}`,
+        {
+          code: 'RIG_UNRESPONSIVE',
+          operation: 'detectBaudRate',
+          ...(lastFailure === undefined ? {} : { cause: lastFailure }),
+        },
+      );
+    });
   }
 
   diagnostics(): Diagnostics {
@@ -1561,6 +1484,72 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     if (failures.length > 0) {
       throw failures[0];
+    }
+  }
+
+  /** The catalogue entry for `modelId`, or `INVALID_ARGUMENT`. */
+  #requireModel(modelId: number, operation: string): RigModel {
+    const model = this.#modelsById.get(modelId);
+
+    if (!model) {
+      throw new HamlibError(
+        `unknown rig model id ${String(modelId)}; use an id from hamlib.models`,
+        { code: 'INVALID_ARGUMENT', operation },
+      );
+    }
+
+    return model;
+  }
+
+  /**
+   * Run `work` on the queue with `port` registered under a fresh logical path.
+   *
+   * The path is tracked before queueing, so dispose() can always see and
+   * release an accepted operation, even when disposal races with it.  It is
+   * released again when the work fails, and when it succeeds unless `keep`
+   * says the path was handed on - an opened rig keeps it.
+   */
+  async #withBorrowedPort<T>(
+    operation: string,
+    port: SerialPortLike,
+    { keep }: { readonly keep: boolean },
+    work: (path: string) => Promise<T>,
+  ): Promise<T> {
+    assertSerialPort(port, operation);
+
+    const path = `serial/${++this.#portCounter}`;
+    const token = this.#registry.storePort(port);
+
+    if (token <= 0) {
+      throw new HamlibError('the selected port could not be registered', {
+        code: 'TRANSPORT_FAILURE',
+        operation,
+      });
+    }
+
+    this.#paths.add(path);
+
+    let kept = false;
+
+    try {
+      const result = await this.queue.enqueue<T>(operation, async () => {
+        const registered = await this.#native.registerPort(path, token);
+
+        if (registered.code !== RIG_OK) {
+          throw hamlibError(registered, operation);
+        }
+
+        return work(path);
+      });
+
+      kept = keep;
+      return result;
+    } finally {
+      if (!kept) {
+        /* The work's own outcome is the one the caller needs; dispose()
+         * reports leftover registrations. */
+        await this.#releasePath(path).catch(() => {});
+      }
     }
   }
 
