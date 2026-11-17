@@ -32,7 +32,6 @@ import {
 import { assert, runMain } from './errors.ts';
 import { log, parseFlag } from './exec.ts';
 import { assertFile, readJson, sha256File, walk } from './files.ts';
-import { verifyRepository } from './guard.ts';
 import {
   PACKAGE_JSON_FILES,
   ROOT_LICENSING_FILES,
@@ -346,9 +345,6 @@ function main(): void {
   const tarballArg = parseFlag(args, '--tarball');
   const workArg = parseFlag(args, '--work-dir');
   const upstream = loadUpstream();
-
-  verifyRepository();
-
   const work = workArg ?? mkdtempSync(path.join(os.tmpdir(), 'hamlib-wasm-package-'));
 
   mkdirSync(work, { recursive: true });

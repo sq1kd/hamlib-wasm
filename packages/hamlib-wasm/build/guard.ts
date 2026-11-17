@@ -1,72 +1,68 @@
+#!/usr/bin/env node
 // SPDX-License-Identifier: MIT
 
 /**
  * Guard the repository against the two regressions that made release bumps
- * expensive: duplicated path literals and hardcoded release identity.
+ * expensive: file locations declared outside `paths.ts` and hardcoded release
+ * identity.
  */
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { assert } from './errors.ts';
+import { assert, runMain } from './errors.ts';
+import { capture, log } from './exec.ts';
 import { sha256File } from './files.ts';
-import { REPO_ROOT } from './paths.ts';
+import { BUILD_SCRIPTS_DIR, CONFIG_PATH, PACKAGE_DIR, REPO_ROOT } from './paths.ts';
 import { loadUpstream } from './upstream.ts';
 
+const SCOPE = 'guard';
+
+/** A module-level constant that locates a file or directory. */
 const PATH_DECLARATION =
-  /^\s*(?:export\s+)?const\s+(?:PACKAGE_DIR|REPO_ROOT|NATIVE_DIR|CACHE_DIR|BUILD_DIR|SOURCE_DIR|DIST_DIR|DIST_NATIVE_DIR|THIRD_PARTY_DIR)\s*=\s*(?:path\.(?:join|resolve)|'|")/m;
+  /^(?:export\s+)?const\s+\w+\s*(?::[^=]+)?=\s*(?:path\.(?:join|resolve|dirname)|fileURLToPath)\(/m;
 
-const BUILD_SCOPE = 'packages/hamlib-wasm/build/';
-
-function trackedFiles(): string[] {
-  return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
+function repositoryFiles(): string[] {
+  return capture(SCOPE, 'git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
     cwd: REPO_ROOT,
-    encoding: 'utf8',
   })
     .split('\n')
-    .filter((file) => file.length > 0);
+    .filter((file) => file.length > 0 && existsSync(path.join(REPO_ROOT, file)));
 }
 
-function releasePatterns(): readonly string[] {
+function main(): void {
   const upstream = loadUpstream();
-
-  assert(upstream.patches.length > 0, 'the release config has no patch');
-
-  return [
+  const relative = (file: string): string => path.relative(REPO_ROOT, file);
+  const buildScope = `${relative(BUILD_SCRIPTS_DIR)}/`;
+  const pathsModule = relative(path.join(BUILD_SCRIPTS_DIR, 'paths.ts'));
+  const releaseLiterals = [
     upstream.version,
     upstream.commit,
     upstream.tagObject,
     upstream.archive.sha256,
     ...upstream.patches.map((patch) => sha256File(patch.path)),
   ];
-}
-
-export function verifyRepository(): void {
-  const files = trackedFiles();
-  const release = releasePatterns();
-  const upstream = loadUpstream();
-  const patchPaths = new Set(
-    upstream.patches.map((patch) => path.relative(REPO_ROOT, patch.path)),
-  );
+  /* The files that pin the release, and the recorded coverage report. */
+  const releaseOwners = new Set([
+    relative(CONFIG_PATH),
+    relative(path.join(PACKAGE_DIR, 'coverage.json')),
+    ...upstream.patches.map((patch) => relative(patch.path)),
+  ]);
   const failures: string[] = [];
 
-  for (const file of files) {
+  for (const file of repositoryFiles()) {
     const content = readFileSync(path.join(REPO_ROOT, file), 'utf8');
 
     if (
-      file.startsWith(BUILD_SCOPE)
-      && !file.endsWith('paths.ts')
+      file.startsWith(buildScope)
+      && /\.m?ts$/.test(file)
+      && file !== pathsModule
       && PATH_DECLARATION.test(content)
     ) {
-      failures.push(`${file}: duplicate path declaration`);
+      failures.push(`${file}: declares a path outside ${pathsModule}`);
     }
 
-    if (
-      file !== 'packages/hamlib-wasm/hamlib.config.yaml'
-      && file !== 'packages/hamlib-wasm/coverage.json'
-      && !patchPaths.has(file)
-    ) {
-      for (const literal of release) {
+    if (!releaseOwners.has(file)) {
+      for (const literal of releaseLiterals) {
         if (content.includes(literal)) {
           failures.push(`${file}: hardcoded release literal ${literal.slice(0, 12)}…`);
         }
@@ -74,8 +70,8 @@ export function verifyRepository(): void {
     }
   }
 
-  assert(
-    failures.length === 0,
-    `repository guard failed:\n${failures.join('\n')}`,
-  );
+  assert(failures.length === 0, `repository guard failed:\n${failures.join('\n')}`);
+  log(SCOPE, 'no stray path declarations or release literals');
 }
+
+await runMain(SCOPE, main);

@@ -104,6 +104,10 @@ run = "biome lint ."
 description = "Lint commit messages with commitlint (mise run lint-commits -- --from <rev>)"
 run = "commitlint --verbose"
 
+[tasks.guard]
+description = "Fail when a build script declares a path outside paths.ts or a file hardcodes the pinned release"
+run = "node packages/hamlib-wasm/build/guard.ts"
+
 [tasks.docs-check]
 description = "Fail when README/docs name a mise task or layout path that does not exist"
 run = "node packages/hamlib-wasm/build/docs-check.ts"
@@ -158,8 +162,8 @@ run = "playwright test tests/browser/baseline.spec.ts --project chromium"
 # --- Gates -------------------------------------------------------------------
 
 [tasks.check]
-description = "The local gate before pushing: lint, docs, typecheck, generated check, unit tests and the browser suite"
-depends = ["lint", "docs-check", "typecheck", "test"]
+description = "The local gate before pushing: lint, docs, repository guard, typecheck, generated check, unit tests and the browser suite"
+depends = ["lint", "docs-check", "guard", "typecheck", "test"]
 
 [tasks.check-release]
 description = "Everything a publish needs: check, the packed tarball audit and the backend audit"
