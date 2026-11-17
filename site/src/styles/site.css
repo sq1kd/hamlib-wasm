@@ -12,7 +12,10 @@
   font-display: swap;
 }
 
-:root {
+/* With ::backdrop, which inherits nothing in older engines, so the overrides
+ * below can name these tokens there too. */
+:root,
+::backdrop {
   --sl-font: 'IBM Plex Sans';
   --sl-font-mono: 'IBM Plex Mono';
 
@@ -52,17 +55,17 @@
 :root,
 ::backdrop {
   --sl-color-white: #ffffff;
-  --sl-color-gray-1: #e8edf2;
+  --sl-color-gray-1: var(--hw-ink);
   --sl-color-gray-2: #c3ccd5;
   --sl-color-gray-3: #8e9aa6;
   --sl-color-gray-4: #5f6b77;
-  --sl-color-gray-5: #26303a;
+  --sl-color-gray-5: var(--hw-control-line);
   --sl-color-gray-6: #10161c;
-  --sl-color-black: #07090c;
+  --sl-color-black: var(--hw-bg);
   --sl-color-accent-low: #0f3a33;
   --sl-color-accent: #2fbfa3;
-  --sl-color-accent-high: #59e0c5;
-  --sl-color-bg-nav: #07090c;
+  --sl-color-accent-high: var(--hw-accent);
+  --sl-color-bg-nav: var(--hw-bg);
   /* Notes and tips: the teal family, not Starlight's indigo and purple. */
   --sl-color-blue-low: #0b2622;
   --sl-color-blue: #2fbfa3;
@@ -70,7 +73,7 @@
   --sl-color-purple-low: #0b2622;
   --sl-color-purple: #2fbfa3;
   --sl-color-purple-high: #a6f2e2;
-  --sl-color-hairline-light: #26303a;
+  --sl-color-hairline-light: var(--hw-control-line);
   --sl-color-hairline: #1a222b;
 }
 

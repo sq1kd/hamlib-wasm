@@ -194,5 +194,5 @@
   padding: 0.7rem 0.9rem;
   border: 1px dashed var(--hw-line);
   border-radius: var(--hw-radius);
-  color: #7f8c98;
+  color: color-mix(in srgb, var(--hw-muted) 35%, var(--hw-faint));
 }

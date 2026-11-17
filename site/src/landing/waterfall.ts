@@ -172,7 +172,7 @@ export function startWaterfall(canvas: HTMLCanvasElement): void {
   };
 
   /* Fill the screen with history so it never starts empty. */
-  ctx.fillStyle = '#07090c';
+  ctx.fillStyle = getComputedStyle(canvas).getPropertyValue('--hw-bg');
   ctx.fillRect(0, 0, W, H);
 
   for (let i = 0; i < H; i++) {
