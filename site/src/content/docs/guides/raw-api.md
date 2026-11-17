@@ -48,6 +48,16 @@ a model offers without a hard-coded table: `tokenForeach()`,
 configuration and extension tables, and `hasScan()`/`hasVfoOp()` answer from
 the backend's own masks. Every walker returns plain `RigConfparam` objects.
 
+A few calls are worth knowing about:
+
+- `sendMorse(text)` and `stopMorse()` are hand-written: Hamlib's
+  `rig_send_morse()` only queues text for a worker thread this build does not
+  start, so they call the backend's own keyer command.
+- `sendRaw(bytes, { terminator | replyLength })`, also hand-written, writes
+  vendor bytes as they are and reads the reply as a `Uint8Array`.
+- `powerToMilliwatts(power, hz, mode)` and its inverse convert through the
+  model's own power scale for that frequency and mode.
+
 ## Gating and arguments
 
 Each method is gated by `rig.model.capabilities`, derived from the backend's

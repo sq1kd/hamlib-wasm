@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { HamlibError } from 'hamlib-wasm';
-import type { RigCapabilities, Rig, PttState, RigMode, RigState, SerialPortLike } from 'hamlib-wasm';
+import type { RigCapabilities, Rig, RigMode, RigState, SerialPortLike } from 'hamlib-wasm';
 import type { RawRig } from 'hamlib-wasm/raw';
 import { useRig, useRigError, useRigState } from 'hamlib-wasm/react';
 
@@ -32,8 +32,6 @@ export interface LogEntry {
 }
 
 export type Log = (entry: LogEntry) => void;
-
-const PTT_STATES: readonly PttState[] = ['off', 'on', 'on-mic', 'on-data'];
 
 function asError(error: unknown, operation: string): HamlibError {
   return error instanceof HamlibError
@@ -65,9 +63,7 @@ async function readRaw(rig: Rig, api: Api, log: Log): Promise<RigState> {
 
   if (rig.capabilities.getPtt) {
     log({ api, call: 'getPtt()' });
-    const ptt = await raw.getPtt();
-
-    next.ptt = PTT_STATES.find((state) => state === ptt) ?? 'off';
+    next.ptt = await raw.getPtt();
   }
 
   return next;

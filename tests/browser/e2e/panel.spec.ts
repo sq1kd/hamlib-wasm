@@ -177,3 +177,35 @@ test('a rejected command reaches the error display of the raw backend', async ({
   await runClockUntilElement(page, { testId: 'frequency-display', text: '7.074.000' });
   await expect(page.getByTestId('frequency-display')).toHaveText('7.074.000');
 });
+
+test('copy diagnostics puts a rig report on the clipboard', async ({ page }) => {
+  await page.goto(REACT_URL);
+
+  /* The clipboard is stubbed: neither browser lets a test read the real one. */
+  await page.evaluate(() => {
+    const copies: string[] = [];
+
+    Object.defineProperty(window, '__copies', { value: copies });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (text: string) => { copies.push(text); return Promise.resolve(); } },
+    });
+  });
+
+  await useRig(page, 'kenwood-ts480');
+  await selectModel(page, 'Kenwood TS-480');
+  await page.getByTestId('connect-button').click();
+  await runClockUntilElement(page, { testId: 'connection-state', state: 'connected' });
+
+  await page.getByTestId('copy-diagnostics').click();
+  await expect(page.getByTestId('copy-diagnostics')).toHaveText('Copied');
+
+  const copied = await page.evaluate(() => (window as unknown as { __copies: string[] }).__copies[0] ?? '');
+  const report = JSON.parse(copied.replace(/^```json\n|\n```$/g, ''));
+
+  expect(report.hamlibVersion).toContain('Hamlib');
+  expect(report.debugLevel).toBe('verbose');
+  expect(report.rigs[0].model).toBe('TS-480');
+  expect(report.trace.length).toBeGreaterThan(0);
+  expect(report.log.length).toBeGreaterThan(0);
+});

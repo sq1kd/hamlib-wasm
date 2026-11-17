@@ -28,7 +28,8 @@ import '../radio/radio.css';
 import './demo.css';
 
 /* A module constant: the provider reads its options once. */
-const OPTIONS: HamlibOptions = { levels: ['STRENGTH', 'SWR'] };
+/* Hamlib's own lines go only into `diagnostics()`, for the copy button. */
+const OPTIONS: HamlibOptions = { levels: ['STRENGTH', 'SWR'], debug: { level: 'verbose' } };
 
 const LOG_LIMIT = 40;
 
@@ -137,6 +138,26 @@ function App(): ReactElement {
   const [detecting, setDetecting] = useState(false);
   const [detectError, setDetectError] = useState<HamlibError | undefined>(undefined);
   const [sample, setSample] = useState<RigState | undefined>(undefined);
+  const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  const copyDiagnostics = useCallback(() => {
+    if (hamlib === undefined) { return; }
+
+    const report = `\`\`\`json\n${JSON.stringify(hamlib.diagnostics(), null, 2)}\n\`\`\``;
+
+    navigator.clipboard.writeText(report).then(
+      () => { setCopied('copied'); },
+      () => { setCopied('failed'); },
+    );
+  }, [hamlib]);
+
+  useEffect(() => {
+    if (copied === 'idle') { return undefined; }
+
+    const timer = setTimeout(() => { setCopied('idle'); }, 2000);
+
+    return () => { clearTimeout(timer); };
+  }, [copied]);
 
   const log = useCallback<Log>((entry) => {
     setEntries((current) => [{ ...entry, id: Math.random() }, ...current].slice(0, LOG_LIMIT));
@@ -311,6 +332,15 @@ function App(): ReactElement {
                 ))}
               </div>
               <button type="button" onClick={() => { setEntries([]); }} disabled={entries.length === 0}>Clear</button>
+              <button
+                type="button"
+                data-testid="copy-diagnostics"
+                title="Copy a diagnostics report for a GitHub rig report"
+                onClick={copyDiagnostics}
+                disabled={hamlib === undefined}
+              >
+                {copied === 'copied' ? 'Copied' : copied === 'failed' ? 'Copy failed' : 'Copy diagnostics'}
+              </button>
             </header>
             {entries.length === 0
               ? (

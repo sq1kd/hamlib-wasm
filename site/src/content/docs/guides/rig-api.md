@@ -65,6 +65,9 @@ as `rig.state`.
   observed state is `state.ptt` (or the `ptt` event); do not overwrite it with
   what was requested. `ptt` reads `'off'`, `'on'`, or `'on-mic'`/`'on-data'` on
   radios that report which audio input is transmitting.
+- `sendMorse(text)` keys `text` through the rig's keyer; the rig must be in CW
+  or CWR. Long text goes in chunks, so polling keeps running, and
+  `stopMorse()` drops whatever is not sent yet.
 
 Calls run one at a time, in order. A method that takes several CAT commands
 runs them back to back, so a raw call, a call on another rig or a later `Rig`
@@ -126,6 +129,7 @@ backend's `rig_caps`:
 ```ts
 rig.capabilities.setFrequency;   // boolean
 rig.capabilities.getPtt;         // boolean
+rig.capabilities.sendMorse;      // boolean
 ```
 
 A read the model cannot perform fails with `UNSUPPORTED_OPERATION` rather than
@@ -149,6 +153,29 @@ const rig = await hamlib.open({ modelId, port, baudRate });
 
 Store `rig.baudRate` to make the next connection explicit and instant. USB
 radios whose CAT interface ignores the line rate (CDC-ACM) are unaffected.
+
+## Configuration tokens
+
+`open()` and `detectBaudRate()` pass Hamlib configuration tokens through
+`conf`, applied before the rig opens:
+
+```ts
+const rig = await hamlib.open({ modelId, port, conf: { civaddr: '0x94', post_write_delay: 5 } });
+```
+
+Hamlib's frontend tokens (`ptt_type`, `rts_state`, `write_delay`, `timeout`,
+...) are typed with the values Hamlib accepts. A model's own tokens differ per
+backend; `rig.raw.tokenForeach()` lists them. The tokens hamlib-wasm sets
+itself, and those that need a second port or a parallel/GPIO line, are refused
+with `INVALID_ARGUMENT`. `ptt_type: 'RTS'` or `'DTR'` makes PTT available even
+on a model that declares none.
+
+## Diagnostics
+
+`hamlib.diagnostics()` returns plain JSON for a bug report: versions, runtime,
+the open rigs, the latest errors and port traffic, and Hamlib's own debug
+lines when `createHamlib({ debug: { level, onLog } })` turned them on. See
+[Troubleshooting](../troubleshooting/#reporting-a-problem).
 
 ## Errors
 

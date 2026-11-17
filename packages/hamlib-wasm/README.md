@@ -67,6 +67,8 @@ await rig.setMode('USB');                              // passband filled in fro
 await rig.setPassband('narrow');                       // current mode + width, in one compound
 await rig.setPtt(true);                                // transmits: dummy load or antenna
 await rig.setPtt(false);
+await rig.sendMorse('CQ CQ DE SP0ABC K');              // CW mode; keyed through the backend
+await rig.stopMorse();                                 // drops what is not sent yet
 
 const stop = rig.watch({ intervalMs: 1000, fields: ['frequency', 'mode'] });
 const stopMeter = rig.watch({ intervalMs: 500, levels: ['STRENGTH'] });  // one SM0 per tick
@@ -80,10 +82,18 @@ await rig.level('STRENGTH');                           // one read, configured +
 rig.capabilities.setFrequency;                         // booleans, from rig_caps
 rig.capabilities.levels;                               // configured levels the model has
 rig.raw;                                               // the RawRig, for anything below
+hamlib.diagnostics();                                  // JSON for a bug report: rigs, errors, traffic
 
 await rig.close();                                     // idempotent
 await hamlib.dispose();                                // closes every rig and port
 ```
+
+`open()` and `detectBaudRate()` take Hamlib configuration tokens as `conf`:
+`{ civaddr: '0x94' }` for an Icom moved off its default address,
+`{ ptt_type: 'RTS' }` for PTT on the port's RTS line, delays and timeouts for a
+slow rig. Frontend tokens are typed; the ones hamlib-wasm sets itself are
+refused. `createHamlib({ debug: { level: 'trace', onLog } })` routes Hamlib's
+own debug output to `onLog` and into `diagnostics()`.
 
 In Node, pass the port explicitly: `open({ modelId, port: await
 hamlib.requestPort({ path }) })`. Every method acts on the rig's current VFO;
@@ -206,7 +216,13 @@ await rig.setLevel('RF', 0.5);                        // level name + float/int 
 const split = await rig.getSplitFreqMode();           // { txFreq, txMode, txWidth }
 const ext = await rig.extLookupTok(0);                // RigConfparam, or empty when unknown
 await rig.passbandWide('USB');                        // pure: no CAT traffic, still queued
+await rig.powerToMilliwatts(0.5, 14_074_000, 'USB');  // the model's own power scale
+await rig.sendRaw(new TextEncoder().encode('FA;'), { terminator: 0x3b });  // vendor bytes
 ```
+
+Morse is the exception to "generated": `rig_send_morse()` only queues text for a
+worker thread this build does not start, so `sendMorse()`/`stopMorse()` call the
+backend's own keyer command, one chunk per queued call.
 
 The discovery surface `rigctl` itself uses is bound too, so a client can find
 out what a model offers without a hardcoded model table: `tokenForeach()` walks
