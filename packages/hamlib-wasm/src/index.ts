@@ -1007,12 +1007,7 @@ class RigHandle implements Rig {
 
   /** Reject a level the instance is not configured for or the model lacks. */
   #requireLevel(name: LevelName): void {
-    if (!LEVEL_NAMES.includes(name)) {
-      throw new HamlibError(
-        `unknown level ${String(name)}; use one of ${LEVEL_NAMES.join(', ')}`,
-        { code: 'INVALID_ARGUMENT', operation: 'level' },
-      );
-    }
+    assertLevelName(name, 'level');
 
     if (this.#advertisedLevels.includes(name)) {
       return;
@@ -1170,17 +1165,22 @@ class HamlibInstance implements Hamlib {
   }
 }
 
+/** Reject a name outside {@link LEVEL_NAMES}, which an untyped caller can pass. */
+function assertLevelName(name: LevelName, operation: string): void {
+  if (!LEVEL_NAMES.includes(name)) {
+    throw new HamlibError(
+      `unknown level ${String(name)}; use one of ${LEVEL_NAMES.join(', ')}`,
+      { code: 'INVALID_ARGUMENT', operation },
+    );
+  }
+}
+
 /** Deduplicate and validate the configured level list. */
 function normalizeLevels(levels: readonly LevelName[] | undefined): readonly LevelName[] {
   const wanted: LevelName[] = [];
 
   for (const name of levels ?? []) {
-    if (!LEVEL_NAMES.includes(name)) {
-      throw new HamlibError(
-        `unknown level ${String(name)}; use one of ${LEVEL_NAMES.join(', ')}`,
-        { code: 'INVALID_ARGUMENT', operation: 'createHamlib' },
-      );
-    }
+    assertLevelName(name, 'createHamlib');
 
     if (!wanted.includes(name)) {
       wanted.push(name);
