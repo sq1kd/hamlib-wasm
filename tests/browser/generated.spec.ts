@@ -201,3 +201,29 @@ test('the NONE repeater shift is a setting, while an unknown name is refused', a
   expect(result.commands).toContain('0F 10');
   expect(expectFailure(result.unknown).hamlibCode).toBe(-RIG_EINVAL);
 });
+
+test('the exported passband constants are the widths Hamlib documents', async ({ harnessPage: page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
+    const port = await hamlib.requestPort();
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
+    const rig = await hamlib.open({ modelId: ts480.id, port });
+    const { RIG_PASSBAND_NOCHANGE, RIG_PASSBAND_NORMAL } = window.__hamlibHarness.passbands;
+
+    await rig.setMode('USB', RIG_PASSBAND_NORMAL);
+    const normal = await rig.getMode();
+    await rig.setMode('LSB', RIG_PASSBAND_NOCHANGE);
+    const kept = await rig.getMode();
+
+    await rig.close();
+    await hamlib.dispose();
+
+    return { normal, kept };
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.kept.mode).toBe('LSB');
+  /* RIG_PASSBAND_NOCHANGE leaves the width the mode change found. */
+  expect(result.kept.passband).toBe(result.normal.passband);
+});

@@ -13,7 +13,7 @@
  */
 
 import { HamlibError } from './errors.js';
-import { LINE_DATA_BITS, LINE_HANDSHAKES, LINE_PARITIES, LINE_STOP_BITS, OWNED_CONF, UNREACHABLE_CONF } from './native/generated/names.js';
+import { type LINE_DATA_BITS, type LINE_HANDSHAKES, type LINE_PARITIES, type LINE_STOP_BITS, OWNED_CONF, UNREACHABLE_CONF } from './native/generated/names.js';
 import type { OwnedConfToken, UnreachableConfToken } from './native/generated/names.js';
 
 /** The `ptt_type`/`dcd_type` values whose line is the rig's own serial port. */

@@ -28,6 +28,8 @@ export interface HamlibHarness {
   nativeModule(): Promise<NativeModule>;
   /** The generated name vocabularies, as the package exports them. */
   vocabularies: Readonly<Record<string, readonly string[]>>;
+  /** The passband widths the package exports, which Hamlib's docs name. */
+  passbands: { readonly RIG_PASSBAND_NORMAL: number; readonly RIG_PASSBAND_NOCHANGE: number };
 }
 
 declare global {

@@ -8,6 +8,7 @@
  * Authored as TypeScript and run directly by Node's type stripping, so this
  * file must stay erasable (no enums, namespaces or parameter properties).
  */
+import { parseComment } from '../docs.ts';
 import type { NameVocabulary } from '../names.ts';
 
 const NAMES_HEADER = `// SPDX-License-Identifier: MIT AND LGPL-2.1-or-later
@@ -63,6 +64,24 @@ export function emitNames(vocabularies: readonly NameVocabulary[], appendix: rea
   }
 
   return [...lines, ...appendix].join('\n');
+}
+
+/**
+ * The upstream macros the config exports, each with the value clang
+ * evaluated and the brief of the Doxygen comment above its `#define` in
+ * `rig.h`.
+ */
+export function macroConstants(values: ReadonlyMap<string, number>, header: string): string[] {
+  return [...values].flatMap(([name, value]) => {
+    const comment = new RegExp(`/\\*\\*((?:(?!\\*/)[\\s\\S])*)\\*/\\s*#define\\s+${name}\\b`).exec(header)?.[1];
+    const brief = comment === undefined ? '' : (parseComment(comment)?.brief ?? '');
+
+    return [
+      `/** ${brief === '' ? '' : `${brief.replace(/\.$/, '')}: `}\`${name}\` in Hamlib's rig.h. */`,
+      `export const ${name} = ${value};`,
+      '',
+    ];
+  });
 }
 
 /**

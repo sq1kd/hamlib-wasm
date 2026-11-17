@@ -99,6 +99,8 @@ export interface Model {
   readonly ownedConf: Readonly<Record<string, string>>;
   /** Configuration tokens that need a device or a thread this build cannot reach, with why. */
   readonly unreachableConf: Readonly<Record<string, string>>;
+  /** Upstream macros exported as constants, evaluated by clang. */
+  readonly macros: readonly string[];
   /** Struct pointers a getter fills, with what upstream reads from them and allocates into them. */
   readonly structOutputs: StructOutputs;
   /** Declarative renames for the mechanically generated surface. */
@@ -383,6 +385,15 @@ export function loadConfig(file: string): CodegenConfig {
       lineSettings: readLineSettings(file, root.lineSettings),
       ownedConf: readTokens(file, root.ownedConf, 'ownedConf'),
       unreachableConf: readTokens(file, root.unreachableConf, 'unreachableConf'),
+      macros: asArray(file, root.macros ?? [], 'macros').map((name, index) => {
+        const macro = asString(file, name, `macros[${index}]`);
+
+        if (!/^RIG_[A-Z0-9_]+$/.test(macro)) {
+          fail(file, `macros[${index}] must be a RIG_ macro name, not "${macro}"`);
+        }
+
+        return macro;
+      }),
       structOutputs: readStructOutputs(file, root.structOutputs ?? {}),
       overrides: readOverrides(file, root.overrides ?? {}),
     },

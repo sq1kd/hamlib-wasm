@@ -467,3 +467,9 @@ export const UNREACHABLE_CONF = {
 
 /** One of the tokens of {@link UNREACHABLE_CONF}. */
 export type UnreachableConfToken = keyof typeof UNREACHABLE_CONF;
+
+/** Macro for bandpass to be set to normal: `RIG_PASSBAND_NORMAL` in Hamlib's rig.h. */
+export const RIG_PASSBAND_NORMAL = 0;
+
+/** Macro for bandpass to be left alone: `RIG_PASSBAND_NOCHANGE` in Hamlib's rig.h. */
+export const RIG_PASSBAND_NOCHANGE = -1;

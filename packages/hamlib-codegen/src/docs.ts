@@ -124,7 +124,7 @@ type Section =
   | { readonly kind: 'see' }
   | { readonly kind: 'body' };
 
-const COMMAND = /^[\\@](brief|param|returns?|retval|note|sa|see|code|endcode)\b\s*(.*)$/;
+const COMMAND = /^[\\@](brief|param|returns?|retval|note|sa|see|code|endcode|def)\b\s*(.*)$/;
 
 /** Split one comment body into its Doxygen sections. */
 export function parseComment(comment: string): UpstreamDoc | null {
@@ -169,6 +169,10 @@ export function parseComment(comment: string): UpstreamDoc | null {
           body.push([]);
           continue;
         case 'endcode':
+          continue;
+        case 'def':
+          /* Names the macro the comment is above, which the reader already has. */
+          section = { kind: 'body' };
           continue;
         case 'brief':
           section = { kind: 'brief' };

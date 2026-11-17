@@ -61,6 +61,10 @@ window.__hamlibHarness = {
     SCAN_OPS: hamlibWasm.SCAN_OPS,
     RPTR_SHIFTS: hamlibWasm.RPTR_SHIFTS,
   },
+  passbands: {
+    RIG_PASSBAND_NORMAL: hamlibWasm.RIG_PASSBAND_NORMAL,
+    RIG_PASSBAND_NOCHANGE: hamlibWasm.RIG_PASSBAND_NOCHANGE,
+  },
   nativeModule: (): Promise<MainModule> => {
     nativeModule ??= createNativeModule();
     return nativeModule;

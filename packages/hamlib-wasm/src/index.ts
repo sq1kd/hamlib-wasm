@@ -126,6 +126,9 @@ import type { PttState } from './native/generated/names.js';
 /** One of the values of `RIG_ERRCODES`; `HamlibError.hamlibCode` carries it negated. */
 export type { RigErrcode } from './native/generated/names.js';
 
+/** Passband widths with a meaning of their own, for `setMode`. */
+export { RIG_PASSBAND_NOCHANGE, RIG_PASSBAND_NORMAL } from './native/generated/names.js';
+
 /** One of Hamlib's own passband helpers, selected by name. */
 export type PassbandSelector = 'normal' | 'narrow' | 'wide';
 
@@ -378,7 +381,8 @@ export interface Rig {
    * `mode` is a Hamlib mode name such as `'USB'`, `'LSB'`, `'CW'`, `'CWR'`,
    * `'AM'`, `'FM'`, `'RTTY'`, `'PKTUSB'` or `'PKTLSB'`; the model decides
    * which ones it accepts.  When `passband` is omitted, the model's normal
-   * width for that mode is used.
+   * width for that mode is used; `RIG_PASSBAND_NOCHANGE` keeps the current
+   * width.
    */
   setMode(mode: RigMode, passband?: number): Promise<void>;
   /**

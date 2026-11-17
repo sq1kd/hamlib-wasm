@@ -5,6 +5,7 @@ import type { AstFunction } from '../../packages/hamlib-codegen/src/ast.ts';
 import { classifyFunction } from '../../packages/hamlib-codegen/src/classify.ts';
 import { operationFacts } from '../../packages/hamlib-codegen/src/emit/common.ts';
 import { emitOperations } from '../../packages/hamlib-codegen/src/emit/cpp.ts';
+import { macroConstants } from '../../packages/hamlib-codegen/src/emit/names.ts';
 import { bindType, type ProjectionSpec, type TypeBinding } from '../../packages/hamlib-codegen/src/types.ts';
 
 function declaration(
@@ -162,5 +163,28 @@ describe('emitOperations struct outputs', () => {
 
   it('frees what upstream allocates for the caller on every path after the call', () => {
     expect(code()).toContain('int rc = rig_get_channel(rig, RIG_VFO_CURR, &out0, value2);\n            std::free(out0.ext_levels);\n');
+  });
+});
+
+describe('macroConstants', () => {
+  const header = [
+    '/**',
+    ' * \\brief Macro for bandpass to be set to normal',
+    ' * \\def RIG_PASSBAND_NORMAL',
+    ' */',
+    '#define RIG_PASSBAND_NORMAL     s_Hz(0)',
+    '',
+    '#define RIG_PASSBAND_NOCHANGE   s_Hz(-1)',
+  ].join('\n');
+
+  it('exports each macro with its evaluated value and the brief above its #define', () => {
+    expect(macroConstants(new Map([['RIG_PASSBAND_NORMAL', 0], ['RIG_PASSBAND_NOCHANGE', -1]]), header)).toEqual([
+      "/** Macro for bandpass to be set to normal: `RIG_PASSBAND_NORMAL` in Hamlib's rig.h. */",
+      'export const RIG_PASSBAND_NORMAL = 0;',
+      '',
+      "/** `RIG_PASSBAND_NOCHANGE` in Hamlib's rig.h. */",
+      'export const RIG_PASSBAND_NOCHANGE = -1;',
+      '',
+    ]);
   });
 });

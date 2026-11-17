@@ -321,6 +321,36 @@ export function indexAst(root: JsonNode): AstIndex {
   return { functions, enums, records, typedefs };
 }
 
+/** The enum the scratch translation unit evaluates the requested macros in. */
+export const MACRO_ENUM = 'hamlib_wasm_macros';
+
+/**
+ * Macros are gone from the AST, so each one is made the initializer of an
+ * enum constant, which clang folds to its value like any other.
+ */
+function macroEnum(macros: readonly string[]): string {
+  if (macros.length === 0) {
+    return '';
+  }
+
+  return `enum ${MACRO_ENUM} : long long {\n${macros.map((name) => `  ${name}_value = (long long) (${name}),\n`).join('')}};\n`;
+}
+
+/** The value clang evaluated for each macro `loadAst` was asked for. */
+export function macroValues(ast: AstIndex, macros: readonly string[]): ReadonlyMap<string, number> {
+  const constants = ast.enums.get(MACRO_ENUM)?.constants ?? [];
+
+  return new Map(macros.map((name) => {
+    const value = constants.find((constant) => constant.name === `${name}_value`)?.value;
+
+    if (value === undefined || !Number.isSafeInteger(value)) {
+      throw new Error(`the AST has no exact value for the macro ${name}`);
+    }
+
+    return [name, value] as const;
+  }));
+}
+
 /**
  * Dump and index the AST of `hamlib/rig.h` from the pinned headers, plus any
  * project header whose declarations the generator also reads (the serial
@@ -330,7 +360,11 @@ export function indexAst(root: JsonNode): AstIndex {
  * would be for a real source file; the JSON is then parsed and reduced to the
  * declarations the generator reasons about.
  */
-export function loadAst(includeDir: string, projectHeaders: readonly string[] = []): AstIndex {
+export function loadAst(
+  includeDir: string,
+  projectHeaders: readonly string[] = [],
+  macros: readonly string[] = [],
+): AstIndex {
   const rigHeader = path.join(includeDir, 'hamlib', 'rig.h');
 
   if (!existsSync(rigHeader)) {
@@ -344,7 +378,7 @@ export function loadAst(includeDir: string, projectHeaders: readonly string[] = 
     const tu = path.join(scratch, 'tu.cpp');
     writeFileSync(tu, ['<hamlib/rig.h>', ...projectHeaders.map((header) => JSON.stringify(header))]
       .map((header) => `#include ${header}\n`)
-      .join(''));
+      .join('') + macroEnum(macros));
 
     let stdout: string;
 

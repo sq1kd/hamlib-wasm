@@ -368,6 +368,13 @@ operations:
     calls:
       - rig_ext_parm_foreach
 
+# Upstream macros exported from the generated names as constants, with the
+# value clang evaluates against the pinned headers: values Hamlib's own
+# documentation of a bound call tells the caller to pass.
+macros:
+  - RIG_PASSBAND_NORMAL
+  - RIG_PASSBAND_NOCHANGE
+
 # Struct pointers a getter fills that its signature types as output only.
 # `reads` are the members upstream consults first to choose what to fetch; the
 # generated method takes them as an input object.  `frees` are the pointer
