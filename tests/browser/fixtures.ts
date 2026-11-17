@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test as base } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { JSHandle, Page } from '@playwright/test';
 
 const CLOCK_SOURCE = readFileSync(
   fileURLToPath(new URL('./fixtures/generated/virtual-clock.js', import.meta.url)),
@@ -119,7 +119,7 @@ export async function runClockUntilElement(page: Page, condition: ElementConditi
 
 /** Fire the page's timers in deadline order until the emulator's port is closed. */
 export async function runClockUntilPortClosed(page: Page): Promise<void> {
-  await page.evaluate(() => window.__virtualClock.until(() => !window.__fakeSerial.isOpen));
+  await (await fakeSerial(page)).evaluate((control) => window.__virtualClock.until(() => !control.isOpen));
 }
 
 /** Hold the panel's PTT button down with the mouse: the radio keys on the press. */
@@ -147,6 +147,17 @@ export async function installSerialDoubles(page: Page, clockMode: VirtualClockMo
   await page.addInitScript({ content: FAKE_SERIAL_SOURCE });
 }
 
+/** The page's fake port, for a helper to act on; fails naming the fixture when the page lacks it. */
+async function fakeSerial(page: Page): Promise<JSHandle<FakePortControl>> {
+  return page.evaluateHandle(() => {
+    if (!window.__fakeSerial) {
+      throw new Error('the fake Web Serial fixture is not installed');
+    }
+
+    return window.__fakeSerial;
+  });
+}
+
 /** Delete every `serial` accessor: the page's own, and the fake's on `navigator`. */
 function deleteWebSerial(): void {
   delete (navigator as { serial?: unknown }).serial;
@@ -167,46 +178,22 @@ export async function removeWebSerial(page: Page): Promise<void> {
 
 /** Select the emulated radio the fixture should answer as. */
 export async function useRig(page: Page, name: FakeRigName): Promise<void> {
-  await page.evaluate((rigName: FakeRigName) => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.useRig(rigName);
-  }, name);
+  await (await fakeSerial(page)).evaluate((control, rigName) => { control.useRig(rigName); }, name);
 }
 
 /** Make the emulator stop answering, so Hamlib runs into its timeout. */
 export async function setEmulatorSilent(page: Page, silent: boolean): Promise<void> {
-  await page.evaluate((value: boolean) => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.state.silent = value;
-  }, silent);
+  await (await fakeSerial(page)).evaluate((control, value) => { control.state.silent = value; }, silent);
 }
 
 /** Make the next `SerialPort.open()` reject with the given DOMException name. */
 export async function failNextPortOpen(page: Page, name: string): Promise<void> {
-  await page.evaluate((domName: string) => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.failNextOpen = domName;
-  }, name);
+  await (await fakeSerial(page)).evaluate((control, domName) => { control.failNextOpen = domName; }, name);
 }
 
 /** Park the next `SerialPort.open()` until {@link releasePortOpen} runs. */
 export async function holdNextPortOpen(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.holdNextOpen = true;
-  });
+  await (await fakeSerial(page)).evaluate((control) => { control.holdNextOpen = true; });
 }
 
 /**
@@ -216,18 +203,12 @@ export async function holdNextPortOpen(page: Page): Promise<void> {
  * order, and nothing past the moment the open parks.
  */
 export async function waitForPortOpenPending(page: Page): Promise<void> {
-  await page.evaluate(() => window.__virtualClock.until(() => window.__fakeSerial.openPending));
+  await (await fakeSerial(page)).evaluate((control) => window.__virtualClock.until(() => control.openPending));
 }
 
 /** Release a parked `open()`, completing it. */
 export async function releasePortOpen(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.releaseOpen();
-  });
+  await (await fakeSerial(page)).evaluate((control) => { control.releaseOpen(); });
 }
 
 /**
@@ -237,36 +218,20 @@ export async function releasePortOpen(page: Page): Promise<void> {
  * virtual time, ordered with every other timer.
  */
 export async function setReplyDelay(page: Page, milliseconds: number): Promise<void> {
-  await page.evaluate((delay: number) => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.replyDelayMs = delay;
-  }, milliseconds);
+  await (await fakeSerial(page)).evaluate((control, delay) => { control.replyDelayMs = delay; }, milliseconds);
 }
 
 /** Deliver every reply in `bytes`-sized pieces, `gapMs` of virtual time apart. */
 export async function setReplyFragments(page: Page, bytes: number, gapMs: number): Promise<void> {
-  await page.evaluate(([size, gap]: readonly [number, number]) => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.fragmentBytes = size;
-    window.__fakeSerial.fragmentGapMs = gap;
+  await (await fakeSerial(page)).evaluate((control, [size, gap]) => {
+    control.fragmentBytes = size;
+    control.fragmentGapMs = gap;
   }, [bytes, gapMs] as const);
 }
 
 /** Mirror every host write back before the rig's answer, as a CI-V bus does. */
 export async function setEcho(page: Page, echo: boolean): Promise<void> {
-  await page.evaluate((value: boolean) => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.echo = value;
-  }, echo);
+  await (await fakeSerial(page)).evaluate((control, value) => { control.echo = value; }, echo);
 }
 
 /**
@@ -276,44 +241,30 @@ export async function setEcho(page: Page, echo: boolean): Promise<void> {
  * observed without a poll failure racing it for the same error slot.
  */
 export async function setWritesFailing(page: Page, failing: boolean): Promise<void> {
-  await page.evaluate((value: boolean) => {
-    if (!window.__fakeSerial) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    window.__fakeSerial.failWrites = value;
-  }, failing);
+  await (await fakeSerial(page)).evaluate((control, value) => { control.failWrites = value; }, failing);
 }
 
 /** Read a serializable snapshot of the fake transport state. */
 export async function readFakeSerial(page: Page): Promise<FakeSerialSnapshot> {
-  return page.evaluate(() => {
-    const control = window.__fakeSerial;
-
-    if (!control) {
-      throw new Error('the fake Web Serial fixture is not installed');
-    }
-
-    return {
-      rigName: control.rigName,
-      openedOptions: control.openedOptions,
-      openCount: control.openCount,
-      closeCount: control.closeCount,
-      isOpen: control.isOpen,
-      closedWithLockedStreams: control.closedWithLockedStreams,
-      openPending: control.openPending,
-      setSignalsCalls: control.setSignalsCalls,
-      outputSignals: control.outputSignals,
-      commands: [...control.commands],
-      state: {
-        frequency: control.state.frequency,
-        modeDigit: control.state.modeDigit,
-        filterValue: control.state.filterValue,
-        transmitting: control.state.transmitting,
-        silent: control.state.silent,
-      },
-    };
-  });
+  return (await fakeSerial(page)).evaluate((control) => ({
+    rigName: control.rigName,
+    openedOptions: control.openedOptions,
+    openCount: control.openCount,
+    closeCount: control.closeCount,
+    isOpen: control.isOpen,
+    closedWithLockedStreams: control.closedWithLockedStreams,
+    openPending: control.openPending,
+    setSignalsCalls: control.setSignalsCalls,
+    outputSignals: control.outputSignals,
+    commands: [...control.commands],
+    state: {
+      frequency: control.state.frequency,
+      modeDigit: control.state.modeDigit,
+      filterValue: control.state.filterValue,
+      transmitting: control.state.transmitting,
+      silent: control.state.silent,
+    },
+  }));
 }
 
 /**
