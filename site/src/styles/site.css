@@ -117,6 +117,11 @@
   border-radius: var(--hw-radius-sm);
 }
 
+/* repositoryPage() gives no href when the build knows no repository: plain text then. */
+.sl-markdown-content a:not([href]) {
+  color: inherit;
+}
+
 /* Every card icon in the one accent, not Starlight's rotating colours. */
 .card .icon {
   color: var(--sl-color-accent-high);
