@@ -51,6 +51,18 @@
      * when the page runs on the virtual clock, as every harness spec does.
      */
     replyDelayMs: 0,
+    /**
+     * Split every reply into pieces of this many bytes, `fragmentGapMs` apart,
+     * as a USB-serial adapter delivers them.  0 hands each reply over whole.
+     */
+    fragmentBytes: 0,
+    fragmentGapMs: 0,
+    /**
+     * Mirror every host write straight back, as a CI-V bus or an echoing
+     * interface does.  The echo comes from the line, not the radio, so it
+     * arrives even when the rig is silent or opened at the wrong rate.
+     */
+    echo: false,
     /** When true, every host write is refused, as a device that rejects commands. */
     failWrites: false,
     /** True when close() found a locked stream, i.e. the transport leaked. */
@@ -97,6 +109,10 @@
 
   /** Feed host bytes to the emulator and hand its replies to the reader. */
   function receive(chunk: Uint8Array): void {
+    if (control.echo && readableController !== null) {
+      readableController.enqueue(chunk.slice());
+    }
+
     /* A rig behind a real UART hears the one rate its own menu is set to.
      * Opened at any other, it sees framing errors and says nothing at all -
      * the failure a rate scan exists to get past, and one no protocol-level
@@ -119,15 +135,29 @@
   }
 
   /**
-   * Hand one reply to the reader, after `replyDelayMs` when one is set.  The
-   * delay is an ordinary timer, so on the virtual clock it fires in deadline
-   * order with Hamlib's own read timeout.
+   * Hand one reply to the reader, after `replyDelayMs` when one is set, and in
+   * `fragmentBytes` pieces when that is set.  The delays are ordinary timers,
+   * so on the virtual clock they fire in deadline order with Hamlib's own read
+   * timeout.
    */
   function enqueueReply(chunk: Uint8Array): void {
-    if (control.replyDelayMs > 0) {
+    if (control.fragmentBytes > 0) {
+      for (var offset = 0, piece = 0; offset < chunk.length; offset += control.fragmentBytes, piece++) {
+        deliver(chunk.slice(offset, offset + control.fragmentBytes), control.replyDelayMs + piece * control.fragmentGapMs);
+      }
+
+      return;
+    }
+
+    deliver(chunk, control.replyDelayMs);
+  }
+
+  /** Enqueue `chunk` after `delayMs`, or now; timers keep their order on the virtual clock. */
+  function deliver(chunk: Uint8Array, delayMs: number): void {
+    if (delayMs > 0) {
       setTimeout(function () {
         if (readableController !== null) { readableController.enqueue(chunk); }
-      }, control.replyDelayMs);
+      }, delayMs);
 
       return;
     }

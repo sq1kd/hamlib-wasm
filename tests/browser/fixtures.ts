@@ -74,6 +74,9 @@ export interface FakeSerialControl {
   openPending: boolean;
   /** Delay applied to every emulator reply, in milliseconds. */
   replyDelayMs: number;
+  fragmentBytes: number;
+  fragmentGapMs: number;
+  echo: boolean;
   /** When true, every host write is refused, as a device that rejects commands. */
   failWrites: boolean;
   setSignalsCalls: number;
@@ -321,6 +324,29 @@ export async function setReplyDelay(page: Page, milliseconds: number): Promise<v
 
     window.__fakeSerial.replyDelayMs = delay;
   }, milliseconds);
+}
+
+/** Deliver every reply in `bytes`-sized pieces, `gapMs` of virtual time apart. */
+export async function setReplyFragments(page: Page, bytes: number, gapMs: number): Promise<void> {
+  await page.evaluate(([size, gap]: readonly [number, number]) => {
+    if (!window.__fakeSerial) {
+      throw new Error('the fake Web Serial fixture is not installed');
+    }
+
+    window.__fakeSerial.fragmentBytes = size;
+    window.__fakeSerial.fragmentGapMs = gap;
+  }, [bytes, gapMs] as const);
+}
+
+/** Mirror every host write back before the rig's answer, as a CI-V bus does. */
+export async function setEcho(page: Page, echo: boolean): Promise<void> {
+  await page.evaluate((value: boolean) => {
+    if (!window.__fakeSerial) {
+      throw new Error('the fake Web Serial fixture is not installed');
+    }
+
+    window.__fakeSerial.echo = value;
+  }, echo);
 }
 
 /**

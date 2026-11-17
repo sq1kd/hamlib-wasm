@@ -144,6 +144,12 @@ interface FakeSerialControlBase {
   releaseOpen(): void;
   /** Delay applied to every emulator reply, in milliseconds. */
   replyDelayMs: number;
+  /** Split every reply into pieces of this many bytes; 0 delivers it whole. */
+  fragmentBytes: number;
+  /** Virtual milliseconds between two pieces of a fragmented reply. */
+  fragmentGapMs: number;
+  /** Mirror every host write back, as a CI-V bus or an echoing interface does. */
+  echo: boolean;
   /** When true, every host write is refused. */
   failWrites: boolean;
   /** True when close() found a locked stream, i.e. the transport leaked. */
