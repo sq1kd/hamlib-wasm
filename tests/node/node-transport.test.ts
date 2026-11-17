@@ -16,6 +16,7 @@ import { nodeSerialTransport } from 'hamlib-wasm/node';
 import { catalogueModel } from './catalogue.js';
 import { rigSerialPortModule } from './rig-serialport.js';
 import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
+import { RIG_EINVAL } from '../hamlib-errors.js';
 
 test('refuses a port request without a path', async () => {
   const transport = nodeSerialTransport({ serialport: rigSerialPortModule() });
@@ -211,7 +212,7 @@ test('surfaces a device that cannot be opened as a Hamlib error, not a crash', a
     expect(failure?.code).toBe('HAMLIB_ERROR');
     /* `ENOENT` maps to NotFoundError, which the transport layer turns into
      * -RIG_EINVAL: never a crash, never an unhandled 'error' event. */
-    expect(failure?.hamlibCode).toBe(-1);
+    expect(failure?.hamlibCode).toBe(-RIG_EINVAL);
     expect(failure?.message).toContain('open failed');
   } finally {
     await hamlib.dispose();

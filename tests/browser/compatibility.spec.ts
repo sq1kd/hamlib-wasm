@@ -19,6 +19,7 @@ import {
 } from 'hamlib-wasm';
 
 import { expect, expectFailure, expectOk, readFakeSerial, test } from './fixtures';
+import { HAMLIB_MESSAGE, RIG_ECONF, RIG_EINTERNAL, RIG_EIO } from '../hamlib-errors';
 
 interface CatalogueModel {
   id: number;
@@ -161,10 +162,10 @@ test('refuses a model whose line settings Web Serial cannot express', async ({ h
 
   const rejected = expectFailure(result.rejected);
   expect(rejected.code).toBe('HAMLIB_ERROR');
-  /* -RIG_ECONF: the transport refuses the configuration before touching the
-   * device, so the user never sees a silently downgraded port. */
-  expect(rejected.hamlibCode).toBe(-2);
-  expect(rejected.hamlibMessage).toBe('invalid configuration');
+  /* The transport refuses the configuration before touching the device, so
+   * the user never sees a silently downgraded port. */
+  expect(rejected.hamlibCode).toBe(-RIG_ECONF);
+  expect(rejected.hamlibMessage).toBe(HAMLIB_MESSAGE[RIG_ECONF]);
 
   const transport = await readFakeSerial(page);
 
@@ -201,8 +202,8 @@ test('fails predictably for a backend that needs a worker thread', async ({ harn
 
   const rejected = expectFailure(result.rejected);
   expect(rejected.code).toBe('HAMLIB_ERROR');
-  /* -RIG_EINTERNAL: pthread_create is refused by the single-threaded shim. */
-  expect(rejected.hamlibCode).toBe(-7);
+  /* pthread_create is refused by the single-threaded shim. */
+  expect(rejected.hamlibCode).toBe(-RIG_EINTERNAL);
 
   const transport = await readFakeSerial(page);
 
@@ -248,9 +249,9 @@ test('reports a device that disappears mid-session', async ({ harnessPage: page 
   /* The lost port shows on the rig, before anything closes it. */
   expect(result.connectedBefore).toBe(true);
   expect(result.connectedAfter).toBe(false);
-  /* -RIG_EIO, not a timeout: the transport failure is what the caller sees. */
-  expect(failed.hamlibCode).toBe(-6);
-  expect(failed.hamlibMessage).toBe('I/O error');
+  /* An I/O error, not a timeout: the transport failure is what the caller sees. */
+  expect(failed.hamlibCode).toBe(-RIG_EIO);
+  expect(failed.hamlibMessage).toBe(HAMLIB_MESSAGE[RIG_EIO]);
 
   expectOk(result.closed);
 

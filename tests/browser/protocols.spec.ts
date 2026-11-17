@@ -11,6 +11,7 @@
  */
 
 import { expect, expectFailure, expectOk, readFakeSerial, test, useRig } from './fixtures';
+import { RIG_EIO } from '../hamlib-errors';
 
 test('drives an Icom CI-V radio, a different protocol family', async ({ harnessPage: page }) => {
   await useRig(page, 'icom-ic703');
@@ -109,7 +110,7 @@ test('reports the upstream open failure that keeps serial DTR PTT unreachable', 
 
   const opened = expectFailure(result.opened);
   expect(opened.code).toBe('HAMLIB_ERROR');
-  expect(opened.hamlibCode).toBe(-6); /* -RIG_EIO */
+  expect(opened.hamlibCode).toBe(-RIG_EIO);
   expect(result.commands).toEqual([]);
 
   const transport = await readFakeSerial(page);

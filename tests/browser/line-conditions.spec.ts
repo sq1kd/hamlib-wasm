@@ -15,6 +15,7 @@ import {
   test,
   useRig,
 } from './fixtures';
+import { RIG_ETIMEOUT } from '../hamlib-errors';
 
 /** One rig per framing: `;`-terminated ASCII, CI-V binary, newcat ASCII, fixed-length binary. */
 const FAMILIES: readonly { rig: FakeRigName; manufacturer: string; model: string; baudRate?: number }[] = [
@@ -103,7 +104,7 @@ test('an echo alone is not a rig answering the open', async ({ harnessPage: page
    * the open fails in Hamlib - before the facade's "nothing arrived" check,
    * which an echo would satisfy, ever decides. */
   expect(opened.ok).toBe(false);
-  expect(opened.ok ? null : opened.error.hamlibCode).toBe(-5); /* -RIG_ETIMEOUT */
+  expect(opened.ok ? null : opened.error.hamlibCode).toBe(-RIG_ETIMEOUT);
 });
 
 test('stale bytes in the receive queue do not become the next reply', async ({ harnessPage: page }) => {

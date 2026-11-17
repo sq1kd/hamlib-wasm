@@ -17,6 +17,7 @@ import {
   TS480_LINE_SETTINGS,
 } from './fixtures';
 import { UPSTREAM_VERSION } from './upstream';
+import { HAMLIB_MESSAGE, RIG_ECONF, RIG_EINVAL, RIG_ETIMEOUT } from '../hamlib-errors';
 
 interface ModelSummary {
   id: number;
@@ -221,9 +222,9 @@ test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting inpu
   /* Hamlib's own rig_parse_mode() rejects the mode name. */
   const badMode = expectFailure(results.badMode);
   expect(badMode.code).toBe('HAMLIB_ERROR');
-  /* Hamlib reports failures as negative codes; -RIG_EINVAL is -1. */
-  expect(badMode.hamlibCode).toBe(-1);
-  expect(badMode.hamlibMessage).toBe('invalid parameter');
+  /* Hamlib reports failures as negative codes. */
+  expect(badMode.hamlibCode).toBe(-RIG_EINVAL);
+  expect(badMode.hamlibMessage).toBe(HAMLIB_MESSAGE[RIG_EINVAL]);
   expect(badMode.operation).toBe('setMode');
 });
 
@@ -360,9 +361,8 @@ test('reports a Hamlib timeout and recovers on the next read', async ({ harnessP
   const error = expectFailure(result.silent);
   expect(error.code).toBe('HAMLIB_ERROR');
   expect(error.operation).toBe('getFrequency');
-  /* -RIG_ETIMEOUT */
-  expect(error.hamlibCode).toBe(-5);
-  expect(error.hamlibMessage).toBe('communication timed out');
+  expect(error.hamlibCode).toBe(-RIG_ETIMEOUT);
+  expect(error.hamlibMessage).toBe(HAMLIB_MESSAGE[RIG_ETIMEOUT]);
 
   /* A timeout is reported, not fatal. */
   expect(result.connectedAfterTimeout).toBe(true);
@@ -403,9 +403,9 @@ test('surfaces a Hamlib error when the port cannot be opened', async ({ harnessP
 
   const error = expectFailure(rejected);
   expect(error.code).toBe('HAMLIB_ERROR');
-  /* -RIG_ECONF: Web Serial refused the requested line settings. */
-  expect(error.hamlibCode).toBe(-2);
-  expect(error.hamlibMessage).toBe('invalid configuration');
+  /* Web Serial refused the requested line settings. */
+  expect(error.hamlibCode).toBe(-RIG_ECONF);
+  expect(error.hamlibMessage).toBe(HAMLIB_MESSAGE[RIG_ECONF]);
   expect(error.operation).toBe('open');
 
   expect(expectOk(retried)).toBe(14_074_000);

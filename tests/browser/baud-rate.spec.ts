@@ -18,6 +18,7 @@
  */
 
 import { expect, expectFailure, expectOk, readFakeSerial, test, useRig } from './fixtures';
+import { RIG_ETIMEOUT } from '../hamlib-errors';
 
 /** The rate the emulated FT-710's CAT menu is set to, as on the real radio. */
 const FT710_CAT_RATE = 38400;
@@ -48,8 +49,8 @@ test('an open that nothing answers fails loudly instead of reporting a rig', asy
 
   const omitted = expectFailure(captured.omitted);
   expect(omitted.code).toBe('HAMLIB_ERROR');
-  /* -RIG_ETIMEOUT: Hamlib's own code for a read that timed out. */
-  expect(omitted.hamlibCode).toBe(-5);
+  /* Hamlib's own code for a read that timed out. */
+  expect(omitted.hamlibCode).toBe(-RIG_ETIMEOUT);
   /* The message has to name the rate that was tried and what to check: the rate
    * is the one thing that can be wrong, and the user is the one who set it. */
   expect(omitted.message).toContain(`at ${String(captured.max)} baud`);
