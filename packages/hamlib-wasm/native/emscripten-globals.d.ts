@@ -29,13 +29,17 @@ declare function lengthBytesUTF8(str: string): number;
  * transport suites fail if the two drift.
  */
 
-/** Line settings a transport opens a port with.  Field names are Web Serial's. */
+/**
+ * Line settings a transport opens a port with.  Field names are Web Serial's;
+ * the values are the ones every transport accepts (generated/transport.d.ts),
+ * whose Hamlib names are also Web Serial's.
+ */
 interface SerialLineSettings {
   baudRate: number;
-  dataBits?: 7 | 8;
-  stopBits?: 1 | 2;
-  parity?: 'none' | 'even' | 'odd';
-  flowControl?: 'none' | 'hardware';
+  dataBits?: LineDataBits;
+  stopBits?: LineStopBits;
+  parity?: LineParity;
+  flowControl?: LineHandshake;
   bufferSize?: number;
 }
 

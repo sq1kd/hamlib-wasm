@@ -21,6 +21,12 @@
  * Everything else stays a `candidate`: worth trying, not promised.
  */
 
+import { LINE_DATA_BITS, LINE_HANDSHAKES, LINE_PARITIES, LINE_STOP_BITS } from './native/generated/names.js';
+
+function supports(accepted: readonly (string | number)[], declared: string | number): boolean {
+  return accepted.includes(declared);
+}
+
 /** How far a rig model has been exercised in a browser. */
 export type BrowserSupport = 'verified' | 'candidate';
 
@@ -105,26 +111,25 @@ export interface DeclaredLineSettings {
  *
  * The transport refuses these configurations before it touches the port
  * (`native/web_serial.c`, `ws_validate_config`), so this only says the same
- * thing earlier and in words.  This build accepts one set of line settings for
- * every transport, so the answer holds whichever one acquired the port.  Keep
- * the two in step.
+ * thing earlier and in words.  Both read the one list in `hamlib.config.yaml`,
+ * and it holds for every transport, whichever one acquired the port.
  */
 export function describeLineSettingsLimitation(
   settings: DeclaredLineSettings,
 ): string | undefined {
-  if (settings.serialDataBits !== 7 && settings.serialDataBits !== 8) {
+  if (!supports(LINE_DATA_BITS, settings.serialDataBits)) {
     return `${settings.serialDataBits} data bits are not available over the serial transport`;
   }
 
-  if (settings.serialStopBits !== 1 && settings.serialStopBits !== 2) {
+  if (!supports(LINE_STOP_BITS, settings.serialStopBits)) {
     return `${settings.serialStopBits} stop bits are not available over the serial transport`;
   }
 
-  if (!['none', 'odd', 'even'].includes(settings.serialParity)) {
+  if (!supports(LINE_PARITIES, settings.serialParity)) {
     return `${settings.serialParity} parity is not available over the serial transport`;
   }
 
-  if (!['none', 'hardware'].includes(settings.serialHandshake)) {
+  if (!supports(LINE_HANDSHAKES, settings.serialHandshake)) {
     return `${settings.serialHandshake} flow control is not available over the serial transport`;
   }
 

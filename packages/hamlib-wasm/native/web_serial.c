@@ -43,7 +43,14 @@
 #include "misc.h"
 #include "serial.h"
 #include "generated/codecs.h"
+#include "generated/line_settings.h"
 #include "web_serial.h"
+
+/* A C string the transport or a codec may leave NULL, or `fallback`. */
+static const char *textOr(const char *text, const char *fallback)
+{
+    return text ? text : fallback;
+}
 
 /* --- error mapping ------------------------------------------------------ */
 
@@ -169,14 +176,14 @@ long webserial_rx_bytes(const char *path)
 
 /*
  * The settings this build's transport contract accepts are the ones Web Serial
- * can express: 7 or 8 data bits, 1 or 2 stop bits, none/even/odd parity and no
- * flow control or hardware handshake.  They apply to every transport - the
- * Node adapter included - so a rig that declares anything else is refused
- * before the port is touched rather than silently downgraded.
+ * can express, listed under `lineSettings` in hamlib.config.yaml.  They apply
+ * to every transport - the Node adapter included - so a rig that declares
+ * anything else is refused before the port is touched rather than silently
+ * downgraded.
  */
 static int ws_validate_config(const hamlib_port_t *p)
 {
-    if (p->parm.serial.data_bits != 7 && p->parm.serial.data_bits != 8)
+    if (!webserial_supports_data_bits(p->parm.serial.data_bits))
     {
         rig_debug(RIG_DEBUG_ERR,
                   "%s: %d data bits are not supported by the serial transport\n",
@@ -184,7 +191,7 @@ static int ws_validate_config(const hamlib_port_t *p)
         return -RIG_ECONF;
     }
 
-    if (p->parm.serial.stop_bits != 1 && p->parm.serial.stop_bits != 2)
+    if (!webserial_supports_stop_bits(p->parm.serial.stop_bits))
     {
         rig_debug(RIG_DEBUG_ERR,
                   "%s: %d stop bits are not supported by the serial transport\n",
@@ -192,22 +199,19 @@ static int ws_validate_config(const hamlib_port_t *p)
         return -RIG_ECONF;
     }
 
-    if (p->parm.serial.parity != RIG_PARITY_NONE
-            && p->parm.serial.parity != RIG_PARITY_EVEN
-            && p->parm.serial.parity != RIG_PARITY_ODD)
+    if (!webserial_supports_parity(p->parm.serial.parity))
     {
         rig_debug(RIG_DEBUG_ERR,
-                  "%s: parity %d is not supported by the serial transport\n",
-                  __func__, p->parm.serial.parity);
+                  "%s: %s parity is not supported by the serial transport\n",
+                  __func__, textOr(strSerialParity(p->parm.serial.parity), "unknown"));
         return -RIG_ECONF;
     }
 
-    if (p->parm.serial.handshake != RIG_HANDSHAKE_NONE
-            && p->parm.serial.handshake != RIG_HANDSHAKE_HARDWARE)
+    if (!webserial_supports_handshake(p->parm.serial.handshake))
     {
         rig_debug(RIG_DEBUG_ERR,
-                  "%s: handshake %d is not supported by the serial transport\n",
-                  __func__, p->parm.serial.handshake);
+                  "%s: %s handshake is not supported by the serial transport\n",
+                  __func__, textOr(strSerialHandshake(p->parm.serial.handshake), "unknown"));
         return -RIG_ECONF;
     }
 
@@ -219,6 +223,39 @@ static int ws_validate_config(const hamlib_port_t *p)
         return -RIG_ECONF;
     }
 
+    return RIG_OK;
+}
+
+/*
+ * Open rp->pathname with rp's line settings and record the handle in rp->fd.
+ * The caller has validated the settings.
+ */
+static int ws_open_port(hamlib_port_t *rp)
+{
+    int status;
+    int handle = hamlibWsOpenPort(rp->pathname, rp->parm.serial.rate,
+                                  rp->parm.serial.data_bits,
+                                  rp->parm.serial.stop_bits,
+                                  strSerialParity(rp->parm.serial.parity),
+                                  strSerialHandshake(rp->parm.serial.handshake));
+
+    if (handle <= 0)
+    {
+        rig_debug(RIG_DEBUG_ERR, "%s: cannot open %s (%s)\n", __func__,
+                  rp->pathname, textOr(webserial_last_error(), "transport error"));
+        /* Handles are positive: 0 is no handle, not success. */
+        return handle < 0 ? webserial_map_error(handle) : -RIG_EIO;
+    }
+
+    status = webserial_register_handle(handle, rp->pathname);
+
+    if (status != RIG_OK)
+    {
+        hamlibWsClosePort(handle);
+        return status;
+    }
+
+    rp->fd = handle;
     return RIG_OK;
 }
 
@@ -241,7 +278,6 @@ int is_uh_radio_fd(int fd)
  */
 int HAMLIB_API serial_open(hamlib_port_t *rp)
 {
-    int handle;
     int status;
 
     if (!rp)
@@ -273,31 +309,7 @@ int HAMLIB_API serial_open(hamlib_port_t *rp)
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s: %s\n", __func__, rp->pathname);
 
-    handle = hamlibWsOpenPort(rp->pathname, rp->parm.serial.rate,
-                              rp->parm.serial.data_bits,
-                              rp->parm.serial.stop_bits,
-                              strSerialParity(rp->parm.serial.parity),
-                              strSerialHandshake(rp->parm.serial.handshake));
-
-    if (handle <= 0)
-    {
-        const char *why = webserial_last_error();
-
-        rig_debug(RIG_DEBUG_ERR, "%s: cannot open %s (%s)\n", __func__,
-                  rp->pathname, why ? why : "transport error");
-        return webserial_map_error(handle);
-    }
-
-    status = webserial_register_handle(handle, rp->pathname);
-
-    if (status != RIG_OK)
-    {
-        hamlibWsClosePort(handle);
-        return status;
-    }
-
-    rp->fd = handle;
-    return RIG_OK;
+    return ws_open_port(rp);
 }
 
 /**
@@ -309,7 +321,6 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
 {
     int status;
     int matches;
-    int handle;
 
     if (!rp)
     {
@@ -365,27 +376,7 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
 
     rp->fd = -1;
 
-    handle = hamlibWsOpenPort(rp->pathname, rp->parm.serial.rate,
-                              rp->parm.serial.data_bits,
-                              rp->parm.serial.stop_bits,
-                              strSerialParity(rp->parm.serial.parity),
-                              strSerialHandshake(rp->parm.serial.handshake));
-
-    if (handle <= 0)
-    {
-        return webserial_map_error(handle);
-    }
-
-    status = webserial_register_handle(handle, rp->pathname);
-
-    if (status != RIG_OK)
-    {
-        hamlibWsClosePort(handle);
-        return status;
-    }
-
-    rp->fd = handle;
-    return RIG_OK;
+    return ws_open_port(rp);
 }
 
 /**

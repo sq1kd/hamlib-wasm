@@ -396,3 +396,15 @@ export const RIG_CONF_TYPES = {
 
 /** One of the values of {@link RIG_CONF_TYPES}. */
 export type RigConfType = (typeof RIG_CONF_TYPES)[keyof typeof RIG_CONF_TYPES];
+
+/** The data bits every transport accepts, from hamlib.config.yaml. */
+export const LINE_DATA_BITS = [7, 8] as const;
+
+/** The stop bits every transport accepts, from hamlib.config.yaml. */
+export const LINE_STOP_BITS = [1, 2] as const;
+
+/** The parities every transport accepts, from hamlib.config.yaml. */
+export const LINE_PARITIES = ['none', 'even', 'odd'] as const satisfies readonly SerialParity[];
+
+/** The flow controls every transport accepts, from hamlib.config.yaml. */
+export const LINE_HANDSHAKES = ['none', 'hardware'] as const satisfies readonly SerialHandshake[];

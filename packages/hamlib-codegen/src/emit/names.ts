@@ -20,7 +20,8 @@ function quote(text: string): string {
   return `'${text.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
 }
 
-export function emitNames(vocabularies: readonly NameVocabulary[]): string {
+/** `appendix` is further generated declarations the file carries (the line settings). */
+export function emitNames(vocabularies: readonly NameVocabulary[], appendix: readonly string[] = []): string {
   const lines = [NAMES_HEADER, ''];
 
   for (const vocabulary of vocabularies) {
@@ -61,7 +62,7 @@ export function emitNames(vocabularies: readonly NameVocabulary[]): string {
     }
   }
 
-  return lines.join('\n');
+  return [...lines, ...appendix].join('\n');
 }
 
 const TRANSPORT_HEADER = `// SPDX-License-Identifier: MIT
@@ -73,8 +74,8 @@ const TRANSPORT_HEADER = `// SPDX-License-Identifier: MIT
  * ambient `const enum`s, so the JS library speaks the same codes and bits as
  * `native/web_serial.c` without importing anything.
  */
-export function emitTransportTypes(vocabularies: readonly NameVocabulary[]): string {
-  const lines = [TRANSPORT_HEADER, ''];
+export function emitTransportTypes(vocabularies: readonly NameVocabulary[], appendix: readonly string[] = []): string {
+  const lines = [TRANSPORT_HEADER, '', ...appendix];
 
   for (const vocabulary of vocabularies) {
     const type = vocabulary.record.constEnum;

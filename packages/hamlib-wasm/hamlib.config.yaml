@@ -25,6 +25,17 @@ release:
     - file: hamlib-4.7.2-web.patch
       purpose: "Skip the Morse worker start in rig_open(): the browser build has no pthreads, and without this the worker's thread creation would fail the whole open. Register only serial-port rig models on Emscripten: the network, parallel, device and dummy models cannot be opened here, the facade already hides them, and leaving them unregistered lets the linker drop their code. No other upstream source change."
 
+# The line settings every transport accepts: the ones Web Serial can express,
+# and the Node transport is held to the same set so a model behaves alike on
+# both.  The serial layer (native/web_serial.c) refuses a rig that declares
+# anything else with -RIG_ECONF before the port is touched, and the catalogue
+# says so up front.  Parity and handshake are Hamlib's names for them.
+lineSettings:
+  dataBits: [ 7, 8 ]
+  stopBits: [ 1, 2 ]
+  parity: [ none, even, odd ]
+  handshake: [ none, hardware ]
+
 # Value objects the Embind boundary returns whose C++ structs are declared in
 # native/facade.cpp.  The generator registers them; it never defines them.
 # The generated single-output results (NumberResult, TextResult and the

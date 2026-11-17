@@ -441,6 +441,8 @@ addToLibrary({
         return this.allocHandle(record);
       }
 
+      /* web_serial.c only opens a port with settings ws_validate_config()
+       * accepted, which are exactly these types. */
       const options: SerialLineSettings = {
         baudRate: rate,
         dataBits: dataBits as SerialLineSettings['dataBits'],

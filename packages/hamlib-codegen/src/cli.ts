@@ -48,6 +48,7 @@ import { operationFacts } from './emit/common.ts';
 import { emitContract } from './emit/contract.ts';
 import { emitCapabilities, emitCodecs, emitEmbind, emitOperations, emitResults } from './emit/cpp.ts';
 import { emitMethodFiles } from './emit/methods.ts';
+import { emitLineSettingsHeader, lineSettingsConstants, lineSettingsTypes } from './emit/line-settings.ts';
 import { emitNames, emitTransportTypes } from './emit/names.ts';
 import { loadVocabularies } from './names.ts';
 import type { NameVocabulary } from './names.ts';
@@ -129,6 +130,7 @@ interface GeneratedPaths {
   readonly embind: string;
   readonly codecs: string;
   readonly transport: string;
+  readonly lineSettings: string;
   readonly results: string;
   readonly operations: string;
   readonly capabilities: string;
@@ -146,6 +148,7 @@ function outputPaths(packageDir: string): GeneratedPaths {
     embind: path.join(generated, 'embind.inc'),
     codecs: path.join(generated, 'codecs.h'),
     transport: path.join(generated, 'transport.d.ts'),
+    lineSettings: path.join(generated, 'line_settings.h'),
     results: path.join(generated, 'results.inc'),
     operations: path.join(generated, 'operations.inc'),
     capabilities: path.join(generated, 'capabilities.inc'),
@@ -479,7 +482,8 @@ function render(
   const files: (readonly [string, string])[] = [
     [paths.results, emitResults(model, facts)],
     [paths.codecs, emitCodecs(vocabularies)],
-    [paths.transport, emitTransportTypes(vocabularies)],
+    [paths.transport, emitTransportTypes(vocabularies, lineSettingsTypes(model.lineSettings, vocabularies))],
+    [paths.lineSettings, emitLineSettingsHeader(model.lineSettings, vocabularies)],
     [paths.operations, emitOperations(facts)],
     [paths.capabilities, emitCapabilities(model, facts)],
     [paths.embind, emitEmbind(model, facts)],
@@ -491,7 +495,7 @@ function render(
         return declarations ? canonicalDeclaration(declarations).params.map((param) => param.name) : [];
       },
     })],
-    [paths.names, emitNames(vocabularies)],
+    [paths.names, emitNames(vocabularies, lineSettingsConstants(model.lineSettings, vocabularies))],
     [paths.coverage, `${JSON.stringify(coverage, null, 2)}\n`],
     ...emitMethodFiles(model, facts).map(
       ({ path: relative, content }) => [path.join(paths.methodsDir, relative), content] as const,

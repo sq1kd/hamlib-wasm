@@ -68,6 +68,7 @@ export const BRIDGE_INPUTS: readonly string[] = [
   'native/generated/capabilities.inc',
   'native/generated/codecs.h',
   'native/generated/embind.inc',
+  'native/generated/line_settings.h',
   'native/generated/operations.inc',
   'native/generated/results.inc',
   'native/generated/transport.d.ts',

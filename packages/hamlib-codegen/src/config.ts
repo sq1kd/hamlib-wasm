@@ -73,6 +73,18 @@ export interface ModelVector {
   readonly binding: string;
 }
 
+/**
+ * The line settings every transport accepts: what Web Serial can express, so
+ * the Node transport is held to the same set.  Parity and handshake are
+ * Hamlib's names (`SerialParity`, `SerialHandshake`).
+ */
+export interface LineSettings {
+  readonly dataBits: readonly number[];
+  readonly stopBits: readonly number[];
+  readonly parity: readonly string[];
+  readonly handshake: readonly string[];
+}
+
 export interface Model {
   readonly results: Readonly<Record<string, ModelResult>>;
   readonly vectors: readonly ModelVector[];
@@ -82,6 +94,7 @@ export interface Model {
    * the `ModelInfo` catalogue value object.
    */
   readonly flags: readonly string[];
+  readonly lineSettings: LineSettings;
   /** Declarative renames for the mechanically generated surface. */
   readonly overrides?: {
     /** Per-symbol method/field renames for generated operations. */
@@ -290,6 +303,28 @@ function readOverrides(file: string, value: unknown): Model['overrides'] {
   };
 }
 
+function readLineSettings(file: string, value: unknown): LineSettings {
+  const settings = asObject(file, value, 'lineSettings');
+  const numbers = (key: string): readonly number[] =>
+    asArray(file, settings[key], `lineSettings.${key}`).map((entry, index) => {
+      if (!Number.isInteger(entry)) {
+        fail(file, `lineSettings.${key}[${index}] must be an integer`);
+      }
+
+      return entry as number;
+    });
+  const names = (key: string): readonly string[] =>
+    asArray(file, settings[key], `lineSettings.${key}`)
+      .map((entry, index) => asString(file, entry, `lineSettings.${key}[${index}]`));
+
+  return {
+    dataBits: numbers('dataBits'),
+    stopBits: numbers('stopBits'),
+    parity: names('parity'),
+    handshake: names('handshake'),
+  };
+}
+
 /** Read the codegen half of the config: everything except `release`. */
 export function loadConfig(file: string): CodegenConfig {
   let parsed: unknown;
@@ -317,6 +352,7 @@ export function loadConfig(file: string): CodegenConfig {
       vectors: readVectors(file, root.vectors),
       operations: readOperations(file, root.operations, flags),
       flags,
+      lineSettings: readLineSettings(file, root.lineSettings),
       overrides: readOverrides(file, root.overrides ?? {}),
     },
   };
