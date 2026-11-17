@@ -967,19 +967,20 @@ function declaredRange(model: RigModel): { min: number; max: number } | undefine
 }
 
 /**
- * Rates to try for `model`, highest first.
+ * The rates {@link RawHamlib.detectBaudRate} tries for `model` when it is
+ * given no `rates`, in the order it tries them: the standard UART rates inside
+ * the model's declared range, highest first.
  *
- * The declared maximum comes first because that is the rate Hamlib itself
- * defaults to, so a model whose default already works is answered immediately.
- * The rest of the ladder follows, filtered to the declared range; a declared
- * range that is not usable (some backends leave it zero) leaves the whole
- * ladder in place rather than turning into an empty search.
+ * The declared maximum leads because that is the rate Hamlib itself defaults
+ * to, so a model whose default already works is answered immediately.  A
+ * declared range that is not usable (some backends leave it zero) leaves the
+ * whole ladder in place rather than turning into an empty search.
+ *
+ * A UI that searches one rate at a time - to show progress, or to try a
+ * remembered rate first - takes its list from here and passes single rates
+ * as `rates`.
  */
-function baudRateCandidates(model: RigModel, rates?: readonly number[]): number[] {
-  if (rates !== undefined) {
-    return [...new Set(rates)];
-  }
-
+export function baudRateCandidates(model: RigModel): number[] {
   const range = declaredRange(model);
   const inRange = (rate: number): boolean =>
     range === undefined || (rate >= range.min && rate <= range.max);
@@ -1293,7 +1294,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
     const { modelId, port, rates } = options;
     const conf = encodeConf(options.conf, 'detectBaudRate');
     const model = this.#requireModel(modelId, 'detectBaudRate');
-    const candidates = baudRateCandidates(model, rates);
+    const candidates = rates === undefined ? baudRateCandidates(model) : [...new Set(rates)];
 
     if (candidates.length === 0) {
       throw new HamlibError(

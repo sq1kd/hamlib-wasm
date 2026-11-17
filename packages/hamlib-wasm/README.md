@@ -178,7 +178,9 @@ What it adds, and what it deliberately does not:
 
   `rig.baudRate` reports the rate a live rig was opened at, so storing it
   (a cookie, a settings row, your own default) makes the next connect explicit
-  and instant.  A rig whose USB interface ignores the line rate - a CDC-ACM one
+  and instant.  `baudRateCandidates(model)` lists the rates the search tries,
+  in order, for a UI that tries one at a time with `rates: [rate]` to show
+  progress or to start from a remembered rate.  A rig whose USB interface ignores the line rate - a CDC-ACM one
   - is unaffected either way.
 
 ## The raw surface

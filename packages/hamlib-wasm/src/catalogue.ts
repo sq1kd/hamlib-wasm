@@ -145,7 +145,8 @@ export interface DetectBaudRateOptions {
    *
    * Defaults to the standard UART rates inside the model's declared range
    * ({@link RigModel.serialRateMin}..{@link RigModel.serialRateMax}), highest
-   * first - the order Hamlib's own default already prefers.
+   * first - the order Hamlib's own default already prefers; see
+   * {@link baudRateCandidates}.
    */
   rates?: readonly number[];
   /**

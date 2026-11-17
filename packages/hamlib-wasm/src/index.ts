@@ -72,6 +72,7 @@ export {
   RIG_MODES,
   UNUSABLE_MODELS,
   VERIFIED_MODELS,
+  baudRateCandidates,
   describeLineSettingsLimitation,
   HamlibError,
   webSerialTransport,
