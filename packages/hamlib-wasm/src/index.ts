@@ -45,6 +45,7 @@
  */
 
 import { HamlibError, createRawHamlib } from './raw.js';
+import { asHamlibError, closedError, disposedError } from './errors.js';
 import type {
   Diagnostics,
   RawHamlib,
@@ -537,18 +538,6 @@ export function capabilitiesOf(model: RigModel): RigOperationCapabilities {
   };
 }
 
-/** Wrap a thrown value as a `HamlibError`; the native layer always throws one. */
-function asHamlibError(error: unknown, operation: string): HamlibError {
-  if (error instanceof HamlibError) {
-    return error;
-  }
-
-  return new HamlibError(
-    error instanceof Error ? error.message : String(error),
-    { code: 'TRANSPORT_FAILURE', operation, cause: error },
-  );
-}
-
 /** One live polling registration; its identity is the unsubscribe handle. */
 interface PollSubscription {
   readonly intervalMs: number;
@@ -756,7 +745,7 @@ class RigHandle implements Rig {
 
   watch(options: WatchOptions): () => void {
     if (!this.connected) {
-      throw new HamlibError('rig is closed', { code: 'RIG_CLOSED', operation: 'watch' });
+      throw closedError('watch');
     }
 
     const { intervalMs } = options;
@@ -1192,10 +1181,7 @@ class HamlibInstance implements Hamlib {
       /* Disposal was accepted while this open waited: hand the rig over closed
        * instead of publishing a live wrapper. */
       await handle.close();
-      throw new HamlibError('Hamlib instance has been disposed', {
-        code: 'DISPOSED',
-        operation: 'open',
-      });
+      throw disposedError('open');
     }
 
     this.#rigs.add(handle);
@@ -1226,10 +1212,7 @@ class HamlibInstance implements Hamlib {
 
   #assertLive(operation: string): void {
     if (this.#disposed) {
-      throw new HamlibError('Hamlib instance has been disposed', {
-        code: 'DISPOSED',
-        operation,
-      });
+      throw disposedError(operation);
     }
   }
 }

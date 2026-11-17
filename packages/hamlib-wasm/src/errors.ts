@@ -141,3 +141,37 @@ export function transportError(cause: unknown, operation: string): HamlibError {
     cause,
   });
 }
+
+/**
+ * Wrap a thrown value as a `HamlibError`.  The native layer only ever throws
+ * one, so anything else came from underneath it and is a transport failure.
+ */
+export function asHamlibError(error: unknown, operation: string): HamlibError {
+  if (error instanceof HamlibError) {
+    return error;
+  }
+
+  return new HamlibError(
+    error instanceof Error ? error.message : String(error),
+    { code: 'TRANSPORT_FAILURE', operation, cause: error },
+  );
+}
+
+/** A call on an instance that has been disposed. */
+export function disposedError(operation: string): HamlibError {
+  return new HamlibError('Hamlib instance has been disposed', { code: 'DISPOSED', operation });
+}
+
+/** A call on a rig that has been closed. */
+export function closedError(operation: string): HamlibError {
+  return new HamlibError('rig is closed', { code: 'RIG_CLOSED', operation });
+}
+
+/** A call on an instance whose earlier call never settled. */
+export function hungError(operation: string): HamlibError {
+  return new HamlibError(
+    'the Hamlib instance is hung after an operation that never settled; '
+    + 'dispose it and create a new one',
+    { code: 'RIG_HUNG', operation },
+  );
+}

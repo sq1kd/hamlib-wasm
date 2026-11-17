@@ -40,7 +40,14 @@ import { confKeysPttLine, encodeConf } from './conf.js';
 import type { RigConf } from './conf.js';
 import { DiagnosticsRecorder, debugLevelIndex } from './diagnostics.js';
 import type { DebugOptions, Diagnostics, DiagnosticsRig } from './diagnostics.js';
-import { HamlibError, HAMLIB_ERROR_MESSAGES } from './errors.js';
+import {
+  HamlibError,
+  HAMLIB_ERROR_MESSAGES,
+  asHamlibError,
+  closedError,
+  disposedError,
+  hungError,
+} from './errors.js';
 import { selectTransport } from './transport-select.js';
 import type {
   PortRequest,
@@ -451,12 +458,7 @@ class Serializer {
   /** Queue work for a live instance. */
   enqueue<T>(operation: string, work: () => T | Promise<T>): Promise<T> {
     if (this.#closed) {
-      return Promise.reject(
-        new HamlibError('Hamlib instance has been disposed', {
-          code: 'DISPOSED',
-          operation,
-        }),
-      );
+      return Promise.reject(disposedError(operation));
     }
 
     if (this.#hung) {
@@ -539,14 +541,6 @@ class Serializer {
 
     return promise;
   }
-}
-
-function hungError(operation: string): HamlibError {
-  return new HamlibError(
-    'the Hamlib instance is hung after an operation that never settled; '
-    + 'dispose it and create a new one',
-    { code: 'RIG_HUNG', operation },
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -867,14 +861,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
         }
       });
     } catch (error) {
-      if (error instanceof HamlibError) {
-        throw error;
-      }
-
-      throw new HamlibError(
-        error instanceof Error ? error.message : String(error),
-        { code: 'TRANSPORT_FAILURE', operation: 'close', cause: error },
-      );
+      throw asHamlibError(error, 'close');
     }
   }
 
@@ -899,14 +886,12 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
    */
   #call<T>(operation: string, work: () => Promise<T>): Promise<T> {
     if (this.#closed) {
-      return Promise.reject(
-        new HamlibError('rig is closed', { code: 'RIG_CLOSED', operation }),
-      );
+      return Promise.reject(closedError(operation));
     }
 
     return this.#context.queue.enqueue<T>(operation, () => {
       if (this.#closed) {
-        throw new HamlibError('rig is closed', { code: 'RIG_CLOSED', operation });
+        throw closedError(operation);
       }
 
       return work();
@@ -1370,10 +1355,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
         /* Disposal was accepted while this open waited in the queue.  Hand
          * the rig over closed instead of letting an open survive it. */
         await rig.close();
-        throw new HamlibError('Hamlib instance has been disposed', {
-          code: 'DISPOSED',
-          operation: 'open',
-        });
+        throw disposedError('open');
       }
 
       return rig;
@@ -1607,10 +1589,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
   #assertLive(operation: string): void {
     if (this.#disposed) {
-      throw new HamlibError('Hamlib instance has been disposed', {
-        code: 'DISPOSED',
-        operation,
-      });
+      throw disposedError(operation);
     }
   }
 }

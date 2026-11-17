@@ -35,9 +35,11 @@ import {
 } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
-import { HamlibError, createHamlib } from './index.js';
+import { asHamlibError } from './errors.js';
+import { createHamlib } from './index.js';
 import type {
   Hamlib,
+  HamlibError,
   HamlibOptions,
   Rig,
   LevelName,
@@ -74,18 +76,6 @@ export type {
   WatchOptions,
 } from './index.js';
 export { HamlibError, createHamlib, webSerialTransport } from './index.js';
-
-/** Wrap any thrown value as a `HamlibError`. */
-function asHamlibError(error: unknown, operation: string): HamlibError {
-  if (error instanceof HamlibError) {
-    return error;
-  }
-
-  return new HamlibError(
-    error instanceof Error ? error.message : String(error),
-    { code: 'TRANSPORT_FAILURE', operation, cause: error },
-  );
-}
 
 /** What the provider publishes. */
 export interface HamlibContextValue {
