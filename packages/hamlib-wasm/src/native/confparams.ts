@@ -10,6 +10,7 @@
  */
 import { drainVector } from '../embind.js';
 import type { RigConfparams, RigConfparamsList } from './hamlib-wasm.mjs';
+import type { RigConfType } from './generated/names.js';
 
 /**
  * One configuration or extension parameter, as `struct confparams` describes
@@ -26,8 +27,8 @@ export interface RigConfparam {
   tooltip: string;
   /** Default value, as text. */
   dflt: string;
-  /** Hamlib `enum rig_conf_e` value: 0 string, 1 combo, 2 numeric, 3 checkbutton, 4 button, 5 binary, 6 int. */
-  type: number;
+  /** Hamlib `enum rig_conf_e` value: one of the values of `RIG_CONF_TYPES`. */
+  type: RigConfType;
 }
 
 /**
@@ -43,7 +44,8 @@ export function projectConfparam(value: RigConfparams): RigConfparam {
     label: String(value.label),
     tooltip: String(value.tooltip),
     dflt: String(value.dflt),
-    type: value.type,
+    /* Hamlib only declares its own `rig_conf_e` constants. */
+    type: value.type as RigConfType,
   };
 }
 

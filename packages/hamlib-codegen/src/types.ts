@@ -10,13 +10,18 @@
  * the generator be trusted: the compiler's AST supplies the exact C type, and
  * this table decides, by name, whether the generator knows how to move it.
  *
- * Name-typed enums lean on the upstream `rig_parse_*`/`rig_str*` functions, so
- * the enum vocabulary is never reimplemented here.  Enums without such a pair
- * cross as their underlying integer, which is lossless and mechanical.
+ * Name-typed enums are described in enums.ts: their names cross through the
+ * upstream `rig_parse_*`/`rig_str*` pair, or through the pair the generator
+ * emits from the enum's own constants.  Enums with neither cross as their
+ * underlying integer, which is lossless and mechanical.
  *
  * Authored as TypeScript and run directly by Node's type stripping, so this
  * file must stay erasable (no enums, namespaces or parameter properties).
  */
+
+import { codecOf, enumRecordFor, type SettingNamespace } from './enums.ts';
+
+export type { SettingNamespace } from './enums.ts';
 
 /** How a mapped value is represented on the Embind boundary. */
 export type BoundaryType = 'int' | 'double' | 'bool' | 'string';
@@ -65,15 +70,6 @@ export function flagBinding(native: string, on: string, off: string): TypeBindin
   return { category: 'boolean', boundary: 'bool', ts: 'boolean', native, flag: { on, off } };
 }
 
-/**
- * Enums Hamlib has no codec for, by the union their constants become; the
- * generator emits `parse<Type>`/`str<Type>` into the facade (see names.ts).
- */
-const NAMED_ENUMS: Readonly<Record<string, string>> = {
-  powerstat_t: 'PowerStatus',
-  reset_t: 'ResetKind',
-};
-
 /** Two-member OFF/ON enums: their name is the only thing that is not a boolean. */
 const FLAG_ENUMS: Readonly<Record<string, { readonly on: string; readonly off: string }>> = {
   split_t: { on: 'RIG_SPLIT_ON', off: 'RIG_SPLIT_OFF' },
@@ -110,15 +106,6 @@ export interface ProjectionSpec {
   readonly dropped: readonly { readonly name: string; readonly reason: string }[];
 }
 
-/** The `setting_t` namespaces, distinguished by the operation symbol. */
-export type SettingNamespace = 'level' | 'func' | 'parm';
-
-const SETTING_BINDINGS: Readonly<Record<SettingNamespace, EnumBinding>> = {
-  level: { ts: 'Level', enumStr: 'rig_strlevel', enumParse: 'rig_parse_level', enumNone: 'RIG_LEVEL_NONE' },
-  func: { ts: 'Func', enumStr: 'rig_strfunc', enumParse: 'rig_parse_func', enumNone: 'RIG_FUNC_NONE' },
-  parm: { ts: 'Parm', enumStr: 'rig_strparm', enumParse: 'rig_parse_parm', enumNone: 'RIG_PARM_NONE' },
-};
-
 /** How a `value_t` is stored for each namespace; `func` carries no value. */
 const VALUE_PREDICATES: Readonly<Record<SettingNamespace, string | null>> = {
   level: 'RIG_LEVEL_IS_FLOAT',
@@ -151,12 +138,7 @@ export function settingNamespaceFor(symbol: string): SettingNamespace | null {
 
 /** A `setting_t` parameter, its name vocabulary chosen by namespace. */
 export function settingBinding(namespace: SettingNamespace): TypeBinding {
-  return {
-    category: 'enum',
-    boundary: 'string',
-    native: 'setting_t',
-    ...SETTING_BINDINGS[namespace],
-  };
+  return enumBinding('setting_t', 'setting_t', namespace) as TypeBinding;
 }
 
 /**
@@ -223,49 +205,25 @@ const NUMBER_NATIVE: ReadonlySet<string> = new Set([
   'rig_conf_e',
 ]);
 
-interface EnumBinding {
-  /**
-   * The string-literal union the names form, emitted into
-   * `src/native/generated/names.ts` from the upstream table (see names.ts).
-   */
-  readonly ts: string;
-  readonly enumStr: string;
-  readonly enumParse: string;
-  readonly enumNone: string;
-}
+/** The binding of an enum whose names cross into C, or `null` when it has no codec. */
+function enumBinding(enumName: string, native: string, namespace?: SettingNamespace): TypeBinding | null {
+  const record = enumRecordFor(enumName, namespace);
+  const codec = record === undefined ? null : codecOf(record);
 
-/**
- * Enums that have an upstream parser and stringifier, so the generated surface
- * speaks names instead of integers.  `vfo_t` and `rmode_t` are typedefs to
- * integer types in this release; the rest are anonymous enums behind a typedef.
- */
-const ENUMS: Readonly<Record<string, EnumBinding>> = {
-  vfo_t: { ts: 'Vfo', enumStr: 'rig_strvfo', enumParse: 'rig_parse_vfo', enumNone: 'RIG_VFO_NONE' },
-  rmode_t: {
-    ts: 'RigMode',
-    enumStr: 'rig_strrmode',
-    enumParse: 'rig_parse_mode',
-    enumNone: 'RIG_MODE_NONE',
-  },
-  rptr_shift_t: {
-    ts: 'RptrShift',
-    enumStr: 'rig_strptrshift',
-    enumParse: 'rig_parse_rptr_shift',
-    enumNone: 'RIG_RPT_SHIFT_NONE',
-  },
-  vfo_op_t: {
-    ts: 'VfoOp',
-    enumStr: 'rig_strvfop',
-    enumParse: 'rig_parse_vfo_op',
-    enumNone: 'RIG_OP_NONE',
-  },
-  scan_t: {
-    ts: 'ScanOp',
-    enumStr: 'rig_strscan',
-    enumParse: 'rig_parse_scan',
-    enumNone: 'RIG_SCAN_NONE',
-  },
-};
+  if (!record?.names || codec === null) {
+    return null;
+  }
+
+  return {
+    category: 'enum',
+    boundary: 'string',
+    native,
+    ts: record.names.type,
+    enumStr: codec.str,
+    enumParse: codec.parse,
+    enumNone: codec.none,
+  };
+}
 
 /** How many call sites need this shared conversion; inline it is not. */
 export function normalizeType(qualType: string): string {
@@ -307,35 +265,16 @@ export function bindType(qualType: string): TypeBinding | null {
     return { category: 'string', boundary: 'string', ts: 'string', native: 'const char *' };
   }
 
-  const named = NAMED_ENUMS[bare];
+  const named = enumBinding(bare, normalized);
 
   if (named) {
-    return {
-      category: 'enum',
-      boundary: 'string',
-      native: normalized,
-      ts: named,
-      enumStr: `str${named}`,
-      enumParse: `parse${named}`,
-      enumNone: `static_cast<${bare}>(-1)`,
-    };
+    return named;
   }
 
   const flagEnum = FLAG_ENUMS[bare];
 
   if (flagEnum) {
     return flagBinding(normalized, flagEnum.on, flagEnum.off);
-  }
-
-  const enumBinding = ENUMS[bare];
-
-  if (enumBinding) {
-    return {
-      category: 'enum',
-      boundary: 'string',
-      native: normalized,
-      ...enumBinding,
-    };
   }
 
   if (NUMBER_NATIVE.has(bare)) {

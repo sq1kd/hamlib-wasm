@@ -40,13 +40,6 @@
  * consumes; see native/tsconfig.library.json and build/compile-native.ts.
  */
 
-/* Hamlib's serial enum order.  The transport contract accepts neither the
- * mark/space parity names nor xon-xoff flow control, so a rig that declares
- * them is refused earlier by ws_validate_config in native/web_serial.c;
- * keeping the full table preserves the index mapping.  These are inlined at
- * each use because a module-scope binding would not survive Emscripten's
- * library lift. */
-
 addToLibrary({
   $HamlibWs: {
     WS_OK: 0,
@@ -440,8 +433,8 @@ addToLibrary({
       rate: number,
       dataBits: number,
       stopBits: number,
-      parity: number,
-      flowControl: number,
+      parity: string,
+      flowControl: string,
     ): Promise<number> {
       const record = this.ports.get(path);
 
@@ -456,20 +449,12 @@ addToLibrary({
         return this.allocHandle(record);
       }
 
-      const parityName = ['none', 'odd', 'even', 'mark', 'space'][parity];
-      const flowName = ['none', 'xon-xoff', 'hardware'][flowControl];
-
-      if (!parityName || !flowName) {
-        this.recordError('TypeError', 'unsupported serial configuration', 'open');
-        return this.WS_ERR_CONF;
-      }
-
       const options: SerialLineSettings = {
         baudRate: rate,
         dataBits: dataBits as SerialLineSettings['dataBits'],
         stopBits: stopBits as SerialLineSettings['stopBits'],
-        parity: parityName as SerialLineSettings['parity'],
-        flowControl: flowName as SerialLineSettings['flowControl'],
+        parity: parity as SerialLineSettings['parity'],
+        flowControl: flowControl as SerialLineSettings['flowControl'],
         bufferSize: 255,
       };
 
@@ -532,8 +517,8 @@ addToLibrary({
       rate: number,
       dataBits: number,
       stopBits: number,
-      parity: number,
-      flowControl: number,
+      parity: string,
+      flowControl: string,
     ): number {
       const entry = this.handles.get(handle);
 
@@ -547,8 +532,8 @@ addToLibrary({
         options.baudRate === rate
         && options.dataBits === dataBits
         && options.stopBits === stopBits
-        && options.parity === ['none', 'odd', 'even', 'mark', 'space'][parity]
-        && options.flowControl === ['none', 'xon-xoff', 'hardware'][flowControl]
+        && options.parity === parity
+        && options.flowControl === flowControl
       ) {
         return 1;
       }
@@ -841,7 +826,9 @@ addToLibrary({
     stopBits: number,
     parity: number,
     flowControl: number,
-  ): Promise<number> => HamlibWs.openPort(UTF8ToString(path), rate, dataBits, stopBits, parity, flowControl),
+  ): Promise<number> => HamlibWs.openPort(
+    UTF8ToString(path), rate, dataBits, stopBits, UTF8ToString(parity), UTF8ToString(flowControl),
+  ),
 
   hamlibWsClosePort__deps: ['$HamlibWs'],
   hamlibWsClosePort__async: 'auto',
@@ -855,7 +842,9 @@ addToLibrary({
     stopBits: number,
     parity: number,
     flowControl: number,
-  ): number => HamlibWs.matchesOpenOptions(handle, rate, dataBits, stopBits, parity, flowControl),
+  ): number => HamlibWs.matchesOpenOptions(
+    handle, rate, dataBits, stopBits, UTF8ToString(parity), UTF8ToString(flowControl),
+  ),
 
   hamlibWsRead__deps: ['$HamlibWs'],
   hamlibWsRead: (handle: number, ptr: number, len: number): number => HamlibWs.read(handle, ptr, len),

@@ -121,11 +121,13 @@ export interface RigModel extends RigModelCapabilities {
 export type { RigMode } from './native/generated/names.js';
 import type { RigMode } from './native/generated/names.js';
 
-/** Serial parity a backend declares. */
-export type SerialParity = 'none' | 'odd' | 'even' | 'mark' | 'space';
+/** Serial parity a backend declares: one of `SERIAL_PARITIES`, named from Hamlib's `serial_parity_e`. */
+export type { SerialParity } from './native/generated/names.js';
+import type { SerialParity } from './native/generated/names.js';
 
-/** Serial flow control a backend declares. */
-export type SerialHandshake = 'none' | 'xon-xoff' | 'hardware';
+/** Serial flow control a backend declares: one of `SERIAL_HANDSHAKES`, named from Hamlib's `serial_handshake_e`. */
+export type { SerialHandshake } from './native/generated/names.js';
+import type { SerialHandshake } from './native/generated/names.js';
 
 /** Mode and passband as reported by the rig. */
 export interface RigModeState {

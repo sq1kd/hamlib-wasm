@@ -37,11 +37,14 @@ export interface AstFunction {
 
 export interface AstEnumConstant {
   readonly name: string;
-  readonly value: number | null;
+  /** The value clang evaluated, or the previous constant's plus one. */
+  readonly value: number;
 }
 
 export interface AstEnum {
   readonly name: string;
+  /** How C code names the type: `enum serial_parity_e`, or the typedef `ptt_t`. */
+  readonly spelling: string;
   readonly constants: readonly AstEnumConstant[];
 }
 
@@ -86,6 +89,8 @@ export interface JsonNode {
   readonly ownedTagDecl?: { readonly id?: string };
   readonly decl?: { readonly id?: string };
   readonly isTagOwned?: boolean;
+  /** The evaluated value of a `ConstantExpr`, as decimal text. */
+  readonly value?: string;
 }
 
 function fail(message: string): never {
@@ -181,16 +186,32 @@ function functionOf(node: JsonNode): AstFunction {
   };
 }
 
-function enumOf(node: JsonNode): AstEnum {
+/** The value clang folded an enum initializer to: its first `ConstantExpr`. */
+function initializerValue(constant: JsonNode): number | null {
+  let value: number | null = null;
+
+  walk(constant, (node) => {
+    if (value === null && node.kind === 'ConstantExpr' && node.value !== undefined) {
+      value = Number(node.value);
+    }
+  });
+
+  return value;
+}
+
+function enumOf(node: JsonNode, name: string, spelling: string): AstEnum {
   const constants: AstEnumConstant[] = [];
+  let next = 0;
 
   for (const child of node.inner ?? []) {
     if (child.kind === 'EnumConstantDecl') {
-      constants.push({ name: child.name ?? '', value: null });
+      const value = initializerValue(child) ?? next;
+      constants.push({ name: child.name ?? '', value });
+      next = value + 1;
     }
   }
 
-  return { name: node.name ?? '', constants };
+  return { name, spelling, constants };
 }
 
 function recordOf(node: JsonNode): AstRecord {
@@ -239,7 +260,7 @@ export function indexAst(root: JsonNode): AstIndex {
 
       case 'EnumDecl': {
         if (node.name && !enums.has(node.name)) {
-          enums.set(node.name, enumOf(node));
+          enums.set(node.name, enumOf(node, node.name, `enum ${node.name}`));
         } else if (!node.name && node.id) {
           anonymousEnums.set(node.id, node);
         }
@@ -286,7 +307,7 @@ export function indexAst(root: JsonNode): AstIndex {
         const anonymous = owned === undefined ? undefined : anonymousEnums.get(owned);
 
         if (node.name && anonymous && !enums.has(node.name)) {
-          enums.set(node.name, { ...enumOf(anonymous), name: node.name });
+          enums.set(node.name, enumOf(anonymous, node.name, node.name));
         }
 
         break;

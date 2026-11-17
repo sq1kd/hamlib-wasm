@@ -48,6 +48,7 @@ import {
   capabilityMember,
   embindArity,
   emitCapabilities,
+  emitCodecs,
   emitContract,
   emitEmbind,
   emitMethodFiles,
@@ -55,7 +56,7 @@ import {
   emitOperations,
   emitResults,
 } from './emit.ts';
-import { astVocabularies, facadeVocabularies, loadVocabularies } from './names.ts';
+import { loadVocabularies } from './names.ts';
 import type { NameVocabulary } from './names.ts';
 import { createProjectionResolver } from './project.ts';
 
@@ -132,6 +133,7 @@ interface Outputs {
 interface GeneratedPaths {
   readonly coverage: string;
   readonly embind: string;
+  readonly codecs: string;
   readonly results: string;
   readonly operations: string;
   readonly capabilities: string;
@@ -147,6 +149,7 @@ function outputPaths(packageDir: string): GeneratedPaths {
   return {
     coverage: path.join(packageDir, 'coverage.json'),
     embind: path.join(generated, 'embind.inc'),
+    codecs: path.join(generated, 'codecs.h'),
     results: path.join(generated, 'results.inc'),
     operations: path.join(generated, 'operations.inc'),
     capabilities: path.join(generated, 'capabilities.inc'),
@@ -458,14 +461,15 @@ function render(
   const methodFiles = emitMethodFiles(model, operations, members);
   const files: (readonly [string, string])[] = [
     [paths.results, emitResults(operations)],
-    [paths.operations, emitOperations(operations, astVocabularies(ast.enums))],
+    [paths.codecs, emitCodecs(vocabularies)],
+    [paths.operations, emitOperations(operations)],
     [paths.capabilities, emitCapabilities(operations, members)],
     [paths.embind, emitEmbind(model, operations)],
     [paths.contract, emitContract(model, operations, {
       upstream,
       parameters: (symbol) => ast.functions.get(symbol)?.[0]?.params.map((param) => param.name) ?? [],
     })],
-    [paths.names, emitNames([...vocabularies, ...astVocabularies(ast.enums)])],
+    [paths.names, emitNames(vocabularies)],
     [paths.coverage, `${JSON.stringify(coverage, null, 2)}\n`],
     ...methodFiles.map(
       ([relative, content]) => [path.join(paths.methodsDir, relative), content] as const,
@@ -488,10 +492,7 @@ function main(): void {
   const { model, release } = loadConfig(path.resolve(options.config));
   const ast = loadAst(path.resolve(options.headers));
   const upstream = loadUpstreamDocs(path.resolve(options.sources));
-  const vocabularies = [
-    ...loadVocabularies(path.resolve(options.sources)),
-    ...facadeVocabularies(path.join(packageDir, 'native', 'facade.cpp')),
-  ];
+  const vocabularies = loadVocabularies(path.resolve(options.sources), ast.enums);
   const built = render(paths, options, model, release, ast, upstream, vocabularies);
   const files = built.files;
 

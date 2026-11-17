@@ -12,11 +12,11 @@
 import { HamlibError } from './errors.js';
 import { bytesToHex } from './hex.js';
 import { describeRuntime } from './runtime.js';
+import { DEBUG_LEVEL_VALUES, DEBUG_LEVELS } from './native/generated/names.js';
+import type { DebugLevel, DebugLevelValue } from './native/generated/names.js';
 
-/** Hamlib's `rig_debug_level_e`, quietest first. */
-export type DebugLevel = 'none' | 'bug' | 'err' | 'warn' | 'verbose' | 'trace' | 'cache';
-
-const DEBUG_LEVELS: readonly DebugLevel[] = ['none', 'bug', 'err', 'warn', 'verbose', 'trace', 'cache'];
+/** Hamlib's `rig_debug_level_e`, quietest first: one of `DEBUG_LEVELS`. */
+export type { DebugLevel } from './native/generated/names.js';
 
 /** Options for Hamlib's debug output; see {@link RawHamlibOptions.debug}. */
 export interface DebugOptions {
@@ -100,17 +100,21 @@ const LOG_LIMIT = 500;
 const TRACE_LIMIT = 200;
 const ERROR_LIMIT = 20;
 
-export function debugLevelIndex(level: DebugLevel, operation: string): number {
-  const index = DEBUG_LEVELS.indexOf(level);
-
-  if (index < 0) {
+/** The `rig_debug_level_e` value of a level name. */
+export function debugLevelIndex(level: DebugLevel, operation: string): DebugLevelValue {
+  if (!Object.hasOwn(DEBUG_LEVEL_VALUES, level)) {
     throw new HamlibError(
       `debug.level must be one of ${DEBUG_LEVELS.join(', ')}, got ${String(level)}`,
       { code: 'INVALID_ARGUMENT', operation },
     );
   }
 
-  return index;
+  return DEBUG_LEVEL_VALUES[level];
+}
+
+/** The level name of a `rig_debug_level_e` value. */
+function debugLevelName(value: number): DebugLevel | undefined {
+  return DEBUG_LEVELS.find((level) => DEBUG_LEVEL_VALUES[level] === value);
 }
 
 function push<T>(buffer: T[], entry: T, limit: number): void {
@@ -138,7 +142,7 @@ export class DiagnosticsRecorder {
   log(level: number, message: string): void {
     const entry: LogEntry = {
       time: Date.now(),
-      level: DEBUG_LEVELS[level] ?? 'verbose',
+      level: debugLevelName(level) ?? 'verbose',
       message: message.replace(/\s+$/, ''),
     };
 

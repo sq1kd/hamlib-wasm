@@ -35,6 +35,7 @@
 
 #include "hamlib/rig.h"
 
+#include "generated/codecs.h"
 #include "web_serial.h"
 
 /* --------------------------------------------------------------------- */
@@ -139,89 +140,11 @@ std::string takeTransportError()
     return std::string(why);
 }
 
-std::string pttToString(ptt_t ptt)
+/* A name the generated codecs return, or the empty string for a value they
+ * have no name for. */
+std::string nameOrEmpty(const char *name)
 {
-    switch (ptt)
-    {
-    case RIG_PTT_ON:
-        return "on";
-
-    case RIG_PTT_ON_MIC:
-        return "on-mic";
-
-    case RIG_PTT_ON_DATA:
-        return "on-data";
-
-    case RIG_PTT_OFF:
-    default:
-        return "off";
-    }
-}
-
-bool stringToPtt(const std::string &value, ptt_t *ptt)
-{
-    if (value == "off")
-    {
-        *ptt = RIG_PTT_OFF;
-    }
-    else if (value == "on")
-    {
-        *ptt = RIG_PTT_ON;
-    }
-    else if (value == "on-mic")
-    {
-        *ptt = RIG_PTT_ON_MIC;
-    }
-    else if (value == "on-data")
-    {
-        *ptt = RIG_PTT_ON_DATA;
-    }
-    else
-    {
-        return false;
-    }
-
-    return true;
-}
-
-/* The declared line settings travel as names, not Hamlib enum values, so the
- * public TypeScript API never exposes an upstream enum. */
-std::string parityToString(enum serial_parity_e parity)
-{
-    switch (parity)
-    {
-    case RIG_PARITY_ODD:
-        return "odd";
-
-    case RIG_PARITY_EVEN:
-        return "even";
-
-    case RIG_PARITY_MARK:
-        return "mark";
-
-    case RIG_PARITY_SPACE:
-        return "space";
-
-    case RIG_PARITY_NONE:
-    default:
-        return "none";
-    }
-}
-
-std::string handshakeToString(enum serial_handshake_e handshake)
-{
-    switch (handshake)
-    {
-    case RIG_HANDSHAKE_XONXOFF:
-        return "xon-xoff";
-
-    case RIG_HANDSHAKE_HARDWARE:
-        return "hardware";
-
-    case RIG_HANDSHAKE_NONE:
-    default:
-        return "none";
-    }
+    return name ? std::string(name) : std::string();
 }
 
 /* A serial RTS/DTR PTT line and a serial DSR/CTS/CAR DCD line are driven by
@@ -257,8 +180,10 @@ int collectModel(const struct rig_caps *caps, void *data)
     info.serialRateMax = caps->serial_rate_max;
     info.serialDataBits = caps->serial_data_bits;
     info.serialStopBits = caps->serial_stop_bits;
-    info.serialParity = parityToString(caps->serial_parity);
-    info.serialHandshake = handshakeToString(caps->serial_handshake);
+    /* The declared line settings travel as names, not Hamlib enum values, so
+     * the public TypeScript API never exposes an upstream enum. */
+    info.serialParity = nameOrEmpty(strSerialParity(caps->serial_parity));
+    info.serialHandshake = nameOrEmpty(strSerialHandshake(caps->serial_handshake));
     /* get_freq/set_freq/get_mode/set_mode are not projected here: the
      * capability list the generator emits already carries those operations,
      * and TypeScript derives the booleans from it. */
@@ -747,9 +672,18 @@ public:
 
         if (rc != RIG_OK) { return failure<PttResult>(rc); }
 
+        const char *name = strPttState(ptt);
+
+        if (!name)
+        {
+            return failure<PttResult>(-RIG_EPROTO,
+                                      "the rig reported PTT state " + std::to_string((int) ptt)
+                                      + ", which Hamlib does not define");
+        }
+
         PttResult result;
         result.code = RIG_OK;
-        result.ptt = pttToString(ptt);
+        result.ptt = name;
         return result;
     }
 
@@ -761,9 +695,9 @@ public:
 
         if (!rig) { return failure<PttResult>(-RIG_EINVAL); }
 
-        ptt_t ptt;
+        ptt_t ptt = parsePttState(state.c_str());
 
-        if (!stringToPtt(state, &ptt)) { return failure<PttResult>(-RIG_EINVAL); }
+        if (ptt == (ptt_t) -1) { return failure<PttResult>(-RIG_EINVAL); }
 
         int rc = rig_set_ptt(rig, RIG_VFO_CURR, ptt);
 
@@ -771,7 +705,7 @@ public:
 
         PttResult result;
         result.code = RIG_OK;
-        result.ptt = pttToString(ptt);
+        result.ptt = state;
         return result;
     }
 

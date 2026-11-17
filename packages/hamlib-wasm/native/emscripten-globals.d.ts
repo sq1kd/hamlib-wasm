@@ -188,8 +188,8 @@ interface HamlibWsApi {
     rate: number,
     dataBits: number,
     stopBits: number,
-    parity: number,
-    flowControl: number,
+    parity: string,
+    flowControl: string,
   ): Promise<number>;
   closePort(handle: number): Promise<number>;
   matchesOpenOptions(
@@ -197,8 +197,8 @@ interface HamlibWsApi {
     rate: number,
     dataBits: number,
     stopBits: number,
-    parity: number,
-    flowControl: number,
+    parity: string,
+    flowControl: string,
   ): number;
   read(handle: number, ptr: number, len: number): number;
   bytesReceived(handle: number): number;

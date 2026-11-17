@@ -9,32 +9,35 @@
  * what the device layer underneath them raises.
  */
 
+import { RIG_ERRCODES } from './native/generated/names.js';
+import type { RigErrcode } from './native/generated/names.js';
+
 /** Human readable text for Hamlib's `enum rig_errcode_e`. */
 export const HAMLIB_ERROR_MESSAGES: Readonly<Record<number, string>> = {
-  0: 'no error',
-  1: 'invalid parameter',
-  2: 'invalid configuration',
-  3: 'memory shortage',
-  4: 'function not implemented',
-  5: 'communication timed out',
-  6: 'I/O error',
-  7: 'internal Hamlib error',
-  8: 'protocol error',
-  9: 'command rejected by the rig',
-  10: 'command performed, but argument truncated',
-  11: 'function not available',
-  12: 'VFO not targetable',
-  13: 'error talking on the bus',
-  14: 'collision on the bus',
-  15: 'invalid pointer parameter',
-  16: 'invalid VFO',
-  17: 'argument out of domain',
-  18: 'function deprecated',
-  19: 'security error',
-  20: 'rig not powered on',
-  21: 'limit exceeded',
-  22: 'access denied',
-};
+  [RIG_ERRCODES.OK]: 'no error',
+  [RIG_ERRCODES.EINVAL]: 'invalid parameter',
+  [RIG_ERRCODES.ECONF]: 'invalid configuration',
+  [RIG_ERRCODES.ENOMEM]: 'memory shortage',
+  [RIG_ERRCODES.ENIMPL]: 'function not implemented',
+  [RIG_ERRCODES.ETIMEOUT]: 'communication timed out',
+  [RIG_ERRCODES.EIO]: 'I/O error',
+  [RIG_ERRCODES.EINTERNAL]: 'internal Hamlib error',
+  [RIG_ERRCODES.EPROTO]: 'protocol error',
+  [RIG_ERRCODES.ERJCTED]: 'command rejected by the rig',
+  [RIG_ERRCODES.ETRUNC]: 'command performed, but argument truncated',
+  [RIG_ERRCODES.ENAVAIL]: 'function not available',
+  [RIG_ERRCODES.ENTARGET]: 'VFO not targetable',
+  [RIG_ERRCODES.BUSERROR]: 'error talking on the bus',
+  [RIG_ERRCODES.BUSBUSY]: 'collision on the bus',
+  [RIG_ERRCODES.EARG]: 'invalid pointer parameter',
+  [RIG_ERRCODES.EVFO]: 'invalid VFO',
+  [RIG_ERRCODES.EDOM]: 'argument out of domain',
+  [RIG_ERRCODES.EDEPRECATED]: 'function deprecated',
+  [RIG_ERRCODES.ESECURITY]: 'security error',
+  [RIG_ERRCODES.EPOWER]: 'rig not powered on',
+  [RIG_ERRCODES.ELIMIT]: 'limit exceeded',
+  [RIG_ERRCODES.EACCESS]: 'access denied',
+} satisfies Record<RigErrcode, string>;
 
 /**
  * Stable error codes reported by {@link HamlibError}.

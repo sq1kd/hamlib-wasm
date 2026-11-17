@@ -112,6 +112,7 @@ export {
   VFOS,
   VFO_OPS,
 } from './native/generated/names.js';
+import { RIG_ERRCODES } from './native/generated/names.js';
 export type {
   Func,
   Level,
@@ -176,8 +177,7 @@ function locateAsset(file: string): string | URL {
     : new URL('./native/' + file, import.meta.url);
 }
 
-/** Hamlib's RIG_OK. */
-const RIG_OK = 0;
+const RIG_OK = RIG_ERRCODES.OK;
 
 /**
  * How long one native call may hold the queue by default.
@@ -951,10 +951,7 @@ const BAUD_RATE_LADDER: readonly number[] = [
  * configuration or permission refusal is about the port, not the rate, so
  * trying the remaining candidates would only repeat it.
  */
-const FATAL_PROBE_CODES: ReadonlySet<number> = new Set([
-  2, /* RIG_ECONF */
-  22, /* RIG_EACCESS */
-]);
+const FATAL_PROBE_CODES: ReadonlySet<number> = new Set([RIG_ERRCODES.ECONF, RIG_ERRCODES.EACCESS]);
 
 /**
  * The rate range `model` declares, when it declares a usable one: some

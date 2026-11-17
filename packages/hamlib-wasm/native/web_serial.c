@@ -42,16 +42,18 @@
 #include "iofunc.h"
 #include "misc.h"
 #include "serial.h"
+#include "generated/codecs.h"
 #include "web_serial.h"
 
 /* --- JavaScript transport imports (see native/web_serial.ts) ------------- */
 
 extern int hamlibWsOpenPort(const char *path, int rate, int data_bits,
-                            int stop_bits, int parity, int flow_control);
+                            int stop_bits, const char *parity,
+                            const char *flow_control);
 extern int hamlibWsClosePort(int handle);
 extern int hamlibWsMatchesOpenOptions(int handle, int rate, int data_bits,
-                                      int stop_bits, int parity,
-                                      int flow_control);
+                                      int stop_bits, const char *parity,
+                                      const char *flow_control);
 extern int hamlibWsRead(int handle, void *buf, int len);
 extern int hamlibWsBytesReceived(int handle);
 extern int hamlibWsWrite(int handle, const void *buf, int len);
@@ -299,8 +301,8 @@ int HAMLIB_API serial_open(hamlib_port_t *rp)
     handle = hamlibWsOpenPort(rp->pathname, rp->parm.serial.rate,
                               rp->parm.serial.data_bits,
                               rp->parm.serial.stop_bits,
-                              (int) rp->parm.serial.parity,
-                              (int) rp->parm.serial.handshake);
+                              strSerialParity(rp->parm.serial.parity),
+                              strSerialHandshake(rp->parm.serial.handshake));
 
     if (handle <= 0)
     {
@@ -355,8 +357,8 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
     matches = hamlibWsMatchesOpenOptions(rp->fd, rp->parm.serial.rate,
                                          rp->parm.serial.data_bits,
                                          rp->parm.serial.stop_bits,
-                                         (int) rp->parm.serial.parity,
-                                         (int) rp->parm.serial.handshake);
+                                         strSerialParity(rp->parm.serial.parity),
+                                         strSerialHandshake(rp->parm.serial.handshake));
 
     if (matches < 0)
     {
@@ -391,8 +393,8 @@ int HAMLIB_API serial_setup(hamlib_port_t *rp)
     handle = hamlibWsOpenPort(rp->pathname, rp->parm.serial.rate,
                               rp->parm.serial.data_bits,
                               rp->parm.serial.stop_bits,
-                              (int) rp->parm.serial.parity,
-                              (int) rp->parm.serial.handshake);
+                              strSerialParity(rp->parm.serial.parity),
+                              strSerialHandshake(rp->parm.serial.handshake));
 
     if (handle <= 0)
     {

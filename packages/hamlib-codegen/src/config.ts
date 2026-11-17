@@ -17,7 +17,7 @@ import process from 'node:process';
 import { parse } from 'yaml';
 
 import type { OperationOverride } from './classify.ts';
-import { VOCABULARY_TYPES } from './names.ts';
+import { VOCABULARY_TYPES } from './enums.ts';
 
 /** How a value object field crosses the Embind boundary. */
 const BOUNDARY_TYPES: ReadonlySet<string> = new Set(['int', 'double', 'bool', 'string']);

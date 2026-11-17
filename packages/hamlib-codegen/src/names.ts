@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The name vocabularies of Hamlib's enums, read from the pinned source.
+ * The name vocabularies of Hamlib's enums, read from the pinned release.
  *
  * Hamlib's `rig_parse_*`/`rig_str*` codecs translate through fixed tables in
  * `src/misc.c` (`mode_str[]`, `vfo_str[]`, ...).  Those tables are the whole
  * vocabulary a name-typed argument accepts, so the generator turns each one
- * into a string-literal union instead of typing the argument `string`.
+ * into a string-literal union instead of typing the argument `string`.  An
+ * enum with no upstream codec is named from its own constants, as clang
+ * reports them; {@link ENUMS} says which source each enum uses.
  *
  * The tables are data, not declarations clang's header AST would carry, so
  * they are read from the source with a strict grammar: every line between the
@@ -23,48 +25,23 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-/** One generated union: its public name and the table it comes from. */
+import type { AstEnum, AstEnumConstant } from './ast.ts';
+import { ENUMS, type EnumRecord, type NameSource } from './enums.ts';
+
+/** One enum's names, resolved from its {@link EnumRecord}. */
 export interface NameVocabulary {
-  /** The exported type, e.g. `RigMode`. */
-  readonly type: string;
-  /** The exported `as const` array, e.g. `RIG_MODES`. */
-  readonly constant: string;
+  readonly record: EnumRecord;
   /** Where the names come from, for the doc comment. */
   readonly source: string;
   /** Every accepted name, in table order, aliases included. */
   readonly names: readonly string[];
   /**
-   * For an enum Hamlib has no codec for: the C constant behind each name, in
-   * the same order.  The generator emits the parse/stringify pair itself.
+   * For a record named from its constants: the C constant behind each name,
+   * in the same order, and how C code spells the type.
    */
-  readonly constants?: readonly string[];
+  readonly constants?: readonly AstEnumConstant[];
+  readonly spelling?: string;
 }
-
-/**
- * Enums with no upstream `rig_str*`/`rig_parse_*` pair, named from their own
- * constants: `RIG_POWER_STANDBY` is `'standby'`.  `codec` names the facade
- * helpers the generator emits (`parsePowerStatus`/`strPowerStatus`).
- */
-export const AST_VOCABULARIES: readonly {
-  readonly enumName: string;
-  readonly type: string;
-  readonly constant: string;
-  readonly prefix: string;
-}[] = [
-  { enumName: 'powerstat_t', type: 'PowerStatus', constant: 'POWER_STATUSES', prefix: 'RIG_POWER_' },
-  { enumName: 'reset_t', type: 'ResetKind', constant: 'RESET_KINDS', prefix: 'RIG_RESET_' },
-];
-
-/** Table name in `src/misc.c` -> the union it becomes. */
-const TABLES: readonly { readonly table: string; readonly type: string; readonly constant: string }[] = [
-  { table: 'mode_str', type: 'RigMode', constant: 'RIG_MODES' },
-  { table: 'vfo_str', type: 'Vfo', constant: 'VFOS' },
-  { table: 'rig_level_str', type: 'Level', constant: 'LEVELS' },
-  { table: 'rig_func_str', type: 'Func', constant: 'FUNCS' },
-  { table: 'rig_parm_str', type: 'Parm', constant: 'PARMS' },
-  { table: 'vfo_op_str', type: 'VfoOp', constant: 'VFO_OPS' },
-  { table: 'scan_str', type: 'ScanOp', constant: 'SCAN_OPS' },
-];
 
 function fail(message: string): never {
   process.stderr.write(`[codegen:names] error: ${message}\n`);
@@ -139,43 +116,51 @@ export function parseSwitchNames(source: string, signature: string): string[] {
   return [...new Set(names)];
 }
 
-/** The union names the type table may use; each one is emitted from a vocabulary below. */
-export const VOCABULARY_TYPES: ReadonlySet<string> = new Set([
-  ...TABLES.map((table) => table.type),
-  'RptrShift',
-  'PttState',
-  ...AST_VOCABULARIES.map((vocabulary) => vocabulary.type),
-]);
+type ConstantSource = Extract<NameSource, { readonly prefix: string }>;
 
-/** The vocabularies of {@link AST_VOCABULARIES}, from the enum constants clang reports. */
-export function astVocabularies(enums: ReadonlyMap<string, { readonly constants: readonly { readonly name: string }[] }>): NameVocabulary[] {
-  return AST_VOCABULARIES.map(({ enumName, type, constant, prefix }) => {
-    const declared = enums.get(enumName);
+/** The names of a record named from the enum constants clang reports. */
+export function constantNames(
+  record: EnumRecord,
+  source: ConstantSource,
+  enums: ReadonlyMap<string, AstEnum>,
+): NameVocabulary {
+  const declared = enums.get(record.enumName);
 
-    if (!declared || declared.constants.length === 0) {
-      fail(`the AST has no constants for ${enumName}`);
+  if (!declared || declared.constants.length === 0) {
+    fail(`the AST has no constants for ${record.enumName}`);
+  }
+
+  const constants = declared.constants.filter((entry) => !source.exclude?.includes(entry.name));
+  const names = constants.map((entry) => {
+    if (!entry.name.startsWith(source.prefix)) {
+      fail(`${record.enumName} constant ${entry.name} does not start with ${source.prefix}`);
     }
 
-    const constants = declared.constants.map((entry) => entry.name);
+    const stem = entry.name.slice(source.prefix.length);
 
-    for (const name of constants) {
-      if (!name.startsWith(prefix)) {
-        fail(`${enumName} constant ${name} does not start with ${prefix}`);
-      }
-    }
-
-    return {
-      type,
-      constant,
-      source: `the \`${enumName}\` constants in Hamlib's rig.h`,
-      names: constants.map((name) => name.slice(prefix.length).toLowerCase()),
-      constants,
-    };
+    return source.rename?.[entry.name] ?? (source.upper ? stem : stem.toLowerCase().replaceAll('_', '-'));
   });
+
+  for (const name of [...Object.keys(source.rename ?? {}), ...(source.exclude ?? [])]) {
+    if (!declared.constants.some((entry) => entry.name === name)) {
+      fail(`${record.enumName} has no constant ${name} to rename or exclude`);
+    }
+  }
+
+  return {
+    record,
+    source: `the \`${declared.spelling}\` constants in Hamlib's rig.h`,
+    names,
+    constants,
+    spelling: declared.spelling,
+  };
 }
 
-/** Every vocabulary the generator types, read from the pinned `src/misc.c`. */
-export function loadVocabularies(sourceDir: string): readonly NameVocabulary[] {
+/** Every vocabulary of {@link ENUMS}, from the pinned `src/misc.c` and the AST. */
+export function loadVocabularies(
+  sourceDir: string,
+  enums: ReadonlyMap<string, AstEnum>,
+): readonly NameVocabulary[] {
   const file = path.join(sourceDir, 'misc.c');
   let source: string;
 
@@ -185,39 +170,19 @@ export function loadVocabularies(sourceDir: string): readonly NameVocabulary[] {
     fail(`cannot read ${file}: ${String(error)}`);
   }
 
-  return [
-    ...TABLES.map(({ table, type, constant }) => ({
-      type,
-      constant,
-      source: `\`${table}[]\` in Hamlib's src/misc.c`,
-      names: parseTable(source, table),
-    })),
-    {
-      type: 'RptrShift',
-      constant: 'RPTR_SHIFTS',
-      source: '`rig_strptrshift()` in Hamlib\'s src/misc.c',
-      names: parseSwitchNames(source, 'const char *HAMLIB_API rig_strptrshift'),
-    },
-  ];
-}
+  return ENUMS.map((record): NameVocabulary => {
+    const from = record.source;
 
-/**
- * Vocabularies the facade defines itself: the push-to-talk states
- * `pttToString()` in `native/facade.cpp` reports and `stringToPtt()` accepts.
- */
-export function facadeVocabularies(facadeFile: string): NameVocabulary[] {
-  let source: string;
+    if ('table' in from) {
+      return { record, source: `\`${from.table}[]\` in Hamlib's src/misc.c`, names: parseTable(source, from.table) };
+    }
 
-  try {
-    source = readFileSync(facadeFile, 'utf8');
-  } catch (error) {
-    fail(`cannot read ${facadeFile}: ${String(error)}`);
-  }
+    if ('stringifier' in from) {
+      const name = from.stringifier.split(' ').at(-1) as string;
 
-  return [{
-    type: 'PttState',
-    constant: 'PTT_STATES',
-    source: '`pttToString()` in native/facade.cpp',
-    names: parseSwitchNames(source, 'std::string pttToString'),
-  }];
+      return { record, source: `\`${name}()\` in Hamlib's src/misc.c`, names: parseSwitchNames(source, from.stringifier) };
+    }
+
+    return constantNames(record, from, enums);
+  });
 }

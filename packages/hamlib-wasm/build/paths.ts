@@ -66,6 +66,7 @@ export const BRIDGE_INPUTS: readonly string[] = [
   'native/web_serial.ts',
   'native/compat/pthread.h',
   'native/generated/capabilities.inc',
+  'native/generated/codecs.h',
   'native/generated/embind.inc',
   'native/generated/operations.inc',
   'native/generated/results.inc',
