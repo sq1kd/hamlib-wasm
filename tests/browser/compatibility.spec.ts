@@ -283,21 +283,27 @@ test('reports a device that disappears mid-session', async ({ page }) => {
      * the healthy session. */
     await window.__virtualClock.advance(600);
 
+    const connectedBefore = rig.connected;
+
     /* The device is unplugged: the readable stream errors. */
     window.__fakeSerial.errorReadable('NetworkError');
 
     const failed = await window.__testHelpers.capture(() => rig.getFrequency());
+    const connectedAfter = rig.connected;
     const closed = await window.__testHelpers.capture(() => rig.close());
 
     await hamlib.dispose();
 
-    return { failed, closed };
+    return { failed, closed, connectedBefore, connectedAfter };
   }));
 
   const result = expectOk(captured);
 
   const failed = expectFailure(result.failed);
   expect(failed.code).toBe('HAMLIB_ERROR');
+  /* The lost port shows on the rig, before anything closes it. */
+  expect(result.connectedBefore).toBe(true);
+  expect(result.connectedAfter).toBe(false);
   /* -RIG_EIO, not a timeout: the transport failure is what the caller sees. */
   expect(failed.hamlibCode).toBe(-6);
   expect(failed.hamlibMessage).toBe('I/O error');

@@ -265,3 +265,71 @@ test('every generated name is one the built module parses', async ({ page }) => 
   expect(result.unparsed).toEqual([]);
   expect(result.checked).toBeGreaterThan(200);
 });
+
+test('Hamlib never writes to the console; its error lines stay in diagnostics', async ({ page }) => {
+  const console: string[] = [];
+
+  page.on('console', (message) => { console.push(message.text()); });
+
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
+    const port = await hamlib.requestPort();
+    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
+
+    if (!ts480) { throw new Error('the TS-480 is missing'); }
+
+    const rig = await hamlib.open({ modelId: ts480.id, port });
+
+    await rig.getFrequency();
+
+    const report = JSON.parse(JSON.stringify(hamlib.diagnostics()));
+
+    await rig.close();
+    await hamlib.dispose();
+
+    return report;
+  }));
+
+  const report = expectOk(captured);
+
+  /* Opening a rig makes Hamlib log at error level (the disabled poll routine). */
+  expect(console).toEqual([]);
+  expect(report.debugLevel).toBe('err');
+  expect(report.log.length).toBeGreaterThan(0);
+  expect(report.log.every((entry: { level: string }) => entry.level === 'err' || entry.level === 'bug')).toBe(true);
+});
+
+test('diagnostics keep the reads a watch tick absorbed', async ({ page }) => {
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createHamlib();
+    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
+
+    if (!ts480) { throw new Error('the TS-480 is missing'); }
+
+    const rig = await hamlib.open({ modelId: ts480.id });
+    const events: string[] = [];
+
+    rig.on('error', (error) => { events.push(error.operation); });
+
+    /* The rig goes quiet: the next tick's read times out, which a watch
+     * reports as an event, not a rejection. */
+    window.__fakeSerial.state.silent = true;
+    const stop = rig.watch({ intervalMs: 1000, fields: ['frequency'] });
+
+    await window.__virtualClock.until(() => events.length > 0);
+    stop();
+
+    const errors = hamlib.diagnostics().errors.map((entry) => entry.operation);
+
+    window.__fakeSerial.state.silent = false;
+    await rig.close();
+    await hamlib.dispose();
+
+    return { events, errors };
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.events.length).toBeGreaterThan(0);
+  expect(result.errors).toEqual(expect.arrayContaining(result.events));
+});

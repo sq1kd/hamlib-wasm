@@ -160,6 +160,7 @@ interface HamlibWsApi {
   /** Set by the TypeScript layer: every chunk written to or read from a port. */
   onTrace: ((direction: 'tx' | 'rx', path: string, bytes: Uint8Array) => void) | null;
   log(level: number, message: string): void;
+  portLost(path: string): boolean;
   trace(direction: 'tx' | 'rx', path: string, bytes: Uint8Array): void;
 
   /**

@@ -356,7 +356,11 @@ export interface Rig {
   readonly baudRate: number;
   /** What this model can do, as booleans, and the levels this rig will read. */
   readonly capabilities: RigCapabilities;
-  /** `false` once `close()` has been called, or the underlying rig closed. */
+  /**
+   * `false` once `close()` has been called, the underlying rig closed, or the
+   * port stopped delivering - an unplugged device.  A lost rig still has to be
+   * closed.
+   */
   readonly connected: boolean;
   /**
    * The last merged snapshot a completed read published, if any.  A failed
@@ -724,12 +728,7 @@ class RigHandle implements Rig {
         }
 
         this.#publish(state);
-
-        for (const failure of failures) {
-          if (this.#live()) {
-            this.#events.emit('error', failure);
-          }
-        }
+        this.#publishFailures(failures);
 
         return this.#state ?? state;
       }
@@ -1012,12 +1011,7 @@ class RigHandle implements Rig {
       ));
 
       this.#publish(partial);
-
-      for (const failure of failures) {
-        if (this.#live()) {
-          this.#events.emit('error', failure);
-        }
-      }
+      this.#publishFailures(failures);
     } catch {
       /* The compound itself failed; #call already emitted the error and the
        * timer must keep running. */
@@ -1081,6 +1075,20 @@ class RigHandle implements Rig {
       `${this.#rig.model.manufacturer} ${this.#rig.model.model} does not report ${name}`,
       { code: 'UNSUPPORTED_OPERATION', operation: 'level' },
     );
+  }
+
+  /**
+   * Report the reads a compound absorbed: into the diagnostics, which keep
+   * them even after a close, and as `error` events while the rig is live.
+   */
+  #publishFailures(failures: readonly HamlibError[]): void {
+    for (const failure of failures) {
+      this.#rig.record(failure.operation, failure);
+
+      if (this.#live()) {
+        this.#events.emit('error', failure);
+      }
+    }
   }
 
   async #call<T>(operation: string, work: () => Promise<T>): Promise<T> {

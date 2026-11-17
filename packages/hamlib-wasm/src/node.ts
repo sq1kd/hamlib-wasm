@@ -45,6 +45,7 @@ import type {
   SerialInputSignals,
   SerialLineSettings,
   SerialOutputSignals,
+  SerialPortInfo,
   SerialPortLike,
   SerialTransport,
 } from './transport.js';
@@ -240,6 +241,19 @@ interface PortListeners {
  * is also what makes Hamlib's own baud-rate reconfiguration (close + open)
  * work.
  */
+/** `listPorts()`' hex strings as Web Serial's numeric ids; absent ones stay absent. */
+function usbInfo(listed: NodeSerialPortListEntry | undefined): SerialPortInfo {
+  const id = (hex: string | undefined): number | undefined =>
+    hex !== undefined && /^[0-9a-f]{1,4}$/i.test(hex) ? Number.parseInt(hex, 16) : undefined;
+  const usbVendorId = id(listed?.vendorId);
+  const usbProductId = id(listed?.productId);
+
+  return {
+    ...(usbVendorId === undefined ? {} : { usbVendorId }),
+    ...(usbProductId === undefined ? {} : { usbProductId }),
+  };
+}
+
 class NodeSerialPortAdapter implements SerialPortLike {
   readonly #path: string;
   readonly #SerialPort: SerialPortConstructorLike;
@@ -255,9 +269,17 @@ class NodeSerialPortAdapter implements SerialPortLike {
    * adapter asserts on open, which is what `initialSignals()` reports. */
   #output: NodeSetOptions = { brk: false, cts: false, dtr: true, rts: true };
 
-  constructor(path: string, SerialPort: SerialPortConstructorLike) {
+  readonly #info: SerialPortInfo;
+
+  constructor(path: string, SerialPort: SerialPortConstructorLike, listed?: NodeSerialPortListEntry) {
     this.#path = path;
     this.#SerialPort = SerialPort;
+    this.#info = usbInfo(listed);
+  }
+
+  /** The USB ids `listPorts()` reported for this path, in Web Serial's shape. */
+  getInfo(): SerialPortInfo {
+    return { ...this.#info };
   }
 
   /** The device path this adapter was asked for.  For diagnostics only. */
@@ -576,8 +598,13 @@ export function nodeSerialTransport(
       }
 
       const { SerialPort } = await module();
+      /* Only for getInfo(): a port the listing cannot describe is still a port. */
+      const listed = await SerialPort.list().then(
+        (entries) => entries.find((entry) => entry.path === path),
+        () => undefined,
+      );
 
-      return new NodeSerialPortAdapter(path, SerialPort);
+      return new NodeSerialPortAdapter(path, SerialPort, listed);
     },
 
     async listPorts(): Promise<readonly NodeSerialPortListEntry[]> {

@@ -81,14 +81,15 @@ export interface Diagnostics {
   transport: string;
   /** `navigator.userAgent` in a browser; `node <version>` (and Electron's) elsewhere. */
   runtime: string;
-  debugLevel: DebugLevel | null;
+  /** The level Hamlib logs at: `'err'` unless `debug` asked for another. */
+  debugLevel: DebugLevel;
   /** `true` once a call overran `callTimeoutMs`; the instance is then unusable. */
   hung: boolean;
   rigs: DiagnosticsRig[];
   errors: ErrorEntry[];
   /** The most recent port traffic, oldest first. */
   trace: TraceEntry[];
-  /** The most recent Hamlib debug lines, oldest first; empty without `debug`. */
+  /** The most recent Hamlib log lines, oldest first; errors only without `debug`. */
   log: LogEntry[];
 }
 
@@ -97,8 +98,8 @@ const LOG_LIMIT = 500;
 const TRACE_LIMIT = 200;
 const ERROR_LIMIT = 20;
 
-export function debugLevelIndex(level: DebugLevel | undefined, operation: string): number {
-  const index = DEBUG_LEVELS.indexOf(level ?? 'verbose');
+export function debugLevelIndex(level: DebugLevel, operation: string): number {
+  const index = DEBUG_LEVELS.indexOf(level);
 
   if (index < 0) {
     throw new HamlibError(
@@ -152,11 +153,11 @@ export class DiagnosticsRecorder {
   readonly #errors: ErrorEntry[] = [];
   readonly #onLog: ((entry: LogEntry) => void) | undefined;
 
-  readonly debugLevel: DebugLevel | null;
+  readonly debugLevel: DebugLevel;
 
-  constructor(debug: DebugOptions | undefined) {
-    this.debugLevel = debug === undefined ? null : (debug.level ?? 'verbose');
-    this.#onLog = debug?.onLog;
+  constructor(level: DebugLevel, onLog: ((entry: LogEntry) => void) | undefined) {
+    this.debugLevel = level;
+    this.#onLog = onLog;
   }
 
   log(level: number, message: string): void {

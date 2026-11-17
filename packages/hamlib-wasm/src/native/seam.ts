@@ -35,4 +35,9 @@ export interface CompoundHost {
   ): Promise<T>;
   /** Whether the rig can run `operation`, counting what its open `conf` added. */
   can(operation: string): boolean;
+  /**
+   * Record a failure a compound absorbed - a best-effort read the caller does
+   * not see rejected - so `diagnostics()` still lists it.
+   */
+  record(operation: string, error: unknown): void;
 }

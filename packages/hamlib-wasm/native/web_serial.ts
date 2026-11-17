@@ -578,6 +578,15 @@ addToLibrary({
      * that rig_open() really reached a radio.  A port that has received
      * nothing has not been talked to by anything.
      */
+    /*
+     * Whether the port opened at `path` stopped delivering: its reader failed,
+     * as an unplugged device makes it.  The TypeScript layer reads this to
+     * report a rig as no longer connected.
+     */
+    portLost(path: string): boolean {
+      return this.ports.get(path)?.state?.failure != null;
+    },
+
     bytesReceived(handle: number): number {
       const entry = this.handles.get(handle);
 

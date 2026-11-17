@@ -286,9 +286,65 @@ test('an unplugged device fails the next call fast, and the instance stays usabl
     /* A Hamlib error from the transport, not the watchdog's RIG_TIMEOUT: the
      * instance is not hung, so the rig still closes and a new one can open. */
     expect(failure?.code).toBe('HAMLIB_ERROR');
+    expect(rig.connected).toBe(false);
     await settle(rig.close());
     expect(rig.connected).toBe(false);
   } finally {
     await settle(hamlib.dispose());
+  }
+});
+
+test('Hamlib writes nothing to stderr or stdout', async () => {
+  const written: string[] = [];
+  const original = { err: process.stderr.write.bind(process.stderr), out: process.stdout.write.bind(process.stdout) };
+  const capture = (chunk: string | Uint8Array): boolean => {
+    written.push(String(chunk));
+    return true;
+  };
+
+  process.stderr.write = capture as typeof process.stderr.write;
+  process.stdout.write = capture as typeof process.stdout.write;
+
+  try {
+    const module = rigSerialPortModule();
+    const transport = nodeSerialTransport({ serialport: module });
+    const hamlib = await createRawHamlib({ transport });
+
+    try {
+      const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
+      const rig = await hamlib.open({ modelId, port: await transport.requestPort({ path: FAKE_PATH }), baudRate: 9600 });
+
+      await rig.getFrequency();
+      await rig.close();
+    } finally {
+      await hamlib.dispose();
+    }
+  } finally {
+    process.stderr.write = original.err;
+    process.stdout.write = original.out;
+  }
+
+  expect(written).toEqual([]);
+});
+
+test('a port reports the USB ids the listing gave its path', async () => {
+  const module = rigSerialPortModule();
+  const transport = nodeSerialTransport({ serialport: module });
+  const hamlib = await createRawHamlib({ transport });
+
+  try {
+    const port = await transport.requestPort({ path: FAKE_PATH });
+
+    expect(port.getInfo?.()).toEqual({ usbVendorId: 0x1a86, usbProductId: 0x7523 });
+
+    const rig = await hamlib.open({ modelId: modelIdOf(hamlib, 'Kenwood', 'TS-480'), port, baudRate: 9600 });
+
+    expect(hamlib.diagnostics().rigs[0]?.usb).toEqual({ vendorId: '1a86', productId: '7523' });
+    await rig.close();
+
+    /* A path the listing does not know still opens; it just reports no ids. */
+    expect((await transport.requestPort({ path: '/dev/not-listed' })).getInfo?.()).toEqual({});
+  } finally {
+    await hamlib.dispose();
   }
 });

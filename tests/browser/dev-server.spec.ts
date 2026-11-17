@@ -17,6 +17,13 @@ import { expect, test } from '@playwright/test';
 const REACT_DEV_URL = 'http://127.0.0.1:5176/demo/';
 
 test('the documentation site demo instantiates the module in dev mode', async ({ page }) => {
+  /* A cold dev server settles on its first page: it finishes bundling and
+   * syncing while that page loads, and can reload it under in-flight dynamic
+   * imports.  That is the dev server's start-up, not the module, so the first
+   * load only lets it settle and the observed load is the second. */
+  await page.goto(REACT_DEV_URL);
+  await page.waitForLoadState('networkidle');
+
   const failures: string[] = [];
 
   page.on('pageerror', (error) => {
@@ -36,7 +43,8 @@ test('the documentation site demo instantiates the module in dev mode', async ({
     .map((entry) => {
       const resource = entry as PerformanceResourceTiming;
 
-      return { url: resource.name, bytes: resource.transferSize };
+      /* The body, not the transfer: the settling load may have cached it. */
+      return { url: resource.name, bytes: resource.decodedBodySize };
     }));
 
   /* The real binary, not the stub a glob lookup hands back. */

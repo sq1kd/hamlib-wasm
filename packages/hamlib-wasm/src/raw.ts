@@ -224,8 +224,9 @@ export interface RawHamlibOptions {
    */
   callTimeoutMs?: number;
   /**
-   * Turn on Hamlib's debug output.  The lines go to `debug.onLog` and into
-   * {@link RawHamlib.diagnostics}.  Omitted, Hamlib logs nothing.
+   * Hamlib's debug output: the level, and a hook for every line.  The lines
+   * also go into {@link RawHamlib.diagnostics}.  Omitted, only Hamlib's error
+   * lines are kept, for diagnostics; Hamlib never writes to the console.
    *
    * Hamlib's level is global to the module, so it applies to every rig the
    * instance opens.
@@ -302,7 +303,10 @@ export interface RawRig extends GeneratedPublicOperations {
    * again: reconnecting with it skips both the guess and the scan.
    */
   readonly baudRate: number;
-  /** `false` once {@link RawRig.close} has completed. */
+  /**
+   * `false` once {@link RawRig.close} has completed, or once the port stopped
+   * delivering - an unplugged device.  A lost rig still has to be closed.
+   */
   readonly connected: boolean;
   /**
    * Send `text` as Morse through the rig's keyer.  The rig must be in CW or
@@ -557,6 +561,8 @@ interface RigContext {
   readonly native: NativeModule;
   readonly queue: Serializer;
   forget(rig: RawRigHandle): void;
+  record(operation: string, error: unknown): void;
+  portLost(path: string): boolean;
 }
 
 /**
@@ -682,7 +688,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
   }
 
   get connected(): boolean {
-    return !this.#closed;
+    return !this.#closed && !this.#context.portLost(this.#path);
   }
 
   /* --- plumbing the generated method classes call --------------------- */
@@ -705,6 +711,10 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
       operation,
       `use ${operation}`,
     );
+  }
+
+  record(operation: string, error: unknown): void {
+    this.#context.record(operation, error);
   }
 
   /** Whether `operation` is available on this rig, `conf` included. */
@@ -924,6 +934,8 @@ interface SerialRegistry {
   storePort(port: SerialPortLike): number;
   onLog: ((level: number, message: string) => void) | null;
   onTrace: ((direction: 'tx' | 'rx', path: string, bytes: Uint8Array) => void) | null;
+  /** Whether the port at `path` stopped delivering (an unplugged device). */
+  portLost(path: string): boolean;
   /**
    * Close every registered port from the JavaScript side, ignoring errors.
    *
@@ -1195,11 +1207,11 @@ class RawHamlibInstance implements RawHamlib, RigContext {
   }
 
   static async create(options: RawHamlibOptions): Promise<RawHamlibInstance> {
-    const debugLevel = options.debug === undefined
-      ? undefined
-      : debugLevelIndex(options.debug.level, 'createRawHamlib');
+    /* Without `debug`, Hamlib's error lines are still kept for diagnostics(). */
+    const level = options.debug === undefined ? 'err' : (options.debug.level ?? 'verbose');
+    const debugLevel = debugLevelIndex(level, 'createRawHamlib');
     const callTimeoutMs = normalizeCallTimeout(options.callTimeoutMs);
-    const recorder = new DiagnosticsRecorder(options.debug);
+    const recorder = new DiagnosticsRecorder(level, options.debug?.onLog);
     const native = await createNativeModule({
       locateFile: (file: string) => String((options.locateFile ?? locateAsset)(file)),
     });
@@ -1225,17 +1237,19 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       recorder.trace(direction, path, bytes);
     };
 
-    /* After the backends registered: their announcements are noise. */
-    if (debugLevel !== undefined) {
-      registry.onLog = (level, message) => {
-        recorder.log(level, message);
-      };
+    /* Hamlib's own output never reaches the console: a library embedded in a
+     * page or a process must not write there, and failures already reach the
+     * caller as a HamlibError.  Every line goes to the recorder instead, and
+     * on to `debug.onLog`.  Set after the backends registered: their
+     * announcements are noise. */
+    registry.onLog = (lineLevel, message) => {
+      recorder.log(lineLevel, message);
+    };
 
-      const debug = await native.setDebug(debugLevel);
+    const debug = await native.setDebug(debugLevel);
 
-      if (debug.code !== RIG_OK) {
-        throw hamlibError(debug, 'initialize');
-      }
+    if (debug.code !== RIG_OK) {
+      throw hamlibError(debug, 'initialize');
     }
 
     const models = collectModels(await native.listModels(), native);
@@ -1265,6 +1279,14 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
   forget(rig: RawRigHandle): void {
     this.#rigs.delete(rig);
+  }
+
+  record(operation: string, error: unknown): void {
+    this.#recorder.error(operation, error);
+  }
+
+  portLost(path: string): boolean {
+    return this.#registry.portLost(path);
   }
 
   async requestPort(options?: PortRequest): Promise<SerialPortLike> {
