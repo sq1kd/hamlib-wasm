@@ -58,4 +58,11 @@ runs:
     - name: Install Playwright browsers on a cache miss
       if: inputs.playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: npx playwright install --with-deps chromium firefox
+      run: mise run install-browsers
+
+    # The cache holds only the browsers; a fresh runner needs their system
+    # packages every time.
+    - name: Install the browsers' system packages
+      if: inputs.playwright == 'true'
+      shell: bash
+      run: mise run install-browser-deps

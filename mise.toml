@@ -7,6 +7,9 @@ emsdk = "6.0.10"
 [env]
 _.path = ["{{config_root}}/node_modules/.bin"]
 
+[vars]
+browsers = "chromium firefox"
+
 # Every task runs from the repository root.  A task named in several places of
 # one `mise run` graph runs once, so composite tasks are plain `depends` lists.
 # `wait_for` orders a task after another only when both are in the same run:
@@ -18,9 +21,17 @@ _.path = ["{{config_root}}/node_modules/.bin"]
 description = "Install the locked dependencies, Playwright Chromium and Firefox, and the commit hook"
 run = [
   "npm ci",
-  "playwright install chromium firefox",
+  { task = "install-browsers" },
   "git config core.hooksPath .githooks",
 ]
+
+[tasks.install-browsers]
+description = "Install the Playwright browsers the browser suite runs"
+run = "playwright install {{vars.browsers}}"
+
+[tasks.install-browser-deps]
+description = "Install the operating-system packages those browsers need (Linux, uses sudo)"
+run = "playwright install-deps {{vars.browsers}}"
 
 # --- Native build and generated bindings -------------------------------------
 
