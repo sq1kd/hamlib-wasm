@@ -41,7 +41,7 @@ run = "node packages/hamlib-wasm/build/codegen.ts --check"
 
 [tasks.build-native]
 description = "Compile the fetched Hamlib release to WebAssembly"
-depends = ["fetch-native"]
+depends = ["fetch-native", "check-generated"]
 wait_for = ["generate"]
 run = "node packages/hamlib-wasm/build/compile-native.ts"
 
@@ -114,8 +114,8 @@ depends = ["build-package"]
 run = "node packages/hamlib-wasm/build/typecheck-consumer.ts"
 
 [tasks.typecheck]
-description = "Typecheck every project (tsc -b), prove the generated bindings are current, and check the packed consumer"
-depends = ["check-generated", "typecheck-consumer"]
+description = "Typecheck every project (tsc -b) and check the packed consumer"
+depends = ["typecheck-consumer"]
 run = "tsc -b --noEmit"
 
 # --- Tests -------------------------------------------------------------------

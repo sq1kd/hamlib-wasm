@@ -29,7 +29,7 @@ import {
   extractTarball,
   packTarball,
 } from './artifact.ts';
-import { assert } from './errors.ts';
+import { assert, runMain } from './errors.ts';
 import { log, parseFlag } from './exec.ts';
 import { assertFile, readJson, sha256File, walk } from './files.ts';
 import { verifyRepository } from './guard.ts';
@@ -41,7 +41,7 @@ import {
   scannedPackageFiles,
 } from './package-manifest.ts';
 import { REPO_ROOT, releaseSourceDirName } from './paths.ts';
-import { loadUpstream } from './upstream.ts';
+import { type Upstream, loadUpstream } from './upstream.ts';
 import { runRelink } from './verify-relink.ts';
 
 const SCOPE = 'verify-package';
@@ -92,22 +92,34 @@ function assertRequiredEntry(packageRoot: string, relative: string, kind: string
   assertFile(absolute, `required package file ${relative}`);
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  const tarballArg = parseFlag(args, '--tarball');
-  const workArg = parseFlag(args, '--work-dir');
-  const keep = args.includes('--keep');
-  const relink = args.includes('--relink');
-  const upstream = loadUpstream();
-  const patchFile = upstream.patches[0]?.file;
+interface PatchRecord {
+  readonly file?: unknown;
+  readonly sha256?: unknown;
+}
 
-  assert(patchFile, 'the release config has no patch');
-  verifyRepository();
+/** SOURCE.json lists every configured patch, in order, with its shipped hash. */
+function verifyPatchRecords(
+  upstream: Upstream,
+  records: unknown,
+  patchDir: string,
+  what: string,
+): void {
+  assert(Array.isArray(records), `${what} has no patches list`);
+  assert(
+    JSON.stringify((records as PatchRecord[]).map((record) => record.file))
+    === JSON.stringify(upstream.patches.map((patch) => patch.file)),
+    `${what} patches do not match the config`,
+  );
 
-  const work = workArg ?? mkdtempSync(path.join(os.tmpdir(), 'hamlib-wasm-package-'));
-  mkdirSync(work, { recursive: true });
+  for (const record of records as PatchRecord[]) {
+    assert(
+      record.sha256 === sha256File(path.join(patchDir, String(record.file))),
+      `${what} hash for ${String(record.file)} does not match the patch in ${patchDir}`,
+    );
+  }
+}
 
-  const tarball = tarballArg ?? packTarball(path.join(work, 'artifact'));
+function verifyTarball(upstream: Upstream, tarball: string, work: string, relink: boolean): void {
   const packageRoot = extractTarball(tarball, path.join(work, 'unpacked'));
 
   for (const entry of requiredPackageFiles(upstream)) {
@@ -206,11 +218,11 @@ function main(): void {
     source.sourceArchiveFile === `source/${upstream.archive.name}`,
     'SOURCE.json archive filename does not match config',
   );
-  assert(source.patch === patchFile, 'SOURCE.json patch filename does not match config');
-  assert(
-    source.patchSha256
-    === sha256File(path.join(packageRoot, 'dist/third_party/hamlib', patchFile)),
-    'SOURCE.json patch hash does not match the packaged patch',
+  verifyPatchRecords(
+    upstream,
+    source.patches,
+    path.join(packageRoot, 'dist/third_party/hamlib'),
+    'SOURCE.json',
   );
   assert(
     source.emscriptenVersion !== null && String(source.emscriptenVersion).length > 0,
@@ -279,22 +291,20 @@ function main(): void {
   }
 
   const kitArchiveFile = path.join(kitArtifact.kit, 'source', upstream.archive.name);
-  const kitPatch = path.join(kitArtifact.kit, 'patches', patchFile);
+  const kitPatchDir = path.join(kitArtifact.kit, 'patches');
   assert(
     sha256File(kitArchiveFile) === source.sourceArchiveSha256,
     'the kit embedded archive hash does not match SOURCE.json',
   );
-  assert(
-    sha256File(kitPatch) === source.patchSha256,
-    'the kit patch hash does not match SOURCE.json',
-  );
+  verifyPatchRecords(upstream, source.patches, kitPatchDir, 'SOURCE.json (kit patches)');
 
   const patchCheck = path.join(work, 'patch-check');
   mkdirSync(patchCheck, { recursive: true });
   execFileSync('tar', ['-xzf', kitArchiveFile, '-C', patchCheck], { stdio: 'inherit' });
-
-  const patchSource = path.join(patchCheck, releaseSourceDirName(upstream));
-  applyPatchFiles([kitPatch], patchSource);
+  applyPatchFiles(
+    upstream.patches.map((patch) => path.join(kitPatchDir, patch.file)),
+    path.join(patchCheck, releaseSourceDirName(upstream)),
+  );
 
   for (const file of walk(kitArtifact.kit)) {
     if (file.endsWith('.md') || file.endsWith('.json') || file.endsWith('.txt')) {
@@ -329,13 +339,26 @@ function main(): void {
     + `${included.length} linked Hamlib objects, source kit verified`
     + `${relink ? ', clean-room relink verified' : ''})`,
   );
-
-  cleanup(work, keep);
 }
 
-try {
-  main();
-} catch (error) {
-  process.stderr.write(`[${SCOPE}] error: ${String(error)}\n`);
-  process.exit(1);
+function main(): void {
+  const args = process.argv.slice(2);
+  const tarballArg = parseFlag(args, '--tarball');
+  const workArg = parseFlag(args, '--work-dir');
+  const upstream = loadUpstream();
+
+  verifyRepository();
+
+  const work = workArg ?? mkdtempSync(path.join(os.tmpdir(), 'hamlib-wasm-package-'));
+
+  mkdirSync(work, { recursive: true });
+
+  try {
+    const tarball = tarballArg ?? packTarball(path.join(work, 'artifact'));
+    verifyTarball(upstream, tarball, work, args.includes('--relink'));
+  } finally {
+    cleanup(work, args.includes('--keep'));
+  }
 }
+
+await runMain(SCOPE, main);

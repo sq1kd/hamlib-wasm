@@ -6,7 +6,6 @@ LGPL 2.1 section 6. The WASM contains statically linked Hamlib.
 
 ## Exact release inputs
 
-- Package version: `hamlib-wasm` {{PACKAGE_VERSION}}
 - Hamlib version: {{HAMLIB_VERSION}}, commit
   `{{HAMLIB_COMMIT}}` (tag object
   `{{HAMLIB_TAG_OBJECT}}`)
@@ -14,9 +13,8 @@ LGPL 2.1 section 6. The WASM contains statically linked Hamlib.
   {{HAMLIB_ARCHIVE_URL}}
 - SHA-256 of original archive:
   `{{HAMLIB_ARCHIVE_SHA256}}`
-- Patch: `{{HAMLIB_PATCH_FILE}}`
-- SHA-256 of applied patch:
-  `{{HAMLIB_PATCH_SHA256}}`
+- Patches, applied in this order:
+{{HAMLIB_PATCHES}}
 - Toolchain: Emscripten SDK {{EMSCRIPTEN_VERSION}}, Node.js {{NODE_MAJOR}}, GNU tar, GNU patch (or the
   BSD equivalents), and `make`
 - Source/relink kit in this npm package:
@@ -25,20 +23,22 @@ LGPL 2.1 section 6. The WASM contains statically linked Hamlib.
 ## What the kit contains
 
 - `source/{{HAMLIB_ARCHIVE_NAME}}`: the complete upstream source archive
-- `patches/{{HAMLIB_PATCH_FILE}}`: the exact applied patch
+- `patches/`: the exact applied patches
 - `native/`: the facade, serial transport, compatibility header, monotonic
   clock replacement and generated `.inc` bindings
 - `library/web_serial.js`: the precompiled Emscripten JS library
 - `rebuild.sh`: the build and relink script
-- `release.env`, `configure.env`, `configure.args`, `link.args`: the pinned
-  version and hash values and the configure and link flags `rebuild.sh` uses
+- `release.env`, `patches.sha256`: the pinned version and hash values
+- `configure.args`, `compile.args`, `link.args`, `finish-module.mts`: the
+  configure, compile, link and post-link steps of the package build, which
+  `rebuild.sh` runs unchanged
 - `LICENSE.md`, `LICENSES/`, `THIRD_PARTY_NOTICES.md`, the upstream
   `AUTHORS`, `LICENSE`, `COPYING` and `COPYING.LIB`: notices
 - `SOURCE.json`: the release, commit and hash manifest
 
 The kit does not need the `hamlib-wasm` monorepo or the TypeScript compiler and
 does not download anything. `rebuild.sh` verifies the archive and patch
-SHA-256 values before compiling and applies the same configure and link flags
+SHA-256 values before compiling and runs the same configure and link commands
 as the package build, including `-Wl,--wrap=monotonic_seconds`, which keeps the
 GPL-3.0 `precise_time.o` out of the binary.
 
@@ -54,7 +54,7 @@ cd hamlib-relink
 tar xzf /path/to/node_modules/hamlib-wasm/dist/third_party/hamlib/corresponding-source.tar.gz
 
 # 2. Verify the recorded source and patch hashes, extract Hamlib, apply the
-#    patch, and install the project serial transport.
+#    patches, and install the project serial transport.
 ./rebuild.sh --prepare
 
 # 3. Change a Hamlib library source file, for example the hamlib_version2
@@ -89,7 +89,7 @@ loader.
 `mise run build-package` builds the WASM, this document and the kit.
 `mise run verify-package` packs the workspace and checks the actual tarball:
 the notices, the hashes in `SOURCE.json`, the linked-input audit, the kit
-contents and a clean application of the patch. `mise run verify-relink` runs
+contents and a clean application of the patches. `mise run verify-relink` runs
 the procedure above from the packed tarball alone, changes `hamlib_version2`,
 and checks that the packaged loader reports the modified version.
 

@@ -8,8 +8,8 @@
  * repository root; packaging copies them into the package.  `REBUILDING.md`
  * carries exact release values, so it is rendered from `REBUILDING.md.in`.
  * None of the package copies is committed.  The source kit contains the pinned
- * upstream archive, the applied patch and every project-owned input needed to
- * relink the WASM without the monorepo.
+ * upstream archive, the applied patches and every project-owned input needed
+ * to relink the WASM without the monorepo.
  */
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -25,21 +25,20 @@ import {
   UPSTREAM_BASE_FILES,
   UPSTREAM_LICENSE_FILES,
 } from './package-manifest.ts';
+import { kitCommandFiles } from './native-flags.ts';
 import {
-  configureArgsFile,
-  configureEnv,
-  linkArgsFile,
   packageLicensingManifest,
+  patchesSha256,
   releaseEnv,
 } from './release-env.ts';
 import {
   BRIDGE_INPUTS,
   CORRESPONDING_SOURCE,
+  FINISH_MODULE_SCRIPT,
   LIBRARY_JS,
   LINK_INPUTS_JSON,
   NATIVE_DIR,
   PACKAGE_DIR,
-  PACKAGE_JSON,
   PACKAGE_LICENSES_DIR,
   PACKAGE_LICENSING_MANIFEST,
   PACKAGE_REBUILDING,
@@ -281,30 +280,27 @@ export function syncPackageLicenseFiles(): void {
  */
 export function writeRebuildingGuide(): void {
   const upstream = loadUpstream();
-  const source = readJson<{ emscriptenVersion?: string | null; patchSha256?: string | null }>(
-    SOURCE_JSON,
-  );
-  const manifest = readJson<{ version?: string }>(PACKAGE_JSON);
-  const patch = upstream.patches[0];
+  const source = readJson<{
+    emscriptenVersion?: string | null;
+    patches?: readonly { file: string; sha256: string }[];
+  }>(SOURCE_JSON);
 
-  assert(patch, 'the release config has no patch');
-  assert(manifest.version, 'package.json has no version');
-  assert(source.patchSha256, 'SOURCE.json has no patch hash');
+  assert(source.patches && source.patches.length > 0, 'SOURCE.json lists no patches');
 
   const emscripten = /(\d+\.\d+\.\d+)/.exec(String(source.emscriptenVersion ?? ''));
 
   assert(emscripten, 'SOURCE.json has no Emscripten version');
 
   const values: Record<string, string> = {
-    PACKAGE_VERSION: manifest.version,
     HAMLIB_VERSION: upstream.version,
     HAMLIB_COMMIT: upstream.commit,
     HAMLIB_TAG_OBJECT: upstream.tagObject,
     HAMLIB_ARCHIVE_NAME: upstream.archive.name,
     HAMLIB_ARCHIVE_URL: upstream.archive.url,
     HAMLIB_ARCHIVE_SHA256: upstream.archive.sha256,
-    HAMLIB_PATCH_FILE: patch.file,
-    HAMLIB_PATCH_SHA256: source.patchSha256,
+    HAMLIB_PATCHES: source.patches
+      .map((patch) => `  - \`${patch.file}\`, SHA-256\n    \`${patch.sha256}\``)
+      .join('\n'),
     HAMLIB_SOURCE_DIR: releaseSourceDirName(upstream),
     EMSCRIPTEN_VERSION: emscripten[1] as string,
     NODE_MAJOR: process.versions.node.split('.')[0] as string,
@@ -388,8 +384,6 @@ export function writeThirdPartyData(linkMapFile: string): void {
     sourceArchiveSha256: upstream.archive.sha256,
     url: upstream.archive.url,
     sha256: upstream.archive.sha256,
-    patch: upstream.patches[0]?.file ?? null,
-    patchSha256: patchHashes[upstream.patches[0]?.file ?? ''] ?? null,
     patches: upstream.patches.map((patch) => ({
       file: patch.file,
       purpose: patch.purpose,
@@ -427,7 +421,7 @@ export function writeThirdPartyData(linkMapFile: string): void {
 }
 
 function kitReadme(upstream: Upstream): string {
-  const patch = upstream.patches[0]?.file ?? '';
+  const patches = upstream.patches.map((patch) => `\`patches/${patch.file}\``).join(', ');
 
   return `# hamlib-wasm corresponding-source and relink kit
 
@@ -437,20 +431,22 @@ This archive contains the source and build inputs needed to rebuild
 - Upstream: Hamlib ${upstream.version}, commit ${upstream.commit}
 - Original archive: \`source/${upstream.archive.name}\`
 - Archive SHA-256: \`${upstream.archive.sha256}\`
-- Patch: \`patches/${patch}\`
+- Patches, applied in order: ${patches}
 - Project bridge and generated bindings: \`native/\`
 - Precompiled Emscripten JS library: \`library/web_serial.js\`
 - License texts and notices: \`LICENSES/\`, \`LICENSE.md\`, \`THIRD_PARTY_NOTICES.md\`,
   and the upstream \`AUTHORS\`, \`LICENSE\`, \`COPYING\`, \`COPYING.LIB\`
 - Rebuild instructions: \`REBUILDING.md\`
-- Release values consumed by \`rebuild.sh\`: \`release.env\`, \`configure.env\`,
-  \`configure.args\`, \`link.args\`
+- Release values consumed by \`rebuild.sh\`: \`release.env\`, \`patches.sha256\`
+- The configure, compile and link commands of the package build:
+  \`configure.args\`, \`compile.args\`, \`link.args\`; the post-link step:
+  \`finish-module.mts\`
 
 The package-level \`dist/third_party/hamlib/SOURCE.json\` records the SHA-256 of
 this tarball. The \`SOURCE.json\` copy inside the kit predates that hash and
 therefore leaves \`correspondingSourceSha256\` null; it is not a placeholder.
 
-\`rebuild.sh\` extracts and verifies the archive, applies the patch, replaces
+\`rebuild.sh\` extracts and verifies the archive, applies the patches, replaces
 \`src/serial.c\` with the project transport, compiles Hamlib, and links a
 replacement \`hamlib-wasm.wasm\` plus loader.
 
@@ -495,6 +491,7 @@ export function buildCorrespondingSourceKit(): void {
   cpSync(NATIVE_DIR, path.join(staging, 'native'), { recursive: true });
   cpSync(LIBRARY_JS, path.join(staging, 'library', 'web_serial.js'));
   cpSync(REBUILD_SCRIPT, path.join(staging, 'rebuild.sh'));
+  cpSync(FINISH_MODULE_SCRIPT, path.join(staging, path.basename(FINISH_MODULE_SCRIPT)));
   cpSync(PACKAGE_REBUILDING, path.join(staging, 'REBUILDING.md'));
   cpSync(SOURCE_JSON, path.join(staging, 'SOURCE.json'));
 
@@ -508,9 +505,12 @@ export function buildCorrespondingSourceKit(): void {
   }
 
   writeFileSync(path.join(staging, 'release.env'), releaseEnv(upstream));
-  writeFileSync(path.join(staging, 'configure.env'), configureEnv());
-  writeFileSync(path.join(staging, 'configure.args'), configureArgsFile());
-  writeFileSync(path.join(staging, 'link.args'), linkArgsFile());
+  writeFileSync(path.join(staging, 'patches.sha256'), patchesSha256(upstream));
+
+  for (const [file, content] of Object.entries(kitCommandFiles())) {
+    writeFileSync(path.join(staging, file), content);
+  }
+
   writeFileSync(path.join(staging, 'KIT-README.md'), kitReadme(upstream));
   writeJson(PACKAGE_LICENSING_MANIFEST, packageLicensingManifest(upstream));
 

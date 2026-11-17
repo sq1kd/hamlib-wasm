@@ -1,56 +1,33 @@
 // SPDX-License-Identifier: MIT
 
-import {
-  CONFIGURE_ARGS,
-  CONFIGURE_VALUES,
-  LINK_ARGS,
-  configureCppflags,
-} from './native-flags.ts';
 import { sha256File } from './files.ts';
 import {
   packageLicensingEntries,
   type PackageLicensingEntry,
 } from './package-manifest.ts';
+import { releaseSourceDirName } from './paths.ts';
 import type { Upstream } from './upstream.ts';
 
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/** The release values `rebuild.sh` sources. */
 export function releaseEnv(upstream: Upstream): string {
-  const patch = upstream.patches[0];
-
-  if (!patch) {
-    throw new Error('the release has no patch');
-  }
-
   return [
-    `HAMLIB_VERSION='${upstream.version}'`,
-    `HAMLIB_ARCHIVE_NAME='${upstream.archive.name}'`,
-    `HAMLIB_ARCHIVE_SHA256='${upstream.archive.sha256}'`,
-    `HAMLIB_PATCH_FILE='${patch.file}'`,
-    `HAMLIB_PATCH_SHA256='${sha256File(patch.path)}'`,
-    `HAMLIB_SOURCE_DIR='hamlib-${upstream.version}'`,
+    `HAMLIB_VERSION=${shellQuote(upstream.version)}`,
+    `HAMLIB_ARCHIVE_NAME=${shellQuote(upstream.archive.name)}`,
+    `HAMLIB_ARCHIVE_SHA256=${shellQuote(upstream.archive.sha256)}`,
+    `HAMLIB_SOURCE_DIR=${shellQuote(releaseSourceDirName(upstream))}`,
     '',
   ].join('\n');
 }
 
-/** Shell values shared by the native build and the standalone kit. */
-export function configureEnv(): string {
-  const cppflags = configureCppflags('$KIT_DIR/native');
-
-  return [
-    `CPPFLAGS="${cppflags}"`,
-    ...CONFIGURE_VALUES.map((value) => {
-      const separator = value.indexOf('=');
-      return `${value.slice(0, separator)}='${value.slice(separator + 1)}'`;
-    }),
-    '',
-  ].join('\n');
-}
-
-export function configureArgsFile(): string {
-  return `${CONFIGURE_ARGS.join('\n')}\n`;
-}
-
-export function linkArgsFile(): string {
-  return `${LINK_ARGS.join('\n')}\n`;
+/** Every patch in application order, in `sha256sum` format. */
+export function patchesSha256(upstream: Upstream): string {
+  return upstream.patches
+    .map((patch) => `${sha256File(patch.path)}  ${patch.file}\n`)
+    .join('');
 }
 
 export interface PackageLicensingManifest {

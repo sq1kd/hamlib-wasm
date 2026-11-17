@@ -52,6 +52,7 @@ export const PACKAGE_LICENSES_DIR = path.join(PACKAGE_DIR, 'LICENSES');
 export const PACKAGE_REBUILDING = path.join(PACKAGE_DIR, 'REBUILDING.md');
 export const REBUILDING_TEMPLATE = path.join(BUILD_SCRIPTS_DIR, 'REBUILDING.md.in');
 export const REBUILD_SCRIPT = path.join(BUILD_SCRIPTS_DIR, 'rebuild.sh');
+export const FINISH_MODULE_SCRIPT = path.join(BUILD_SCRIPTS_DIR, 'finish-module.mts');
 
 export const BRIDGE_INPUTS: readonly string[] = [
   'native/facade.cpp',

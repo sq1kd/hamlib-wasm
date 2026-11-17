@@ -18,11 +18,13 @@ import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 import { readJson } from './files.ts';
+import { kitCommandFiles } from './native-flags.ts';
 import {
   BRIDGE_INPUTS,
   DIST_MODULE_JS,
   DIST_MODULE_TSD,
   DIST_MODULE_WASM,
+  FINISH_MODULE_SCRIPT,
   PACKAGE_DIR,
   PACKAGE_JSON,
 } from './paths.ts';
@@ -198,10 +200,10 @@ export function kitFiles(upstream: Upstream): readonly string[] {
     'REBUILDING.md',
     'rebuild.sh',
     'SOURCE.json',
+    path.basename(FINISH_MODULE_SCRIPT),
     'release.env',
-    'configure.env',
-    'configure.args',
-    'link.args',
+    'patches.sha256',
+    ...Object.keys(kitCommandFiles()),
     `source/${upstream.archive.name}`,
     ...upstream.patches.map((patch) => `patches/${patch.file}`),
     ...BRIDGE_INPUTS.map((relative) => (
