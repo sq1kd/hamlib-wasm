@@ -454,9 +454,10 @@ layer and walks through the build. In short:
 
 Every `RawRig` method comes from the pinned upstream headers: a declaration is
 bound when the upstream `rigctl`/`rigctld` sources call it and all its types
-map, and refused with a reason in `coverage.json` otherwise. Today that is 89
-generated operations plus 11 with a hand-written C++ body: 100 methods, against
-87 refusals. The generated declaration uses value objects and primitive handles
+map, and refused with a reason otherwise. The repository's
+[`coverage.json`](https://github.com/sq1kd/hamlib-wasm/blob/main/packages/hamlib-wasm/coverage.json)
+records every decision, and its `summary` counts the generated operations, the
+ones with a hand-written C++ body and the refusals. The generated declaration uses value objects and primitive handles
 only - no C pointers, Hamlib structures or Wasm addresses - and types every
 operation as `T | Promise<T>`, because an Asyncify-suspended call returns a
 promise.
