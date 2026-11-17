@@ -20,17 +20,19 @@ import path from 'node:path';
 import { readJson } from './files.ts';
 import { kitCommandFiles } from './native-flags.ts';
 import {
-  BRIDGE_INPUTS,
   DIST_MODULE_JS,
   DIST_MODULE_TSD,
   DIST_DIR,
   DIST_MODULE_WASM,
+  DIST_NATIVE_DIR,
   FINISH_MODULE_SCRIPT,
   LIBRARY_JS,
   PACKAGE_DIR,
   PACKAGE_JSON,
   PACKAGE_REBUILDING,
   TSD_SOURCE_PATH,
+  bridgeInputs,
+  packageRelative,
 } from './paths.ts';
 import type { Upstream } from './upstream.ts';
 
@@ -49,11 +51,6 @@ interface PackageJson {
 }
 
 const PACKAGE_MANIFEST = readJson<PackageJson>(PACKAGE_JSON);
-
-/** Path of a package file, relative to the package root, as npm sees it. */
-function packageRelative(file: string): string {
-  return path.relative(PACKAGE_DIR, file).split(path.sep).join('/');
-}
 
 /**
  * `package.json` `files` entries.  The entry is a directory when it exists and
@@ -214,11 +211,14 @@ export function scannedPackageFiles(upstream: Upstream): readonly string[] {
   ];
 }
 
-/**
- * Files the standalone relink kit must contain.  The kit keeps the archive,
- * the patches and the whole native bridge, so derive the bridge entries from
- * `BRIDGE_INPUTS` instead of restating them.
- */
+/** Where a bridge input sits in the relink kit: the compiled JS library drops `dist/native/`. */
+export function kitBridgePath(relative: string): string {
+  const distNative = `${packageRelative(DIST_NATIVE_DIR)}/`;
+
+  return relative.startsWith(distNative) ? relative.slice(distNative.length) : relative;
+}
+
+/** Files the standalone relink kit must contain. */
 export function kitFiles(upstream: Upstream): readonly string[] {
   return [
     'KIT-README.md',
@@ -231,11 +231,7 @@ export function kitFiles(upstream: Upstream): readonly string[] {
     ...Object.keys(kitCommandFiles()),
     `source/${upstream.archive.name}`,
     ...upstream.patches.map((patch) => `patches/${patch.file}`),
-    ...BRIDGE_INPUTS.map((relative) => (
-      relative.startsWith('dist/native/')
-        ? relative.slice('dist/native/'.length)
-        : relative
-    )),
+    ...bridgeInputs().map(kitBridgePath),
     ...ROOT_LICENSING_FILES,
     ...UPSTREAM_BASE_FILES,
   ];

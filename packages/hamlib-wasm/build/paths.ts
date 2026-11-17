@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { walk } from './files.ts';
 import type { Upstream } from './upstream.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -11,6 +12,7 @@ export const BUILD_SCRIPTS_DIR = HERE;
 export const PACKAGE_DIR = path.resolve(HERE, '..');
 export const REPO_ROOT = path.resolve(PACKAGE_DIR, '..', '..');
 export const NATIVE_DIR = path.join(PACKAGE_DIR, 'native');
+export const NATIVE_PATCHES_DIR = path.join(NATIVE_DIR, 'patches');
 export const CONFIG_PATH = path.join(PACKAGE_DIR, 'hamlib.config.yaml');
 export const PACKAGE_JSON = path.join(PACKAGE_DIR, 'package.json');
 export const MISE_TOML = path.join(REPO_ROOT, 'mise.toml');
@@ -57,25 +59,24 @@ export const REBUILDING_TEMPLATE = path.join(BUILD_SCRIPTS_DIR, 'REBUILDING.md.i
 export const REBUILD_SCRIPT = path.join(BUILD_SCRIPTS_DIR, 'rebuild.sh');
 export const FINISH_MODULE_SCRIPT = path.join(BUILD_SCRIPTS_DIR, 'finish-module.mts');
 
-export const BRIDGE_INPUTS: readonly string[] = [
-  'native/facade.cpp',
-  'native/wrapped_io.cpp',
-  'native/monotonic_time.c',
-  'native/web_serial.c',
-  'native/web_serial.h',
-  'native/web_serial.ts',
-  'native/compat/pthread.h',
-  'native/generated/capabilities.inc',
-  'native/generated/codecs.h',
-  'native/generated/embind.inc',
-  'native/generated/policy.h',
-  'native/generated/operations.inc',
-  'native/generated/results.inc',
-  'native/generated/transport.d.ts',
-  'native/emscripten-globals.d.ts',
-  'native/tsconfig.library.json',
-  'dist/native/library/web_serial.js',
-];
+/** Path of a package file relative to the package root, as npm sees it. */
+export function packageRelative(file: string): string {
+  return path.relative(PACKAGE_DIR, file).split(path.sep).join('/');
+}
+
+/**
+ * The MIT bridge linked into the module, relative to the package root: every
+ * file under `native/` except the Hamlib patches, plus the compiled JS
+ * library.  Read from disk so a file the generator adds is covered.
+ */
+export function bridgeInputs(): readonly string[] {
+  const sources = walk(NATIVE_DIR).filter((file) => (
+    !file.startsWith(`${NATIVE_PATCHES_DIR}${path.sep}`)
+    && !path.basename(file).startsWith('.')
+  ));
+
+  return [...sources, LIBRARY_JS].map(packageRelative).sort();
+}
 
 export function releaseCacheDir(upstream: Upstream): string {
   return path.join(REPO_ROOT, '.cache', 'hamlib', upstream.version);
@@ -119,7 +120,6 @@ export function releaseLinkMap(upstream: Upstream): string {
 export function releaseKitStaging(upstream: Upstream): string {
   return path.join(releaseCacheDir(upstream), 'corresponding-source');
 }
-
 
 /** The host (non-Wasm) build `compare-native` traces against. */
 export function releaseHostDir(upstream: Upstream): string {

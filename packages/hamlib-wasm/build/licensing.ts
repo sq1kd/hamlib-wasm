@@ -24,6 +24,7 @@ import {
   ROOT_LICENSING_FILES,
   UPSTREAM_BASE_FILES,
   UPSTREAM_LICENSE_FILES,
+  kitBridgePath,
 } from './package-manifest.ts';
 import { kitCommandFiles } from './native-flags.ts';
 import {
@@ -32,12 +33,10 @@ import {
   releaseEnv,
 } from './release-env.ts';
 import {
-  BRIDGE_INPUTS,
   CORRESPONDING_SOURCE,
   FINISH_MODULE_SCRIPT,
   LIBRARY_JS,
   LINK_INPUTS_JSON,
-  NATIVE_DIR,
   PACKAGE_DIR,
   PACKAGE_LICENSES_DIR,
   PACKAGE_LICENSING_MANIFEST,
@@ -47,6 +46,7 @@ import {
   REPO_ROOT,
   SOURCE_JSON,
   THIRD_PARTY_DIR,
+  bridgeInputs,
   releaseArchivePath,
   releaseKitStaging,
   releaseSourceDir,
@@ -214,10 +214,7 @@ export function readLinkInputs(mapFile: string): LinkInputs {
   }
 
   const linkedLicenses = [
-    ...new Set([
-      ...included.map((entry) => entry.license),
-      ...BRIDGE_INPUTS.map(() => 'MIT'),
-    ]),
+    ...new Set([...included.map((entry) => entry.license), 'MIT']),
   ].sort();
 
   return {
@@ -229,7 +226,7 @@ export function readLinkInputs(mapFile: string): LinkInputs {
       + 'LICENSE policy determines the license. For a basename collision the '
       + 'shortest matching source is recorded because the license is the same '
       + 'source family.',
-    bridgeInputs: BRIDGE_INPUTS.map((source) => ({ source, license: 'MIT' as const })),
+    bridgeInputs: bridgeInputs().map((source) => ({ source, license: 'MIT' as const })),
     included,
     excluded: [
       {
@@ -478,7 +475,7 @@ export function buildCorrespondingSourceKit(): void {
   );
 
   rmSync(staging, { recursive: true, force: true });
-  for (const dir of ['source', 'patches', 'library']) {
+  for (const dir of ['source', 'patches']) {
     mkdirSync(path.join(staging, dir), { recursive: true });
   }
 
@@ -488,8 +485,13 @@ export function buildCorrespondingSourceKit(): void {
     cpSync(patch.path, path.join(staging, 'patches', patch.file));
   }
 
-  cpSync(NATIVE_DIR, path.join(staging, 'native'), { recursive: true });
-  cpSync(LIBRARY_JS, path.join(staging, 'library', 'web_serial.js'));
+  for (const relative of bridgeInputs()) {
+    const destination = path.join(staging, kitBridgePath(relative));
+
+    mkdirSync(path.dirname(destination), { recursive: true });
+    cpSync(path.join(PACKAGE_DIR, relative), destination);
+  }
+
   cpSync(REBUILD_SCRIPT, path.join(staging, 'rebuild.sh'));
   cpSync(FINISH_MODULE_SCRIPT, path.join(staging, path.basename(FINISH_MODULE_SCRIPT)));
   cpSync(PACKAGE_REBUILDING, path.join(staging, 'REBUILDING.md'));

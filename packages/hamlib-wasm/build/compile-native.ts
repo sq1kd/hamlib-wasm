@@ -34,7 +34,6 @@ import {
   linkCommand,
 } from './native-flags.ts';
 import {
-  BRIDGE_INPUTS,
   BUILD_SCRIPTS_DIR,
   CODEGEN_DIR,
   CONFIG_PATH,
@@ -48,6 +47,7 @@ import {
   PACKAGE_DIR,
   REPO_ROOT,
   TSD_SOURCE_PATH,
+  bridgeInputs,
   releaseBuildDir,
   releaseLinkMap,
   releaseSourceDir,
@@ -63,9 +63,9 @@ const SCOPE = 'build-native';
  * release and every applied patch. */
 function trackedFiles(): string[] {
   return [
-    ...BRIDGE_INPUTS
-      .filter((relative) => !relative.startsWith('dist/'))
-      .map((relative) => path.join(PACKAGE_DIR, relative)),
+    ...bridgeInputs()
+      .map((relative) => path.join(PACKAGE_DIR, relative))
+      .filter((file) => file !== LIBRARY_JS),
     CONFIG_PATH,
     ...['compile-native.ts', 'native-flags.ts', 'upstream.ts', 'codegen.ts', 'paths.ts']
       .map((file) => path.join(BUILD_SCRIPTS_DIR, file)),

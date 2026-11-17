@@ -17,7 +17,7 @@ import path from 'node:path';
 import { parse } from 'yaml';
 
 import { errorMessage } from './errors.ts';
-import { CONFIG_PATH, NATIVE_DIR, REPO_ROOT } from './paths.ts';
+import { CONFIG_PATH, NATIVE_PATCHES_DIR, REPO_ROOT } from './paths.ts';
 
 const VERSION_PATTERN = /^\d+\.\d+(?:\.\d+)?$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -128,7 +128,7 @@ export function parseUpstreamConfig(text: string): Upstream {
     const patch = assertObject(entry, 'release.patches entry');
     const file = assertString(patch.file, 'patch file');
     const purpose = assertString(patch.purpose, 'patch purpose');
-    const absolute = path.join(NATIVE_DIR, 'patches', file);
+    const absolute = path.join(NATIVE_PATCHES_DIR, file);
 
     if (!existsSync(absolute)) {
       invalid(`the config names a patch that does not exist: ${file}`);
