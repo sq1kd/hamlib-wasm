@@ -3,6 +3,8 @@ title: Supported rigs
 description: Which models work, what "verified" means, and the known limitations.
 ---
 
+import { repositoryPage } from '../../../links';
+
 Hamlib reports several hundred serial models, and every one of them is in the
 catalogue (`hamlib.models`). Being in the catalogue only says the backend goes
 through Hamlib's common serial port layer, so each `RigModel` also says how far
@@ -69,7 +71,7 @@ tried; `detectBaudRate()` searches the declared range. See
 ## Notes from real radios
 
 What we, and the people who send
-[rig reports](https://github.com/sq1kd/hamlib-wasm/issues/new?template=rig-report.yml),
+<a href={repositoryPage('/issues/new?template=rig-report.yml')}>rig reports</a>,
 found on real radios, one section per radio in the same shape: how it was
 connected, what works, what is Hamlib's own behaviour, and how to work around
 it. Hamlib issues are noted as they are, not patched here.

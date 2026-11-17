@@ -14,3 +14,8 @@ export function served(path: string): string {
 export function repositoryFile(path: string, fallback: string): string {
   return REPOSITORY_URL === null ? served(fallback) : `${REPOSITORY_URL}/blob/main/${path}`;
 }
+
+/** A page of the repository on GitHub; no href when the build has no repository. */
+export function repositoryPage(path: string): string | undefined {
+  return REPOSITORY_URL === null ? undefined : `${REPOSITORY_URL}${path}`;
+}
