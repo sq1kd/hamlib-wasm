@@ -1,12 +1,14 @@
 /**
- * What the radio panel shows, as pure functions.
+ * What the radio panel shows and lets you press, as pure functions.
  *
  * One panel is drawn by React on the demo page and painted by a small script
  * on the landing page (`paint.ts`); both read their text and cell counts
- * from here, so the two never disagree about what a reading looks like.
+ * from here, so the two never disagree about a reading or a control.
  */
 
-import type { PassbandSelector, PttState, RigCapabilities, RigMode } from 'hamlib-wasm';
+import type { PassbandSelector, PttState, RigCapabilities, RigMode, RigState } from 'hamlib-wasm';
+
+import type { PanelModel } from './models';
 
 /** Before a radio is connected: nothing can be set. */
 export const NO_CAPABILITIES: RigCapabilities = {
@@ -28,6 +30,53 @@ export function keyed(ptt: PttState | 'unknown' | undefined): boolean {
 
 /** Tuning increments, in Hz. */
 export const STEPS: readonly number[] = [10, 100, 1000, 10_000, 100_000];
+
+/** Which write controls are usable: what the rig can set, and what the last reading makes meaningful. */
+export interface ControlStates {
+  /** The frequency entry. */
+  readonly entry: boolean;
+  /** The entry's Set button: an entry, and something typed in it. */
+  readonly set: boolean;
+  /** The step buttons and step picker: they move the frequency last read. */
+  readonly tune: boolean;
+  readonly mode: boolean;
+  /** Hamlib's passband helpers take the current mode. */
+  readonly passband: boolean;
+  readonly ptt: boolean;
+}
+
+/** Not gated on a write in flight: Hamlib's calls queue, so a control pressed meanwhile runs next. */
+export function controlStates(capabilities: RigCapabilities, state: RigState | undefined, entry = ''): ControlStates {
+  return {
+    entry: capabilities.setFrequency,
+    set: capabilities.setFrequency && entry !== '',
+    tune: capabilities.setFrequency && state?.frequency !== undefined,
+    mode: capabilities.setMode,
+    passband: capabilities.setMode && state?.mode !== undefined,
+    ptt: capabilities.setPtt,
+  };
+}
+
+/** `steps` steps of `step` Hz up (or down, when negative) from `hz`, never below 0. */
+export function tuned(hz: number, steps: number, step: number): number {
+  return Math.max(0, hz + steps * step);
+}
+
+/** What the frequency entry asks for, in Hz, ignoring separators; `undefined` when it names none. */
+export function parseFrequency(entry: string): number | undefined {
+  const hz = Number(entry.replace(/[^0-9]/g, ''));
+
+  return Number.isFinite(hz) && hz > 0 ? hz : undefined;
+}
+
+export function entryPlaceholder(hz: number | undefined): string {
+  return hz === undefined ? 'Frequency, Hz' : String(hz);
+}
+
+/** Why the picked model cannot be connected, as the panel says it; `undefined` when it can. */
+export function limitationText(model: PanelModel | undefined): string | undefined {
+  return model?.limitation === undefined ? undefined : `${model.manufacturer} ${model.model}: ${model.limitation}`;
+}
 
 /** The modes the panel lists; the current mode is added when it is not one of them. */
 export const MODES: readonly RigMode[] = ['LSB', 'USB', 'CW', 'CW-R', 'AM', 'FM', 'RTTY', 'PKTUSB'];

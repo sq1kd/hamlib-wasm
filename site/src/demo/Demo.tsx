@@ -233,7 +233,6 @@ function App(): ReactElement {
             ? {
               controls: {
                 capabilities: backend.capabilities,
-                busy,
                 onSetFrequency: backend.setFrequency,
                 onSetMode: backend.setMode,
                 onSetPassband: backend.setPassband,

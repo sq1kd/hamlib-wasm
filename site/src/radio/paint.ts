@@ -7,7 +7,8 @@
  */
 import type { RigCapabilities } from 'hamlib-wasm';
 
-import { cellState, keyed, meterCells, modeList, NO_CAPABILITIES, passbandLabel, segments } from './format';
+import { cellState, controlStates, entryPlaceholder, keyed, meterCells, modeList, NO_CAPABILITIES, passbandLabel, segments } from './format';
+import type { ControlStates } from './format';
 import type { PanelView } from './RadioPanel';
 
 function find<T extends Element>(root: Element, selector: string): T {
@@ -25,6 +26,7 @@ export function paint(root: HTMLElement, view: PanelView, capabilities: RigCapab
   const digits = segments(state?.frequency);
   const ptt = state?.ptt ?? 'unknown';
   const lit = meterCells(state?.levels?.STRENGTH);
+  const can = controlStates(capabilities, state, root.querySelector<HTMLInputElement>('[data-radio-entry]')?.value);
 
   root.dataset.state = view.phase;
   root.toggleAttribute('data-sample', view.sample);
@@ -66,10 +68,10 @@ export function paint(root: HTMLElement, view: PanelView, capabilities: RigCapab
 
   for (const chip of modes.querySelectorAll<HTMLButtonElement>('[data-mode]')) {
     chip.setAttribute('aria-pressed', String(chip.dataset.mode === state?.mode));
-    chip.disabled = !capabilities.setMode;
+    chip.disabled = !can.mode;
   }
 
-  paintControls(root, view, capabilities);
+  paintControls(root, view, can);
 
   find(root, '[data-radio-meter]').querySelectorAll<HTMLElement>('i').forEach((cell, index) => {
     cell.dataset.on = cellState(index, lit);
@@ -77,7 +79,7 @@ export function paint(root: HTMLElement, view: PanelView, capabilities: RigCapab
 }
 
 /** The write controls, when the panel has them: what is pressed, and what can be pressed. */
-function paintControls(root: HTMLElement, view: PanelView, capabilities: RigCapabilities): void {
+function paintControls(root: HTMLElement, view: PanelView, can: ControlStates): void {
   const controls = root.querySelector<HTMLElement>('[data-radio-controls]');
 
   if (controls === null) {
@@ -89,26 +91,24 @@ function paintControls(root: HTMLElement, view: PanelView, capabilities: RigCapa
 
   if (ptt !== null) {
     ptt.setAttribute('aria-pressed', String(keyed(view.state?.ptt)));
-    ptt.disabled = !capabilities.setPtt;
+    ptt.disabled = !can.ptt;
   }
 
-  const tunable = capabilities.setFrequency && frequency !== undefined;
-
   for (const control of controls.querySelectorAll<HTMLButtonElement | HTMLSelectElement>('[data-tune], [data-radio-step]')) {
-    control.disabled = !tunable;
+    control.disabled = !can.tune;
   }
 
   const input = controls.querySelector<HTMLInputElement>('[data-radio-entry]');
   const set = controls.querySelector<HTMLButtonElement>('[data-radio-set]');
 
   if (input !== null) {
-    input.disabled = !capabilities.setFrequency;
-    input.placeholder = frequency === undefined ? 'Frequency, Hz' : String(frequency);
+    input.disabled = !can.entry;
+    input.placeholder = entryPlaceholder(frequency);
   }
 
-  if (set !== null) set.disabled = !capabilities.setFrequency || input?.value === '';
+  if (set !== null) set.disabled = !can.set;
 
   for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-passband]')) {
-    button.disabled = !capabilities.setMode || view.state?.mode === undefined;
+    button.disabled = !can.passband;
   }
 }

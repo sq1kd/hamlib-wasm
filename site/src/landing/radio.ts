@@ -17,7 +17,7 @@ import { WEB_SERIAL_BROWSERS } from '../facts';
 import { constrainedConnection } from '../network';
 import { detectRate, rememberRate } from '../radio/detect';
 import { failureMessage } from '../radio/errors';
-import { MODES, PASSBANDS } from '../radio/format';
+import { controlStates, limitationText, MODES, NO_CAPABILITIES, parseFrequency, PASSBANDS, tuned } from '../radio/format';
 import { defaultModel } from '../radio/models';
 import type { CatalogueModel } from '../radio/models';
 import { paint } from '../radio/paint';
@@ -87,7 +87,7 @@ export function mountRadio(root: HTMLElement, options: MountOptions = {}): void 
   const lock = (locked: boolean): void => {
     model.disabled = locked;
     baud.disabled = locked;
-    connect.disabled = locked || !serial || selected()?.limitation !== undefined;
+    connect.disabled = locked || !serial || limitationText(selected()) !== undefined;
   };
 
   const showSample = (): void => {
@@ -104,9 +104,9 @@ export function mountRadio(root: HTMLElement, options: MountOptions = {}): void 
     baud.replaceChildren(auto, ...(picked?.rates ?? []).map((rate) => new Option(String(rate))));
     baud.value = 'auto';
 
-    const reason = picked?.limitation;
+    const reason = limitationText(picked);
 
-    limitation.textContent = picked === undefined || reason === undefined ? '' : `${picked.manufacturer} ${picked.model}: ${reason}`;
+    limitation.textContent = reason ?? '';
     limitation.hidden = reason === undefined;
     lock(false);
   };
@@ -225,7 +225,7 @@ export function mountRadio(root: HTMLElement, options: MountOptions = {}): void 
       const hz = rig?.state?.frequency;
 
       if (hz !== undefined) {
-        write((target) => target.setFrequency(Math.max(0, hz + direction * Number(step?.value ?? 1000))));
+        write((target) => target.setFrequency(tuned(hz, direction, Number(step?.value ?? 1000))));
       }
     });
   }
@@ -233,14 +233,16 @@ export function mountRadio(root: HTMLElement, options: MountOptions = {}): void 
   const entry = controls.querySelector<HTMLInputElement>('[data-radio-entry]');
   const set = controls.querySelector<HTMLButtonElement>('[data-radio-set]');
   const submit = (): void => {
-    const hz = Number(entry?.value.replace(/[^0-9]/g, '') ?? '');
+    const hz = parseFrequency(entry?.value ?? '');
 
     if (entry !== null) entry.value = '';
     if (set !== null) set.disabled = true;
-    if (Number.isFinite(hz) && hz > 0) write((target) => target.setFrequency(hz));
+    if (hz !== undefined) write((target) => target.setFrequency(hz));
   };
 
-  entry?.addEventListener('input', () => { if (set !== null) set.disabled = rig?.capabilities.setFrequency !== true || entry.value === ''; });
+  entry?.addEventListener('input', () => {
+    if (set !== null) set.disabled = !controlStates(rig?.capabilities ?? NO_CAPABILITIES, rig?.state, entry.value).set;
+  });
   entry?.addEventListener('keydown', (event) => { if (event.key === 'Enter') submit(); });
   set?.addEventListener('click', submit);
 

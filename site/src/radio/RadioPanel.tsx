@@ -13,7 +13,23 @@ import type { ReactElement, ReactNode } from 'react';
 
 import type { PassbandSelector, RigCapabilities, RigMode, RigState } from 'hamlib-wasm';
 
-import { cellState, keyed, METER_CELLS, meterCells, modeList, PASSBANDS, passbandLabel, segments, STEPS } from './format';
+import {
+  cellState,
+  controlStates,
+  entryPlaceholder,
+  keyed,
+  limitationText,
+  METER_CELLS,
+  meterCells,
+  modeList,
+  NO_CAPABILITIES,
+  parseFrequency,
+  PASSBANDS,
+  passbandLabel,
+  segments,
+  STEPS,
+  tuned,
+} from './format';
 import type { PanelModel } from './models';
 import { bindPtt } from './ptt';
 
@@ -33,7 +49,6 @@ export interface PanelView {
 /** The write controls, shown once a radio is connected. */
 export interface PanelControls {
   readonly capabilities: RigCapabilities;
-  readonly busy: boolean;
   readonly onSetFrequency: (hz: number) => void;
   readonly onSetMode: (mode: RigMode) => void;
   readonly onSetPassband: (kind: PassbandSelector) => void;
@@ -89,14 +104,11 @@ interface ControlsProps {
 }
 
 function Controls({ controls, state }: ControlsProps): ReactElement {
-  const { capabilities, busy } = controls;
   const [step, setStep] = useState(1000);
   const [entry, setEntry] = useState('');
 
   const frequency = state?.frequency;
-  const canSetFrequency = !busy && capabilities.setFrequency;
-  const canTune = canSetFrequency && frequency !== undefined;
-  const canSetMode = !busy && capabilities.setMode;
+  const can = controlStates(controls.capabilities, state, entry);
   const ptt = useRef<HTMLButtonElement>(null);
   const onSetPtt = useRef(controls.onSetPtt);
 
@@ -106,15 +118,15 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
 
   const tune = (steps: number): void => {
     if (frequency !== undefined) {
-      controls.onSetFrequency(Math.max(0, frequency + steps * step));
+      controls.onSetFrequency(tuned(frequency, steps, step));
     }
   };
 
   const submit = (): void => {
-    const value = Number(entry.replace(/[^0-9]/g, ''));
+    const hz = parseFrequency(entry);
 
-    if (Number.isFinite(value) && value > 0) {
-      controls.onSetFrequency(value);
+    if (hz !== undefined) {
+      controls.onSetFrequency(hz);
     }
 
     setEntry('');
@@ -125,11 +137,11 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
       <span className="radio-label">Tune</span>
       <div className="radio-row">
         <div className="radio-group radio-joined">
-          <button data-testid="tune-down" data-tune="-1" type="button" aria-label="Tune down" disabled={!canTune} onClick={() => { tune(-1); }}>−</button>
-          <select data-radio-step aria-label="Tuning step" value={String(step)} disabled={!canTune} onChange={(event) => { setStep(Number(event.target.value)); }}>
+          <button data-testid="tune-down" data-tune="-1" type="button" aria-label="Tune down" disabled={!can.tune} onClick={() => { tune(-1); }}>−</button>
+          <select data-radio-step aria-label="Tuning step" value={String(step)} disabled={!can.tune} onChange={(event) => { setStep(Number(event.target.value)); }}>
             {STEPS.map((value) => <option key={value} value={String(value)}>{`${group(value)} Hz`}</option>)}
           </select>
-          <button data-testid="tune-up" data-tune="1" type="button" aria-label="Tune up" disabled={!canTune} onClick={() => { tune(1); }}>+</button>
+          <button data-testid="tune-up" data-tune="1" type="button" aria-label="Tune up" disabled={!can.tune} onClick={() => { tune(1); }}>+</button>
         </div>
         <div className="radio-group radio-joined radio-entry">
           <input
@@ -138,13 +150,13 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
             aria-label="Frequency in Hz"
             type="number"
             inputMode="numeric"
-            placeholder={frequency === undefined ? 'Frequency, Hz' : String(frequency)}
+            placeholder={entryPlaceholder(frequency)}
             value={entry}
-            disabled={!canSetFrequency}
+            disabled={!can.entry}
             onChange={(event) => { setEntry(event.target.value); }}
             onKeyDown={(event) => { if (event.key === 'Enter') { submit(); } }}
           />
-          <button data-testid="frequency-set" data-radio-set type="button" disabled={!canSetFrequency || entry === ''} onClick={submit}>Set</button>
+          <button data-testid="frequency-set" data-radio-set type="button" disabled={!can.set} onClick={submit}>Set</button>
         </div>
       </div>
 
@@ -157,7 +169,7 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
               data-testid={`passband-${kind}`}
               data-passband={kind}
               type="button"
-              disabled={!canSetMode || state?.mode === undefined}
+              disabled={!can.passband}
               onClick={() => { controls.onSetPassband(kind); }}
             >
               {kind}
@@ -171,7 +183,7 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
           data-radio-ptt
           type="button"
           aria-pressed={keyed(state?.ptt)}
-          disabled={busy || !capabilities.setPtt}
+          disabled={!can.ptt}
         >
           PTT
         </button>
@@ -187,8 +199,9 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
   const lit = meterCells(state?.levels?.STRENGTH);
   const ptt = state?.ptt ?? 'unknown';
   const transmitting = keyed(ptt);
-  const canSetMode = controls !== undefined && !controls.busy && controls.capabilities.setMode;
+  const can = controlStates(controls?.capabilities ?? NO_CAPABILITIES, state);
   const selected = props.models.find((model) => model.id === props.modelId);
+  const limitation = limitationText(selected);
 
   return (
     <section
@@ -232,7 +245,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
               data-mode={mode}
               type="button"
               aria-pressed={state?.mode === mode}
-              disabled={!canSetMode}
+              disabled={!can.mode}
               onClick={() => { controls?.onSetMode(mode); }}
             >
               {mode}
@@ -291,16 +304,16 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
           data-testid="connect-button"
           data-radio-connect
           type="button"
-          disabled={!props.serial || props.locked || selected?.limitation !== undefined}
+          disabled={!props.serial || props.locked || limitation !== undefined}
           onClick={props.onConnect}
         >
           Connect your radio
         </button>
       </div>
 
-      {(props.prerender === true || selected?.limitation !== undefined) && (
-        <p className="radio-limitation" data-testid="model-limitation" data-radio-limitation hidden={selected?.limitation === undefined}>
-          {selected?.limitation === undefined ? '' : `${selected.manufacturer} ${selected.model}: ${selected.limitation}`}
+      {(props.prerender === true || limitation !== undefined) && (
+        <p className="radio-limitation" data-testid="model-limitation" data-radio-limitation hidden={limitation === undefined}>
+          {limitation ?? ''}
         </p>
       )}
       <p className="radio-note">
