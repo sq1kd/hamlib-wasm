@@ -30,12 +30,10 @@ import {
   releasePortOpen,
   waitForPortOpenPending,
 } from './fixtures';
+import { POLL_MS } from '../harness/src/hook-harness-types';
 import type { HookSnapshot } from '../harness/src/hook-harness-types';
 
 const HOOKS_URL = 'http://127.0.0.1:4174/hooks.html';
-
-/** The probe's poll interval (tests/harness/src/hooks.tsx). */
-const POLL_MS = 100;
 
 async function snapshot(page: Page): Promise<HookSnapshot> {
   return page.evaluate(() => window.__hookHarness.snapshot());

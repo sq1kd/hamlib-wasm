@@ -18,13 +18,11 @@ import { createRoot } from 'react-dom/client';
 import { HamlibProvider, useRig, useModels, useRigState } from 'hamlib-wasm/react';
 import type { HamlibOptions } from 'hamlib-wasm';
 
+import { POLL_MS } from './hook-harness-types';
 import type { HookControls, HookSnapshot } from './hook-harness-types';
 
 /** Read once by the provider: a second Wasm instance is never wanted here. */
 const OPTIONS: HamlibOptions = {};
-
-/** How often the probe polls while a rig is owned. */
-const POLL_MS = 100;
 
 /** What the mounted probe published, or `undefined` while nothing is mounted. */
 let controls: HookControls | undefined;

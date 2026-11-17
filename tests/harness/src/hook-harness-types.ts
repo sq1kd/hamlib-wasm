@@ -5,6 +5,9 @@
  * JSX file into its own TypeScript project.
  */
 
+/** How often the probe polls while a rig is owned. */
+export const POLL_MS = 100;
+
 /** What the mounted hooks published, as plain data. */
 export interface HookSnapshot {
   /** The provider finished loading, so its catalogue is known. */
