@@ -1,16 +1,18 @@
 /** Facts the pages and the panels state, each from one source. */
 
+import { DEVICES } from '../../tests/hardware/devices';
+
 /** The first Firefox release with Web Serial. */
 export const FIREFOX_WEB_SERIAL = 151;
 
 /** Where a page can reach a serial port, as a reader would be told. */
 export const WEB_SERIAL_BROWSERS = `desktop Chrome, Edge or Firefox ${String(FIREFOX_WEB_SERIAL)}+`;
 
-/** The radios the opt-in hardware suite runs on; see guides/rigs.mdx. */
-export const HARDWARE_TESTED = [
-  { manufacturer: 'QRP Labs', model: 'QMX+' },
-  { manufacturer: 'Yaesu', model: 'FT-710' },
-] as const;
+/**
+ * The radios the opt-in hardware suite runs on; see guides/rigs.mdx.  Pure, so
+ * the panels' scripts, which import this module, do not ship the device table.
+ */
+export const HARDWARE_TESTED = /* @__PURE__ */ Object.values(DEVICES).map((device) => device.name);
 
 /** Bytes the live demo's Hamlib module costs; see integrations/demo-size.ts. */
 export const DEMO_DOWNLOAD = __DEMO_DOWNLOAD__;
