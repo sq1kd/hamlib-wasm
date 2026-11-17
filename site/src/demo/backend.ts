@@ -12,17 +12,19 @@
  *    `getFrequency()`/`getMode()`/`getPtt()` reads polled by hand and an
  *    explicit passband on every `setMode()`.
  *
- * Every call is logged, so the log is the visible difference.
+ * Either way the panel polls and writes as on the landing page
+ * (`../radio/polling.ts`), and every call is logged, so the log is the
+ * visible difference.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { HamlibError } from 'hamlib-wasm';
-import type { RigCapabilities, Rig, RigMode, RigState, SerialPortLike } from 'hamlib-wasm';
+import type { PassbandSelector, RigCapabilities, Rig, RigMode, RigState, SerialPortLike } from 'hamlib-wasm';
 import type { RawRig } from 'hamlib-wasm/raw';
 import { useRig, useRigError, useRigState } from 'hamlib-wasm/react';
 
-import { NO_CAPABILITIES, POLL_MS } from '../radio/format';
-import type { PassbandKind } from '../radio/RadioPanel';
+import { failureMessage } from '../radio/errors';
+import { NO_CAPABILITIES } from '../radio/format';
+import { metered, POLL_MS, TELEMETRY, writeAndRead } from '../radio/polling';
 
 export type Api = 'rig' | 'raw';
 
@@ -32,16 +34,6 @@ export interface LogEntry {
 }
 
 export type Log = (entry: LogEntry) => void;
-
-function asError(error: unknown, operation: string): HamlibError {
-  return error instanceof HamlibError
-    ? error
-    : new HamlibError(error instanceof Error ? error.message : String(error), {
-      code: 'TRANSPORT_FAILURE',
-      operation,
-      cause: error,
-    });
-}
 
 /** Read what the model advertises through the raw surface, and only that. */
 async function readRaw(rig: Rig, api: Api, log: Log): Promise<RigState> {
@@ -70,7 +62,7 @@ async function readRaw(rig: Rig, api: Api, log: Log): Promise<RigState> {
 }
 
 /** Hamlib's own passband helper for the requested width. */
-function passbandWidth(raw: RawRig, mode: RigMode, kind: PassbandKind): Promise<number> {
+function passbandWidth(raw: RawRig, mode: RigMode, kind: PassbandSelector): Promise<number> {
   switch (kind) {
     case 'narrow':
       return raw.passbandNarrow(mode);
@@ -86,36 +78,38 @@ export interface Backend {
   readonly state: RigState | undefined;
   readonly capabilities: RigCapabilities;
   readonly connecting: boolean;
-  readonly error: HamlibError | undefined;
+  /** What the panel says about the last failure. */
+  readonly error: string | undefined;
   connect(modelId: number, baudRate?: number, port?: SerialPortLike): Promise<void>;
   disconnect(): Promise<void>;
   setFrequency(hz: number): void;
   setMode(mode: RigMode): void;
-  setPassband(kind: PassbandKind): void;
+  setPassband(kind: PassbandSelector): void;
   setPtt(on: boolean): void;
 }
 
 export function useBackend(api: Api, log: Log): Backend {
   const { rig, connecting, error: connectError, connect, disconnect } = useRig();
 
-  /* rig: the library polls - frequency, mode and PTT once a second, and the
-   * S-meter on its own faster timer, so it moves while the slower reads wait.
-   * Both registrations publish into the one snapshot each hook returns. */
+  /* rig: the library polls; both registrations publish into the one
+   * snapshot each hook returns. */
   const rigState = useRigState(api === 'rig' ? rig : undefined, {
     pollMs: POLL_MS.telemetry,
-    fields: ['frequency', 'mode', 'ptt'],
+    fields: [...TELEMETRY],
   });
-  const metered = api === 'rig' && rig !== undefined && rig.capabilities.levels.length > 0;
 
-  useRigState(metered ? rig : undefined, { pollMs: POLL_MS.meter, fields: ['levels'] });
+  useRigState(api === 'rig' && rig !== undefined && metered(rig.capabilities) ? rig : undefined, {
+    pollMs: POLL_MS.meter,
+    fields: ['levels'],
+  });
   const rigError = useRigError(rig);
 
   /* raw: the app polls, and orders its own multi-call actions. */
   const [rawState, setRawState] = useState<RigState | undefined>(undefined);
-  const [rawError, setRawError] = useState<HamlibError | undefined>(undefined);
+  const [rawError, setRawError] = useState<unknown>(undefined);
   const tailRef = useRef<Promise<void>>(Promise.resolve());
 
-  /** Queue one panel action so its calls cannot interleave with the next one's. */
+  /** Queue one panel action, then its read-back, so their calls cannot interleave with the next one's. */
   const enqueue = useCallback((label: string, run: (rig: Rig) => Promise<unknown>): void => {
     if (rig === undefined) {
       return;
@@ -123,11 +117,26 @@ export function useBackend(api: Api, log: Log): Backend {
 
     log({ api, call: label });
     tailRef.current = tailRef.current
-      .then(() => run(rig))
+      .then(async () => {
+        await run(rig);
+        setRawState(await readRaw(rig, api, log));
+      })
       .then(
         () => undefined,
-        (cause: unknown) => { setRawError(asError(cause, label)); },
+        (cause: unknown) => { setRawError(cause); },
       );
+  }, [api, log, rig]);
+
+  /** A write through the rig, then its read-back. */
+  const write = useCallback((label: string, run: (rig: Rig) => Promise<unknown>): void => {
+    if (rig === undefined) {
+      return;
+    }
+
+    log({ api, call: label });
+    log({ api, call: 'refresh()' });
+    /* A failure reaches the panel through useRigError. */
+    void writeAndRead(rig, run).catch(() => undefined);
   }, [api, log, rig]);
 
   useEffect(() => {
@@ -151,7 +160,7 @@ export function useBackend(api: Api, log: Log): Backend {
         .then(() => readRaw(rig, api, log))
         .then(
           (next) => { if (live) { setRawState(next); } },
-          (cause: unknown) => { if (live) { setRawError(asError(cause, 'refresh')); } },
+          (cause: unknown) => { if (live) { setRawError(cause); } },
         )
         .finally(() => { busy = false; });
     };
@@ -166,6 +175,7 @@ export function useBackend(api: Api, log: Log): Backend {
   }, [api, rig, log]);
 
   const isRaw = api === 'raw';
+  const failure: unknown = connectError ?? (isRaw ? rawError : rigError);
 
   return {
     rig,
@@ -174,7 +184,7 @@ export function useBackend(api: Api, log: Log): Backend {
       ? NO_CAPABILITIES
       : isRaw ? { ...rig.capabilities, levels: [] } : rig.capabilities,
     connecting,
-    error: connectError ?? (isRaw ? rawError : rigError),
+    error: failure === undefined ? undefined : failureMessage(failure),
     connect: async (modelId, baudRate, port) => {
       log({
         api,
@@ -197,7 +207,7 @@ export function useBackend(api: Api, log: Log): Backend {
     },
     setFrequency: isRaw
       ? (hz) => { enqueue(`raw.setFrequency(${String(hz)})`, (r) => r.raw.setFrequency(hz)); }
-      : (hz) => { log({ api, call: `setFrequency(${String(hz)})` }); void rig?.setFrequency(hz).catch(() => undefined); },
+      : (hz) => { write(`setFrequency(${String(hz)})`, (r) => r.setFrequency(hz)); },
     setMode: isRaw
       ? (mode) => {
         enqueue(`raw.setMode('${mode}', raw.passbandNormal('${mode}'))`, async (r) => {
@@ -205,7 +215,7 @@ export function useBackend(api: Api, log: Log): Backend {
           await r.raw.setMode(mode, await r.raw.passbandNormal(mode));
         });
       }
-      : (mode) => { log({ api, call: `setMode('${mode}')` }); void rig?.setMode(mode).catch(() => undefined); },
+      : (mode) => { write(`setMode('${mode}')`, (r) => r.setMode(mode)); },
     setPassband: isRaw
       ? (kind) => {
         enqueue(`raw.getMode() + raw.setMode(mode, ${kind} width)`, async (r) => {
@@ -214,9 +224,9 @@ export function useBackend(api: Api, log: Log): Backend {
           await r.raw.setMode(mode, await passbandWidth(r.raw, mode, kind));
         });
       }
-      : (kind) => { log({ api, call: `setPassband('${kind}')` }); void rig?.setPassband(kind).catch(() => undefined); },
+      : (kind) => { write(`setPassband('${kind}')`, (r) => r.setPassband(kind)); },
     setPtt: isRaw
       ? (on) => { enqueue(`raw.setPtt('${on ? 'on' : 'off'}')`, (r) => r.raw.setPtt(on ? 'on' : 'off')); }
-      : (on) => { log({ api, call: `setPtt(${String(on)})` }); void rig?.setPtt(on).catch(() => undefined); },
+      : (on) => { write(`setPtt(${String(on)})`, (r) => r.setPtt(on)); },
   };
 }

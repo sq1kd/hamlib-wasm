@@ -3,12 +3,12 @@
  * through the catch-all docs route; owning the page here avoids both. */
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 
-const home = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+import { served } from '../links';
 ---
 
 <StarlightPage frontmatter={{ title: 'Page not found', template: 'splash' }}>
   <p>
-    This page does not exist. Start from the <a href={home}>introduction</a> or the
-    <a href={`${home}getting-started/`}>getting started guide</a>.
+    This page does not exist. Start from the <a href={served('')}>introduction</a> or the
+    <a href={served('getting-started/')}>getting started guide</a>.
   </p>
 </StarlightPage>

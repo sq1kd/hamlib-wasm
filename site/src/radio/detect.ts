@@ -8,42 +8,37 @@
  * before any other, and the search goes one rate per call, which lets the
  * panel say which rate it is on.
  */
-import type { SerialPortLike } from 'hamlib-wasm';
+import type { Hamlib, SerialPortLike } from 'hamlib-wasm';
 
-/** The standard UART rates, highest first: the order Hamlib's own search uses. */
-const LADDER: readonly number[] = [115200, 57600, 38400, 19200, 9600, 4800, 2400, 1200];
+import type { PanelModel } from './models';
+import { rateKey, recall, remember } from './storage';
 
-const KEY = 'hamlib-demo:baud:';
+/* hamlib-wasm's own ladder, from its private `baudRateCandidates()`.  Once the
+ * library exports that function, `baudRates` below becomes a re-export of it. */
+const LADDER: readonly number[] = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 
-interface Detector {
-  detectBaudRate(options: { modelId: number; port: SerialPortLike; rates?: readonly number[] }): Promise<number>;
-}
-
-/** The rates a model accepts, from the ladder and its declared range. */
-export function ratesFor(min: number, max: number): number[] {
+/**
+ * The rates `detectBaudRate()` tries for a model, in its order: the declared
+ * maximum, then the ladder within the declared range, highest first.  A range
+ * a backend leaves unset keeps the whole ladder.
+ */
+export function baudRates(model: Pick<PanelModel, 'serialRateMin' | 'serialRateMax'>): number[] {
+  const { serialRateMin: min, serialRateMax: max } = model;
   const usable = min > 0 && max >= min;
 
-  return [...new Set([...(usable ? [max] : []), ...LADDER])]
-    .filter((rate) => !usable || (rate >= min && rate <= max))
+  return [...new Set([max, ...LADDER.filter((rate) => !usable || (rate >= min && rate <= max))])]
+    .filter((rate) => Number.isInteger(rate) && rate > 0)
     .sort((left, right) => right - left);
 }
 
-export function rememberedRate(modelId: number): number | undefined {
-  try {
-    const value = Number(localStorage.getItem(`${KEY}${String(modelId)}`));
+function rememberedRate(modelId: number): number | undefined {
+  const value = Number(recall(rateKey(modelId)));
 
-    return Number.isInteger(value) && value > 0 ? value : undefined;
-  } catch {
-    return undefined;
-  }
+  return Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
 export function rememberRate(modelId: number, rate: number): void {
-  try {
-    localStorage.setItem(`${KEY}${String(modelId)}`, String(rate));
-  } catch {
-    /* Storage disabled: the next search starts from the top again. */
-  }
+  remember(rateKey(modelId), String(rate));
 }
 
 /**
@@ -52,13 +47,13 @@ export function rememberRate(modelId: number, rate: number): void {
  * `RIG_UNRESPONSIVE` - when none answers.
  */
 export async function detectRate(
-  hamlib: Detector,
-  model: { readonly id: number; readonly rateMin: number; readonly rateMax: number },
+  hamlib: Pick<Hamlib, 'detectBaudRate'>,
+  model: PanelModel,
   port: SerialPortLike,
   onTry: (rate: number) => void,
 ): Promise<number> {
   const remembered = rememberedRate(model.id);
-  const order = [...new Set([...(remembered === undefined ? [] : [remembered]), ...ratesFor(model.rateMin, model.rateMax)])];
+  const order = [...new Set([...(remembered === undefined ? [] : [remembered]), ...baudRates(model)])];
   let failure: unknown;
 
   for (const rate of order) {

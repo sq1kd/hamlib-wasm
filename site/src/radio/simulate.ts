@@ -9,7 +9,7 @@
  */
 import type { RigMode, RigState } from 'hamlib-wasm';
 
-import { POLL_MS } from './format';
+import { POLL_MS } from './polling';
 
 interface Stop {
   readonly hz: number;

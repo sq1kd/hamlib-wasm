@@ -6,7 +6,7 @@
  * from here, so the two never disagree about what a reading looks like.
  */
 
-import type { PttState, RigCapabilities, RigMode } from 'hamlib-wasm';
+import type { PassbandSelector, PttState, RigCapabilities, RigMode } from 'hamlib-wasm';
 
 /** Before a radio is connected: nothing can be set. */
 export const NO_CAPABILITIES: RigCapabilities = {
@@ -21,8 +21,7 @@ export const NO_CAPABILITIES: RigCapabilities = {
   levels: [],
 };
 
-/** Whether a PTT reading means the radio is keyed. */
-/** The panel shows `'unknown'` before the first PTT read. */
+/** Whether a PTT reading means the radio is keyed; `'unknown'` is before the first read. */
 export function keyed(ptt: PttState | 'unknown' | undefined): boolean {
   return ptt !== undefined && ptt !== 'off' && ptt !== 'unknown';
 }
@@ -33,17 +32,12 @@ export const STEPS: readonly number[] = [10, 100, 1000, 10_000, 100_000];
 /** The modes the panel lists; the current mode is added when it is not one of them. */
 export const MODES: readonly RigMode[] = ['LSB', 'USB', 'CW', 'CW-R', 'AM', 'FM', 'RTTY', 'PKTUSB'];
 
+/** Hamlib's passband helpers, in the order the panel offers them. */
+export const PASSBANDS: readonly PassbandSelector[] = ['narrow', 'normal', 'wide'];
+
 /** S-meter cells: S0..S9 fill the first 13, +60 dB the rest. */
 export const METER_CELLS = 24;
 const S9_CELLS = 13;
-
-/** How often the panel re-reads the radio, in milliseconds. */
-export const POLL_MS = {
-  /** Frequency, mode and PTT. */
-  telemetry: 1000,
-  /** The S-meter, on its own, faster timer. */
-  meter: 250,
-} as const;
 
 export interface Segments {
   /** The lit digits, e.g. `14.074.000`. */

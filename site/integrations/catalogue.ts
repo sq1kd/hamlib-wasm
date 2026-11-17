@@ -8,19 +8,13 @@
  */
 import { createHamlib } from 'hamlib-wasm';
 
-export interface CatalogueModel {
-  readonly id: number;
-  readonly manufacturer: string;
-  readonly model: string;
-  readonly limitation?: string;
-  readonly rateMin: number;
-  readonly rateMax: number;
-}
+import type { PanelModel } from '../src/radio/models';
 
 export interface Catalogue {
   /** The upstream release, e.g. `X.Y.Z`. */
   readonly version: string;
-  readonly models: readonly CatalogueModel[];
+  /** Only what the panel needs of each model, to keep the page small. */
+  readonly models: readonly PanelModel[];
 }
 
 export async function readCatalogue(): Promise<Catalogue> {
@@ -34,8 +28,8 @@ export async function readCatalogue(): Promise<Catalogue> {
         manufacturer: model.manufacturer,
         model: model.model,
         ...(model.limitation === undefined ? {} : { limitation: model.limitation }),
-        rateMin: model.serialRateMin,
-        rateMax: model.serialRateMax,
+        serialRateMin: model.serialRateMin,
+        serialRateMax: model.serialRateMax,
       })),
     };
   } finally {

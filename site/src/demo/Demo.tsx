@@ -12,48 +12,33 @@
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
-import { HamlibError } from 'hamlib-wasm';
-import type { HamlibOptions, RigModel, RigState, SerialPortLike } from 'hamlib-wasm';
+import type { HamlibOptions, RigState, SerialPortLike } from 'hamlib-wasm';
 import { HamlibProvider, useHamlibContext, useModels } from 'hamlib-wasm/react';
 
 import { DemoLoading } from '../components/DemoLoading';
-import { detectRate, ratesFor, rememberRate } from '../radio/detect';
-import { EMULATED_MODEL, emulate } from '../radio/emulate';
+import { WEB_SERIAL_BROWSERS } from '../facts';
+import { baudRates, detectRate, rememberRate } from '../radio/detect';
+import { emulate } from '../radio/emulate';
+import { failureMessage } from '../radio/errors';
+import { defaultModel } from '../radio/models';
+import { PANEL_OPTIONS } from '../radio/polling';
 import { RadioPanel } from '../radio/RadioPanel';
-import type { PanelModel, PanelView } from '../radio/RadioPanel';
 import { simulate } from '../radio/simulate';
+import { MODEL_KEY, remember } from '../radio/storage';
+import { connectedView, connectingView, sampleView } from '../radio/views';
 import { useBackend } from './backend';
 import type { Api, Log, LogEntry } from './backend';
 import '../radio/radio.css';
 import './demo.css';
 
-/* A module constant: the provider reads its options once. */
-/* Hamlib's own lines go only into `diagnostics()`, for the copy button. */
-const OPTIONS: HamlibOptions = { levels: ['STRENGTH', 'SWR'], debug: { level: 'verbose' } };
+/* A module constant, as the provider reads its options once.  Hamlib's own
+ * lines go only into `diagnostics()`, for the copy button. */
+const OPTIONS: HamlibOptions = { ...PANEL_OPTIONS, debug: { level: 'verbose' } };
 
 const LOG_LIMIT = 40;
 
 /* Development only: `?emulate` answers Web Serial with the test suite's TS-480. */
 const EMULATED = await emulate();
-
-/* What a returning reader chose last time: the model. */
-const MODEL_KEY = 'hamlib-demo:model';
-
-function recall(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function remember(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* Storage disabled: the demo simply forgets. */
-  }
-}
 
 interface ApiOption {
   readonly api: Api;
@@ -97,38 +82,9 @@ interface Logged extends LogEntry {
   readonly id: number;
 }
 
-/** The model picked last time, else the TS-480: the one the test suite's emulator speaks. */
-function defaultModel(models: readonly RigModel[]): RigModel | undefined {
-  const stored = Number(recall(MODEL_KEY) ?? Number.NaN);
-
-  return (EMULATED ? models.find((model) => model.model === EMULATED_MODEL) : undefined)
-    ?? models.find((model) => model.id === stored)
-    ?? models.find((model) => model.model === 'TS-480')
-    ?? models.find((model) => model.support === 'verified')
-    ?? models[0];
-}
-
-function toPanel(model: RigModel): PanelModel {
-  return {
-    id: model.id,
-    manufacturer: model.manufacturer,
-    model: model.model,
-    ...(model.limitation === undefined ? {} : { limitation: model.limitation }),
-    rateMin: model.serialRateMin,
-    rateMax: model.serialRateMax,
-  };
-}
-
-function asHamlibError(cause: unknown, operation: string): HamlibError {
-  return cause instanceof HamlibError
-    ? cause
-    : new HamlibError(cause instanceof Error ? cause.message : String(cause), { code: 'TRANSPORT_FAILURE', operation });
-}
-
 function App(): ReactElement {
   const { hamlib, loading, error: loadError } = useHamlibContext();
   const models = useModels();
-  const panelModels = useMemo(() => models.map(toPanel), [models]);
 
   const [api, setApi] = useState<Api>('rig');
   const [entries, setEntries] = useState<readonly Logged[]>([]);
@@ -136,7 +92,7 @@ function App(): ReactElement {
   const [baud, setBaud] = useState('auto');
   const [trying, setTrying] = useState<number | undefined>(undefined);
   const [detecting, setDetecting] = useState(false);
-  const [detectError, setDetectError] = useState<HamlibError | undefined>(undefined);
+  const [detectError, setDetectError] = useState<string | undefined>(undefined);
   const [sample, setSample] = useState<RigState | undefined>(undefined);
   const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
 
@@ -168,16 +124,16 @@ function App(): ReactElement {
 
   useEffect(() => {
     if (modelId === undefined && models.length > 0) {
-      setModelId(defaultModel(models)?.id);
+      setModelId(defaultModel(models, EMULATED)?.id);
     }
   }, [modelId, models]);
 
-  const selected = useMemo(() => panelModels.find((model) => model.id === modelId), [panelModels, modelId]);
-  const rates = useMemo(() => (selected === undefined ? [] : ratesFor(selected.rateMin, selected.rateMax)), [selected]);
+  const selected = useMemo(() => models.find((model) => model.id === modelId), [models, modelId]);
+  const rates = useMemo(() => (selected === undefined ? [] : baudRates(selected)), [selected]);
   const connected = rig !== undefined;
   const busy = backend.connecting || detecting;
   const serial = typeof navigator !== 'undefined' && 'serial' in navigator;
-  const error = loadError ?? detectError ?? backend.error;
+  const error = loadError === undefined ? detectError ?? backend.error : failureMessage(loadError);
 
   /* With no radio, the panel plays sample readings - and stops the moment one connects. */
   useEffect(() => {
@@ -225,7 +181,7 @@ function App(): ReactElement {
           log({ api, call: `detectBaudRate({ modelId: ${String(selected.id)}, rates: [${String(rate)}] })` });
         });
       } catch (cause) {
-        setDetectError(asHamlibError(cause, 'detectBaudRate'));
+        setDetectError(failureMessage(cause));
         return;
       } finally {
         setDetecting(false);
@@ -241,29 +197,11 @@ function App(): ReactElement {
     void open().catch(() => undefined);
   };
 
-  let view: PanelView;
-
-  if (rig !== undefined) {
-    view = {
-      phase: 'connected',
-      sample: false,
-      name: `${rig.model.manufacturer} ${rig.model.model}`,
-      meta: `${String(rig.baudRate)} baud`,
-      pill: 'Connected',
-      state: backend.state,
-    };
-  } else if (busy) {
-    view = {
-      phase: 'connecting',
-      sample: false,
-      name: 'Connecting',
-      meta: '',
-      pill: trying === undefined ? 'Connecting' : `Trying ${String(trying)}`,
-      state: undefined,
-    };
-  } else {
-    view = { phase: 'disconnected', sample: true, name: 'No radio connected', meta: 'sample readings', pill: 'Sample', state: sample };
-  }
+  const view = rig !== undefined
+    ? connectedView(rig, backend.state)
+    : busy
+      ? connectingView(trying === undefined ? undefined : `Trying ${String(trying)}`)
+      : sampleView(sample);
 
   const note = (
     <>
@@ -272,7 +210,7 @@ function App(): ReactElement {
       <span data-testid="web-serial-status" data-state={serial ? 'available' : 'unavailable'}>
         {serial
           ? 'Web Serial available'
-          : 'Web Serial unavailable: use desktop Chrome, Edge or Firefox 151+'}
+          : `Web Serial unavailable: use ${WEB_SERIAL_BROWSERS}`}
       </span>
     </>
   );
@@ -282,14 +220,14 @@ function App(): ReactElement {
       <div className="workspace">
         <RadioPanel
           view={view}
-          models={panelModels}
+          models={models}
           modelId={modelId}
           baud={baud}
           rates={rates}
           serial={serial}
           locked={hamlib === undefined || busy}
           note={note}
-          {...(error === undefined ? {} : { error: error.message })}
+          {...(error === undefined ? {} : { error })}
           {...(connected
             ? {
               controls: {

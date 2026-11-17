@@ -4,30 +4,20 @@
  * Driven entirely by props.  The demo renders it with React and passes the
  * controls; the landing page renders it once, at build time, to plain HTML,
  * and `paint.ts` updates that HTML in place - so the two pages show the same
- * panel, and the landing page ships no React.  The data attributes `paint.ts`
- * looks for are part of this markup's contract.
+ * panel, and the landing page ships no React.  The `data-radio-*` attributes
+ * (and `data-mode`, `data-tune`, `data-passband`) are the contract the
+ * landing page's scripts find their elements by; test ids are for tests only.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
-import type { RigCapabilities, RigMode, RigState } from 'hamlib-wasm';
+import type { PassbandSelector, RigCapabilities, RigMode, RigState } from 'hamlib-wasm';
 
-import { cellState, keyed, METER_CELLS, meterCells, modeList, passbandLabel, segments, STEPS } from './format';
+import { cellState, keyed, METER_CELLS, meterCells, modeList, PASSBANDS, passbandLabel, segments, STEPS } from './format';
+import type { PanelModel } from './models';
 import { bindPtt } from './ptt';
 
 export type Phase = 'disconnected' | 'connecting' | 'connected';
-
-/** Which of Hamlib's own passband helpers to apply. */
-export type PassbandKind = 'narrow' | 'normal' | 'wide';
-
-export interface PanelModel {
-  readonly id: number;
-  readonly manufacturer: string;
-  readonly model: string;
-  readonly limitation?: string;
-  readonly rateMin: number;
-  readonly rateMax: number;
-}
 
 /** What the header and display show. */
 export interface PanelView {
@@ -46,7 +36,7 @@ export interface PanelControls {
   readonly busy: boolean;
   readonly onSetFrequency: (hz: number) => void;
   readonly onSetMode: (mode: RigMode) => void;
-  readonly onSetPassband: (kind: PassbandKind) => void;
+  readonly onSetPassband: (kind: PassbandSelector) => void;
   /** Held: `true` on press, `false` on release. */
   readonly onSetPtt: (on: boolean) => void;
 }
@@ -76,8 +66,6 @@ export interface RadioPanelProps {
    */
   readonly prerender?: boolean;
 }
-
-const PASSBANDS: readonly PassbandKind[] = ['narrow', 'normal', 'wide'];
 
 const CELLS: readonly number[] = Array.from({ length: METER_CELLS }, (_, cell) => cell);
 
@@ -137,15 +125,16 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
       <span className="radio-label">Tune</span>
       <div className="radio-row">
         <div className="radio-group radio-joined">
-          <button data-testid="tune-down" type="button" aria-label="Tune down" disabled={!canTune} onClick={() => { tune(-1); }}>−</button>
-          <select aria-label="Tuning step" value={String(step)} disabled={!canTune} onChange={(event) => { setStep(Number(event.target.value)); }}>
+          <button data-testid="tune-down" data-tune="-1" type="button" aria-label="Tune down" disabled={!canTune} onClick={() => { tune(-1); }}>−</button>
+          <select data-radio-step aria-label="Tuning step" value={String(step)} disabled={!canTune} onChange={(event) => { setStep(Number(event.target.value)); }}>
             {STEPS.map((value) => <option key={value} value={String(value)}>{`${group(value)} Hz`}</option>)}
           </select>
-          <button data-testid="tune-up" type="button" aria-label="Tune up" disabled={!canTune} onClick={() => { tune(1); }}>+</button>
+          <button data-testid="tune-up" data-tune="1" type="button" aria-label="Tune up" disabled={!canTune} onClick={() => { tune(1); }}>+</button>
         </div>
         <div className="radio-group radio-joined radio-entry">
           <input
             data-testid="frequency-input"
+            data-radio-entry
             aria-label="Frequency in Hz"
             type="number"
             inputMode="numeric"
@@ -155,7 +144,7 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
             onChange={(event) => { setEntry(event.target.value); }}
             onKeyDown={(event) => { if (event.key === 'Enter') { submit(); } }}
           />
-          <button data-testid="frequency-set" type="button" disabled={!canSetFrequency || entry === ''} onClick={submit}>Set</button>
+          <button data-testid="frequency-set" data-radio-set type="button" disabled={!canSetFrequency || entry === ''} onClick={submit}>Set</button>
         </div>
       </div>
 
@@ -166,6 +155,7 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
             <button
               key={kind}
               data-testid={`passband-${kind}`}
+              data-passband={kind}
               type="button"
               disabled={!canSetMode || state?.mode === undefined}
               onClick={() => { controls.onSetPassband(kind); }}
@@ -178,6 +168,7 @@ function Controls({ controls, state }: ControlsProps): ReactElement {
           ref={ptt}
           className="radio-ptt"
           data-testid="ptt-button"
+          data-radio-ptt
           type="button"
           aria-pressed={keyed(state?.ptt)}
           disabled={busy || !capabilities.setPtt}
@@ -211,9 +202,9 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
         <span className="radio-name" data-radio-name>{view.name}</span>
         <span className="radio-meta" data-radio-meta>{view.meta}</span>
         <span className="radio-status">
-          <span className="radio-pill" data-testid="connection-state" data-state={view.phase} aria-live="polite">{view.pill}</span>
+          <span className="radio-pill" data-testid="connection-state" data-radio-pill data-state={view.phase} aria-live="polite">{view.pill}</span>
           {(props.prerender === true || view.phase === 'connected') && (
-            <button className="radio-disconnect" data-testid="disconnect-button" type="button" onClick={props.onDisconnect}>
+            <button className="radio-disconnect" data-testid="disconnect-button" data-radio-disconnect type="button" onClick={props.onDisconnect}>
               Disconnect
             </button>
           )}
@@ -224,13 +215,13 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
         <div className="radio-freq">
           <span className="radio-seg">
             <span className="radio-ghost" data-radio-ghost aria-hidden="true">{digits.ghost}</span>
-            <span className="radio-lit" data-testid="frequency-display">{digits.lit}</span>
+            <span className="radio-lit" data-testid="frequency-display" data-radio-frequency>{digits.lit}</span>
           </span>
           <span className="radio-unit">MHz</span>
           <span className="radio-readout">
-            <span className="radio-tx" data-testid="ptt-state" data-state={ptt} hidden={!transmitting}>TX</span>
-            <span data-testid="mode-display">{state?.mode ?? '—'}</span>
-            <span data-testid="passband-display">{passbandLabel(state?.passband)}</span>
+            <span className="radio-tx" data-testid="ptt-state" data-radio-tx data-state={ptt} hidden={!transmitting}>TX</span>
+            <span className="radio-mode" data-testid="mode-display" data-radio-mode>{state?.mode ?? '—'}</span>
+            <span data-testid="passband-display" data-radio-passband>{passbandLabel(state?.passband)}</span>
           </span>
         </div>
         <fieldset className="radio-modes" aria-label="Mode" data-radio-modes>
@@ -238,6 +229,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
             <button
               key={mode}
               data-testid={`mode-${mode}`}
+              data-mode={mode}
               type="button"
               aria-pressed={state?.mode === mode}
               disabled={!canSetMode}
@@ -264,6 +256,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
           <span>Model</span>
           <select
             data-testid="model-select"
+            data-radio-model
             value={props.modelId === undefined ? '' : String(props.modelId)}
             disabled={props.locked}
             onChange={(event) => { props.onModel?.(Number(event.target.value)); }}
@@ -275,8 +268,9 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
                   <option
                     key={model.id}
                     value={String(model.id)}
-                    data-min={model.rateMin}
-                    data-max={model.rateMax}
+                    data-model={model.model}
+                    data-min={model.serialRateMin}
+                    data-max={model.serialRateMax}
                     data-limitation={model.limitation}
                   >
                     {`${manufacturer} ${model.model}`}
@@ -288,7 +282,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
         </label>
         <label className="radio-field radio-baud">
           <span>Baud</span>
-          <select data-testid="baud-select" value={props.baud} disabled={props.locked} onChange={(event) => { props.onBaud?.(event.target.value); }}>
+          <select data-testid="baud-select" data-radio-baud value={props.baud} disabled={props.locked} onChange={(event) => { props.onBaud?.(event.target.value); }}>
             <option value="auto">Auto-detect</option>
             {props.rates.map((rate) => <option key={rate} value={String(rate)}>{rate}</option>)}
           </select>
@@ -296,6 +290,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
         <button
           className="radio-primary"
           data-testid="connect-button"
+          data-radio-connect
           type="button"
           disabled={!props.serial || props.locked || selected?.limitation !== undefined}
           onClick={props.onConnect}
@@ -305,7 +300,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
       </div>
 
       {(props.prerender === true || selected?.limitation !== undefined) && (
-        <p className="radio-limitation" data-testid="model-limitation" hidden={selected?.limitation === undefined}>
+        <p className="radio-limitation" data-testid="model-limitation" data-radio-limitation hidden={selected?.limitation === undefined}>
           {selected?.limitation === undefined ? '' : `${selected.manufacturer} ${selected.model}: ${selected.limitation}`}
         </p>
       )}
@@ -314,7 +309,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
         {props.link !== undefined && <a href={props.link.href}>{props.link.text}</a>}
       </p>
       {(props.prerender === true || props.error !== undefined) && (
-        <p className="radio-error" data-testid="error-message" role="alert" hidden={props.error === undefined}>{props.error}</p>
+        <p className="radio-error" data-testid="error-message" data-radio-error role="alert" hidden={props.error === undefined}>{props.error}</p>
       )}
     </section>
   );

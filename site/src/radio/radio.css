@@ -101,7 +101,7 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   align-self: center;
   white-space: nowrap;
 }
-.radio-readout [data-testid='mode-display'] { color: var(--r-accent); font-size: 1rem; }
+.radio-readout .radio-mode { color: var(--r-accent); font-size: 1rem; }
 .radio-tx { font-weight: 600; color: #07090c; background: var(--r-tx); padding: 0 0.45rem; border-radius: var(--hw-radius-sm); }
 
 .radio-modes { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.9rem; }

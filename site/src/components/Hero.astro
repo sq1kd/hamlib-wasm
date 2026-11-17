@@ -8,22 +8,23 @@
  * connects a radio.
  */
 import { megabytes } from '../bytes';
-import { ratesFor } from '../radio/detect';
+import { CATALOGUE, DEMO_DOWNLOAD, HARDWARE_TESTED } from '../facts';
+import { served } from '../links';
+import { baudRates } from '../radio/detect';
 import { NO_CAPABILITIES } from '../radio/format';
+import { defaultModel } from '../radio/models';
 import { RadioPanel } from '../radio/RadioPanel';
 import { SAMPLE_STATE } from '../radio/simulate';
+import { sampleView } from '../radio/views';
 import '../radio/radio.css';
 
 const { data } = Astro.locals.starlightRoute.entry;
 const { title = data.title, tagline, actions = [] } = data.hero ?? {};
 const primary = actions[0];
 
-const catalogue = __CATALOGUE__;
-const { models } = catalogue;
-
-/* The emulator-tested Kenwood is the default; a returning reader's pick wins in the script. */
-const defaultId = models.find((model) => model.model === 'TS-480')?.id;
-const demo = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}demo/`;
+const { models, version } = CATALOGUE;
+/* A returning reader's pick replaces this in the script. */
+const initial = defaultModel(models);
 ---
 
 <section class="hw-hero" aria-labelledby="_top">
@@ -39,24 +40,24 @@ const demo = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}demo/`;
         </button>
       </div>
       <dl class="hw-facts">
-        <div><dt>{catalogue.models.length}</dt><dd>serial radio models</dd></div>
-        <div><dt>{megabytes(__DEMO_DOWNLOAD__.gzip)}</dt><dd>gzip, Hamlib {catalogue.version}</dd></div>
-        <div><dt>QMX+, FT-710</dt><dd>tested on real radios</dd></div>
+        <div><dt>{models.length}</dt><dd>serial radio models</dd></div>
+        <div><dt>{megabytes(DEMO_DOWNLOAD.gzip)}</dt><dd>gzip, Hamlib {version}</dd></div>
+        <div><dt>{HARDWARE_TESTED.map((radio) => radio.model).join(', ')}</dt><dd>tested on real radios</dd></div>
       </dl>
     </div>
 
     <div class="hw-side">
       <RadioPanel
         prerender
-        view={{ phase: 'disconnected', sample: true, name: 'No radio connected', meta: 'sample readings', pill: 'Sample', state: SAMPLE_STATE }}
+        view={sampleView(SAMPLE_STATE)}
         models={models}
-        modelId={defaultId}
+        modelId={initial?.id}
         baud="auto"
-        rates={ratesFor(0, 0)}
+        rates={initial === undefined ? [] : baudRates(initial)}
         serial
         locked={false}
         note="Tune it and key it, from the browser."
-        link={{ href: demo, text: 'See every library call' }}
+        link={{ href: served('demo/'), text: 'See every library call' }}
         controls={{
           capabilities: NO_CAPABILITIES,
           busy: false,

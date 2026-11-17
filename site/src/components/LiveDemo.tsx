@@ -5,17 +5,16 @@
  * dynamic `import()` below, and only that chunk reaches `hamlib-wasm` - so the
  * Emscripten glue and the ~5 MB Wasm stay off every other documentation page.
  *
- * A reader who asked the browser to save data, or who is on a 2G-class link,
- * gets a button instead and decides for themselves.  Browsers without the
- * Network Information API (Firefox, Safari) always load straight away.
+ * On a constrained connection (`../network.ts`) the reader gets a button
+ * instead and decides for themselves.
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { ComponentType, ReactElement } from 'react';
 
 import { megabytes } from '../bytes';
+import { DEMO_DOWNLOAD as SIZE } from '../facts';
+import { constrainedConnection } from '../network';
 import { DemoLoading } from './DemoLoading';
-
-const SIZE = __DEMO_DOWNLOAD__;
 
 type Status =
   | { readonly kind: 'idle' }
@@ -23,20 +22,8 @@ type Status =
   | { readonly kind: 'ready'; readonly Demo: ComponentType }
   | { readonly kind: 'failed'; readonly message: string };
 
-interface NetworkInformation {
-  readonly saveData?: boolean;
-  readonly effectiveType?: string;
-}
-
-/** Whether the connection asks us not to fetch megabytes unprompted. */
-function constrained(): boolean {
-  const connection = (navigator as { connection?: NetworkInformation }).connection;
-
-  return connection?.saveData === true || connection?.effectiveType === 'slow-2g' || connection?.effectiveType === '2g';
-}
-
 export default function LiveDemo(): ReactElement {
-  const [status, setStatus] = useState<Status>(() => (constrained() ? { kind: 'idle' } : { kind: 'loading' }));
+  const [status, setStatus] = useState<Status>(() => (constrainedConnection() ? { kind: 'idle' } : { kind: 'loading' }));
 
   const load = useCallback((): void => {
     setStatus({ kind: 'loading' });
@@ -49,7 +36,7 @@ export default function LiveDemo(): ReactElement {
   }, []);
 
   useEffect(() => {
-    if (!constrained()) {
+    if (!constrainedConnection()) {
       load();
     }
   }, [load]);
