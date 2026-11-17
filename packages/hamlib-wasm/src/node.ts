@@ -40,6 +40,7 @@
  */
 
 import { HamlibError } from './errors.js';
+import { runsInNode } from './runtime.js';
 import type {
   PortRequest,
   SerialInputSignals,
@@ -583,7 +584,7 @@ export function nodeSerialTransport(
     name: 'serialport',
 
     isSupported(): boolean {
-      return typeof process === 'object' && typeof process.versions?.node === 'string';
+      return runsInNode();
     },
 
     async requestPort(request?: PortRequest): Promise<SerialPortLike> {

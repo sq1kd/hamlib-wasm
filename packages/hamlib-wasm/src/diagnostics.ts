@@ -10,6 +10,7 @@
  */
 
 import { HamlibError } from './errors.js';
+import { describeRuntime } from './runtime.js';
 
 /** Hamlib's `rig_debug_level_e`, quietest first. */
 export type DebugLevel = 'none' | 'bug' | 'err' | 'warn' | 'verbose' | 'trace' | 'cache';
@@ -127,23 +128,6 @@ function toHex(bytes: Uint8Array): string {
   }
 
   return hex;
-}
-
-/** The runtime, as one line. */
-function describeRuntime(): string {
-  const scope = globalThis as {
-    navigator?: { userAgent?: string };
-    process?: { versions?: Record<string, string | undefined> };
-  };
-  const versions = scope.process?.versions;
-
-  if (versions?.node) {
-    return versions.electron
-      ? `electron ${versions.electron} (node ${versions.node})`
-      : `node ${versions.node}`;
-  }
-
-  return scope.navigator?.userAgent ?? 'unknown';
 }
 
 /** The three buffers of one instance. */
