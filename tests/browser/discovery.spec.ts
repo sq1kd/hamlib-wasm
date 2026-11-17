@@ -20,9 +20,7 @@ test.beforeEach(async ({ harnessPage: page }) => {
 test('an IC-746PRO client discovers its extension parameters', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');
-
-    if (!model) { throw new Error('the IC-746PRO is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Icom', 'IC-746PRO');
 
     const port = await hamlib.requestPort();
     const rig = await hamlib.open({ modelId: model.id, port, baudRate: model.serialRateMax });
@@ -69,9 +67,7 @@ test('an IC-746PRO client discovers its extension parameters', async ({ harnessP
 test('configuration enumeration returns parameter descriptions', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');
-
-    if (!model) { throw new Error('the IC-746PRO is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Icom', 'IC-746PRO');
 
     const port = await hamlib.requestPort();
     const rig = await hamlib.open({ modelId: model.id, port, baudRate: model.serialRateMax });
@@ -108,9 +104,7 @@ test('configuration enumeration returns parameter descriptions', async ({ harnes
 test('scan and VFO suboperations are distinguishable before use', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'IC-746PRO');
-
-    if (!model) { throw new Error('the IC-746PRO is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Icom', 'IC-746PRO');
 
     const port = await hamlib.requestPort();
     const rig = await hamlib.open({ modelId: model.id, port, baudRate: model.serialRateMax });

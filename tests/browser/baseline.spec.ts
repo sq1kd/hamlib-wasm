@@ -99,13 +99,7 @@ test('matches the recorded upstream baseline', async ({ harnessPage: page }) => 
   const sample = await page.evaluate(async (): Promise<Sample> => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find(
-      (model) => model.manufacturer === 'Kenwood' && model.model === 'TS-480',
-    );
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const version = hamlib.version;
     const catalogueCount = hamlib.models.length;

@@ -13,9 +13,7 @@ test('civaddr reaches an Icom radio moved off its default address', async ({ har
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ic703 = hamlib.models.find((model) => model.manufacturer === 'Icom' && model.model === 'IC-703');
-
-    if (!ic703) { throw new Error('the IC-703 model is missing'); }
+    const ic703 = window.__testHelpers.catalogueModel(hamlib.models, 'Icom', 'IC-703');
 
     /* Addressed to 0x68, nothing on the bus answers. */
     const silent = await window.__testHelpers.capture(() => hamlib.open({ modelId: ic703.id, port }));
@@ -38,9 +36,7 @@ test('refuses owned, unreachable and unknown tokens', async ({ harnessPage: page
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const attempt = (conf: Record<string, string>) =>
       window.__testHelpers.capture(() => hamlib.open({ modelId: ts480.id, port, conf }));
@@ -70,9 +66,7 @@ test('sendRaw writes bytes as they are and reads up to the terminator', async ({
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
     const reply = await rig.sendRaw(new TextEncoder().encode('FA;'), { terminator: 0x3b });
@@ -102,9 +96,7 @@ test('sendRaw writes bytes as they are and reads up to the terminator', async ({
 test('sendMorse keys through the backend in chunks, and only in CW', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id });
     const notCw = await window.__testHelpers.capture(() => rig.sendMorse('TEST'));
@@ -139,9 +131,7 @@ test('converts a power level to milliwatts through the model\'s ranges', async (
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
     const full = await rig.powerToMilliwatts(1, 14_074_000, 'USB');
@@ -165,9 +155,7 @@ test('diagnostics carry the rigs, the port traffic, errors and debug lines', asy
     const hamlib = await window.__hamlibHarness.createHamlib({
       debug: { level: 'verbose', onLog: (entry) => { lines.push(entry.message); } },
     });
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id });
 
@@ -203,9 +191,7 @@ test('every generated name is one the built module parses', async ({ harnessPage
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
     const names = window.__hamlibHarness.vocabularies;
@@ -253,9 +239,7 @@ test('Hamlib never writes to the console; its error lines stay in diagnostics', 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
 
@@ -281,9 +265,7 @@ test('Hamlib never writes to the console; its error lines stay in diagnostics', 
 test('diagnostics keep the reads a watch tick absorbed', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id });
     const events: string[] = [];

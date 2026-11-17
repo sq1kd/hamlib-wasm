@@ -18,9 +18,7 @@ test('disposal during a parked open publishes nothing and releases the port', as
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     /* Start the open, then wait until its port open is actually parked. */
     const opening = window.__testHelpers.capture(
@@ -75,9 +73,7 @@ test('a later open after a cancelled one still works', async ({ harnessPage: pag
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     /* First attempt: cancelled through close() of the wrapper it would have
      * produced - here the cancelled attempt is the disposal race's rig. */

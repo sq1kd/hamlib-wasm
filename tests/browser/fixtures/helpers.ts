@@ -36,6 +36,26 @@
 
   window.__testHelpers = {
     describeError: describeError,
+    catalogueModel: function <T extends CatalogueEntry>(
+      models: readonly T[],
+      manufacturer: string,
+      model: string,
+    ): T {
+      var found = models.find(function (candidate) {
+        return candidate.manufacturer === manufacturer && candidate.model === model;
+      });
+
+      if (found) { return found; }
+
+      var siblings = models
+        .filter(function (candidate) { return candidate.manufacturer === manufacturer; })
+        .map(function (candidate) { return candidate.model; });
+
+      throw new Error(
+        manufacturer + ' ' + model + ' is not in the catalogue; '
+        + manufacturer + ' entries: ' + (siblings.join(', ') || 'none'),
+      );
+    },
     capture: async function <T>(
       action: () => T | Promise<T>,
     ): Promise<Captured<Awaited<T>>> {

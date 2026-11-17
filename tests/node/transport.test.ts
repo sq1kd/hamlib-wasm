@@ -12,6 +12,7 @@ import { afterEach, expect, test } from 'vitest';
 import { createRawHamlib, webSerialTransport } from 'hamlib-wasm/raw';
 import type { SerialTransport } from 'hamlib-wasm/raw';
 
+import { catalogueModel } from './catalogue.js';
 import { fakePort } from './fake-port.js';
 import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
 
@@ -35,13 +36,7 @@ test('drives a rig through a caller-supplied transport and port', async () => {
     expect(port).toBe(control.port);
     expect(requested).toBe(1);
 
-    const ts480 = hamlib.models.find(
-      (model) => model.manufacturer === 'Kenwood' && model.model === 'TS-480',
-    );
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
 
@@ -126,13 +121,7 @@ test('bounds a call that never settles and refuses the instance afterwards', asy
   const hamlib = await createRawHamlib({ transport, callTimeoutMs: 150 });
 
   try {
-    const ts480 = hamlib.models.find(
-      (model) => model.manufacturer === 'Kenwood' && model.model === 'TS-480',
-    );
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const failure = await settle(hamlib.open({ modelId: ts480.id, port: control.port }).then(
       () => null,
@@ -174,13 +163,7 @@ test('close releases the native handle', async () => {
   }).native;
 
   try {
-    const ts480 = hamlib.models.find(
-      (model) => model.manufacturer === 'Kenwood' && model.model === 'TS-480',
-    );
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port: control.port });
     expect(await native.liveHandles()).toBe(1);

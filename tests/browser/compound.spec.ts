@@ -40,9 +40,7 @@ function expectRawWriteAfterReads(commands: readonly string[]): void {
 test('a later mode change wins over an earlier one', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -72,9 +70,7 @@ test('a later mode change wins over an earlier one', async ({ harnessPage: page 
 test('a refresh reports the values from before the write that follows it', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -115,9 +111,7 @@ test('a refresh reports the values from before the write that follows it', async
 test('a raw call cannot run between the steps of a Rig operation', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -144,9 +138,7 @@ test('a raw call cannot run between the steps of a Rig operation', async ({ harn
 test('a failed operation does not poison the queue', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -184,9 +176,7 @@ test('a slow step cannot let another call overtake the operation', async ({ harn
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -216,9 +206,7 @@ test('a pure helper cannot re-enter the module while a write is suspended', asyn
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -263,9 +251,7 @@ test('a passband action cannot undo a mode selected after it', async ({ harnessP
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -302,9 +288,7 @@ test('a passband action cannot undo a mode selected after it', async ({ harnessP
 test('a write issued while a watch tick holds the queue is not nested', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({ levels: ['STRENGTH'] });
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 

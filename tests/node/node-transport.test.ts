@@ -10,24 +10,12 @@
 import { afterEach, expect, test } from 'vitest';
 
 import { createRawHamlib } from 'hamlib-wasm/raw';
-import type { RawHamlib, SerialTransport } from 'hamlib-wasm/raw';
+import type { SerialTransport } from 'hamlib-wasm/raw';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
+import { catalogueModel } from './catalogue.js';
 import { rigSerialPortModule } from './rig-serialport.js';
 import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
-
-/** The model id of a catalogue entry, or a failure that names what is missing. */
-function modelIdOf(hamlib: RawHamlib, manufacturer: string, model: string): number {
-  const entry = hamlib.models.find(
-    (candidate) => candidate.manufacturer === manufacturer && candidate.model === model,
-  );
-
-  if (!entry) {
-    throw new Error(`the ${manufacturer} ${model} model is missing`);
-  }
-
-  return entry.id;
-}
 
 test('refuses a port request without a path', async () => {
   const transport = nodeSerialTransport({ serialport: rigSerialPortModule() });
@@ -65,7 +53,7 @@ test('opens the requested path at the rig settings and reads the rig', async () 
   const hamlib = await createRawHamlib({ transport });
 
   try {
-    const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
+    const modelId = catalogueModel(hamlib.models, 'Kenwood', 'TS-480').id;
     const port = await transport.requestPort({ path: module.path });
     const rig = await hamlib.open({ modelId, port, baudRate: 9600 });
 
@@ -212,7 +200,7 @@ test('surfaces a device that cannot be opened as a Hamlib error, not a crash', a
   const hamlib = await createRawHamlib({ transport });
 
   try {
-    const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
+    const modelId = catalogueModel(hamlib.models, 'Kenwood', 'TS-480').id;
     const port = await transport.requestPort({ path: module.path });
     const failure = await hamlib.open({ modelId, port }).then(
       () => null,
@@ -246,7 +234,7 @@ test('finds the rate a rig answers at through the adapter', async () => {
   const hamlib = await createRawHamlib({ transport });
 
   try {
-    const modelId = modelIdOf(hamlib, 'Yaesu', 'FT-710');
+    const modelId = catalogueModel(hamlib.models, 'Yaesu', 'FT-710').id;
     const port = await transport.requestPort({ path: module.path });
     const baudRate = await settle(hamlib.detectBaudRate({ modelId, port }));
 
@@ -268,7 +256,7 @@ test('an unplugged device fails the next call fast, and the instance stays usabl
   const hamlib = await createRawHamlib({ transport });
 
   try {
-    const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
+    const modelId = catalogueModel(hamlib.models, 'Kenwood', 'TS-480').id;
     const port = await transport.requestPort({ path: module.path });
     const rig = await settle(hamlib.open({ modelId, port, baudRate: 9600 }));
 
@@ -312,7 +300,7 @@ test('Hamlib writes nothing to stderr or stdout', async () => {
     const hamlib = await createRawHamlib({ transport });
 
     try {
-      const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
+      const modelId = catalogueModel(hamlib.models, 'Kenwood', 'TS-480').id;
       const rig = await hamlib.open({ modelId, port: await transport.requestPort({ path: module.path }), baudRate: 9600 });
 
       await rig.getFrequency();
@@ -338,7 +326,7 @@ test('a port reports the USB ids the listing gave its path', async () => {
 
     expect(port.getInfo?.()).toEqual({ usbVendorId: 0x1a86, usbProductId: 0x7523 });
 
-    const rig = await hamlib.open({ modelId: modelIdOf(hamlib, 'Kenwood', 'TS-480'), port, baudRate: 9600 });
+    const rig = await hamlib.open({ modelId: catalogueModel(hamlib.models, 'Kenwood', 'TS-480').id, port, baudRate: 9600 });
 
     expect(hamlib.diagnostics().rigs[0]?.usb).toEqual({ vendorId: '1a86', productId: '7523' });
     await rig.close();

@@ -13,11 +13,7 @@ test('exposes the generated capability matrix and drives a generated operation',
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const capabilities = [...ts480.capabilities];
     const rig = await hamlib.open({ modelId: ts480.id, port });

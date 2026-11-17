@@ -18,9 +18,7 @@ import { expect, expectOk, test } from './fixtures';
 test('two watchers coexist and removing one leaves the other polling', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
     let samples = 0;
@@ -66,9 +64,7 @@ test('two watchers coexist and removing one leaves the other polling', async ({ 
 test('a slow read never accumulates poll work', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -106,9 +102,7 @@ test('a slow read never accumulates poll work', async ({ harnessPage: page }) =>
 test('disposal with an active watcher closes the port and stops polling', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
     let samples = 0;
@@ -163,9 +157,7 @@ test('disposal with an active watcher closes the port and stops polling', async 
 test('closing the raw rig behind the wrapper stops the scheduler', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -201,9 +193,7 @@ test('closing the raw rig behind the wrapper stops the scheduler', async ({ harn
 test('a closed wrapper publishes nothing more', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
     let samples = 0;
@@ -245,9 +235,7 @@ test('a closed wrapper publishes nothing more', async ({ harnessPage: page }) =>
 test('a second instance can reuse the port after the first cleaned up', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const first = await window.__hamlibHarness.createHamlib({});
-    const model = first.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(first.models, 'Kenwood', 'TS-480');
 
     const rigA = await first.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -283,9 +271,7 @@ test('a second instance can reuse the port after the first cleaned up', async ({
 test('watching a closed rig is refused', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
     await rig.close();

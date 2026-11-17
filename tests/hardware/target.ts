@@ -19,6 +19,7 @@ import { createRawHamlib } from 'hamlib-wasm/raw';
 import type { RawHamlib, RigModel } from 'hamlib-wasm/raw';
 import type { NodeSerialTransport } from 'hamlib-wasm/node';
 
+import { catalogueModel } from '../node/catalogue.js';
 import { DEVICES } from './devices.js';
 import type { HardwareDevice } from './devices.js';
 
@@ -166,7 +167,7 @@ async function probeForAnswer(
   device: HardwareDevice,
   env: Environment,
 ): Promise<HardwareTarget> {
-  const model = catalogueModel(hamlib.models, device);
+  const model = catalogueModel(hamlib.models, device.model.manufacturer, device.model.model);
   const candidates = await candidatePorts(transport, device, env);
   const requested = (env[BAUD_VARIABLE] ?? '').trim();
   const fixedRate = requested === '' ? device.baudRate : Number(requested);
@@ -203,27 +204,6 @@ async function probeForAnswer(
     `no ${device.label} answered.  Every attempt, in order:\n  ${tried.join('\n  ')}\n`
     + 'The rig and its port are the operator\'s to fix (another application holding it, a '
     + 'renamed /dev/cu.* node, the menu rate); the profiles are data, in tests/hardware/devices.ts.',
-  );
-}
-
-/** The profile's model, looked up the way `hamlib.models` reports it. */
-function catalogueModel(models: readonly RigModel[], device: HardwareDevice): RigModel {
-  const model = models.find(
-    (candidate) => candidate.manufacturer === device.model.manufacturer
-      && candidate.model === device.model.model,
-  );
-
-  if (model) {
-    return model;
-  }
-
-  const siblings = models
-    .filter((candidate) => candidate.manufacturer === device.model.manufacturer)
-    .map((candidate) => candidate.model);
-
-  throw new Error(
-    `${device.model.manufacturer} ${device.model.model} is not in the catalogue; `
-    + `${device.model.manufacturer} entries: ${siblings.join(', ') || 'none'}`,
   );
 }
 

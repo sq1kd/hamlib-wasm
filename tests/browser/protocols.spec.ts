@@ -18,13 +18,7 @@ test('drives an Icom CI-V radio, a different protocol family', async ({ harnessP
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ic703 = hamlib.models.find(
-      (model) => model.manufacturer === 'Icom' && model.model === 'IC-703',
-    );
-
-    if (!ic703) {
-      throw new Error('the IC-703 model is missing');
-    }
+    const ic703 = window.__testHelpers.catalogueModel(hamlib.models, 'Icom', 'IC-703');
 
     const rig = await hamlib.open({ modelId: ic703.id, port });
 
@@ -92,13 +86,7 @@ test('reports the upstream open failure that keeps serial DTR PTT unreachable', 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ft757 = hamlib.models.find(
-      (model) => model.manufacturer === 'Yaesu' && model.model === 'FT-757GXII',
-    );
-
-    if (!ft757) {
-      throw new Error('the FT-757GXII model is missing');
-    }
+    const ft757 = window.__testHelpers.catalogueModel(hamlib.models, 'Yaesu', 'FT-757GXII');
 
     const opened = await window.__testHelpers.capture(
       () => hamlib.open({ modelId: ft757.id, port }),

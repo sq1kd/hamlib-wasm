@@ -27,23 +27,23 @@ test('an open that nothing answers fails loudly instead of reporting a rig', asy
 
   const captured = await page.evaluate(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
-    const model = hamlib.models.find((candidate) => candidate.model === 'FT-710');
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Yaesu', 'FT-710');
     const port = await hamlib.requestPort();
 
     /* No baudRate: Hamlib's own default is the highest rate the model
      * advertises, which for this rig is not the rate it is listening at. */
     const omitted = await window.__testHelpers.capture(
-      () => hamlib.open({ modelId: model!.id, port }),
+      () => hamlib.open({ modelId: model.id, port }),
     );
 
     /* An explicit rate the rig does not answer at is the same silence; the
      * caller's own guess is not trusted either. */
     const explicit = await window.__testHelpers.capture(
-      () => hamlib.open({ modelId: model!.id, port, baudRate: 9600 }),
+      () => hamlib.open({ modelId: model.id, port, baudRate: 9600 }),
     );
 
     await hamlib.dispose();
-    return { omitted, explicit, max: model!.serialRateMax };
+    return { omitted, explicit, max: model.serialRateMax };
   });
 
   const omitted = expectFailure(captured.omitted);
@@ -73,11 +73,11 @@ test('detectBaudRate finds the rate the rig answers at, then the rig opens', asy
 
   const found = await page.evaluate(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
-    const model = hamlib.models.find((candidate) => candidate.model === 'FT-710');
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Yaesu', 'FT-710');
     const port = await hamlib.requestPort();
 
     const detected = await window.__testHelpers.capture(
-      () => hamlib.detectBaudRate({ modelId: model!.id, port }),
+      () => hamlib.detectBaudRate({ modelId: model.id, port }),
     );
 
     /* What the search itself did, before the rig is opened for real. */
@@ -95,7 +95,7 @@ test('detectBaudRate finds the rate the rig answers at, then the rig opens', asy
 
     /* The search is no use to the caller if it keeps the port: they open the rig
      * with the number it found. */
-    const rig = await hamlib.open({ modelId: model!.id, port, baudRate: detected.value });
+    const rig = await hamlib.open({ modelId: model.id, port, baudRate: detected.value });
     const frequency = await rig.getFrequency();
     const baudRate = rig.baudRate;
 
@@ -129,15 +129,15 @@ test('a rig whose declared maximum is right is not searched at all', async ({ ha
    * so Hamlib's default is already correct. */
   const found = await page.evaluate(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
     const port = await hamlib.requestPort();
 
     const detected = await window.__testHelpers.capture(
-      () => hamlib.detectBaudRate({ modelId: model!.id, port }),
+      () => hamlib.detectBaudRate({ modelId: model.id, port }),
     );
 
     await hamlib.dispose();
-    return { detected, max: model!.serialRateMax };
+    return { detected, max: model.serialRateMax };
   });
 
   expect(expectOk(found.detected)).toBe(found.max);
@@ -154,15 +154,15 @@ test('a rate outside the model range is refused before the port is touched', asy
 
   const captured = await page.evaluate(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
-    const model = hamlib.models.find((candidate) => candidate.model === 'FT-710');
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Yaesu', 'FT-710');
     const port = await hamlib.requestPort();
 
     const captured = await window.__testHelpers.capture(
-      () => hamlib.open({ modelId: model!.id, port, baudRate: 460800 }),
+      () => hamlib.open({ modelId: model.id, port, baudRate: 460800 }),
     );
 
     await hamlib.dispose();
-    return { captured, min: model!.serialRateMin, max: model!.serialRateMax };
+    return { captured, min: model.serialRateMin, max: model.serialRateMax };
   });
 
   const failure = expectFailure(captured.captured);

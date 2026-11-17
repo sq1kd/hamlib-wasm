@@ -13,11 +13,7 @@ test('disposal during an accepted open closes the rig and rejects the open', asy
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     /* open() reaches the queue synchronously, so this is the exact race: the
      * open is accepted, dispose() is requested while it waits on the chain. */
@@ -61,11 +57,7 @@ test('disposal is idempotent and releases a port that raced with it', async ({ h
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const pendingOpen = window.__testHelpers.capture(
       () => hamlib.open({ modelId: ts480.id, port }),
@@ -103,11 +95,7 @@ test('a later instance can use the same port after a raced disposal', async ({ h
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const first = await window.__hamlibHarness.createRawHamlib();
     const port = await first.requestPort();
-    const ts480 = first.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(first.models, 'Kenwood', 'TS-480');
 
     const pendingOpen = window.__testHelpers.capture(
       () => first.open({ modelId: ts480.id, port }),
@@ -139,9 +127,7 @@ for (const action of ['close', 'dispose'] as const) {
   test(`${action} from a state listener finishes that event but suppresses the rest`, async ({ harnessPage: page }) => {
     const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
       const hamlib = await window.__hamlibHarness.createHamlib({});
-      const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-      if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+      const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
       const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
       const events: string[] = [];
@@ -178,9 +164,7 @@ for (const action of ['close', 'dispose'] as const) {
   test(`${action} from an error listener preserves rejection and the error event`, async ({ harnessPage: page }) => {
     const captured = await page.evaluate((action) => window.__testHelpers.capture(async () => {
       const hamlib = await window.__hamlibHarness.createHamlib({});
-      const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-      if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+      const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
       const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
       const events: string[] = [];

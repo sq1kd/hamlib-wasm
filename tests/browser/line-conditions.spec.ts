@@ -32,11 +32,7 @@ async function readOnce(
   const captured = await page.evaluate((target) => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const model = hamlib.models.find(
-      (candidate) => candidate.manufacturer === target.manufacturer && candidate.model === target.model,
-    );
-
-    if (!model) { throw new Error(`${target.model} is missing`); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, target.manufacturer, target.model);
 
     const rig = await hamlib.open({
       modelId: model.id,
@@ -92,9 +88,7 @@ test('an echo alone is not a rig answering the open', async ({ harnessPage: page
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ic703 = hamlib.models.find((model) => model.manufacturer === 'Icom' && model.model === 'IC-703');
-
-    if (!ic703) { throw new Error('the IC-703 is missing'); }
+    const ic703 = window.__testHelpers.catalogueModel(hamlib.models, 'Icom', 'IC-703');
 
     const opened = await window.__testHelpers.capture(() => hamlib.open({ modelId: ic703.id, port }));
 
@@ -116,9 +110,7 @@ test('stale bytes in the receive queue do not become the next reply', async ({ h
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) { throw new Error('the TS-480 is missing'); }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
 

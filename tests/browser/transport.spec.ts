@@ -152,11 +152,7 @@ test('uses a caller-supplied transport instead of Web Serial', async ({ harnessP
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const transport = window.__hamlibHarness.fakeTransport(window.__fakeSerial.port);
     const hamlib = await window.__hamlibHarness.createRawHamlib({ transport });
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const port = await hamlib.requestPort();
     const rig = await hamlib.open({ modelId: ts480.id, port });
@@ -189,11 +185,7 @@ test('rejects an unknown model and baud rate, and surfaces Hamlib rejecting inpu
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = window.__fakeSerial.port;
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const unknownModel = await window.__testHelpers.capture(
       () => hamlib.open({ modelId: 999_999, port }),
@@ -239,11 +231,7 @@ test('opens a rig, drives it over the transport and releases the port', async ({
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
 
@@ -341,11 +329,7 @@ test('reports a Hamlib timeout and recovers on the next read', async ({ harnessP
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
     const before = await rig.getFrequency();
@@ -396,11 +380,7 @@ test('surfaces a Hamlib error when the port cannot be opened', async ({ harnessP
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rejected = await window.__testHelpers.capture(
       () => hamlib.open({ modelId: ts480.id, port }),

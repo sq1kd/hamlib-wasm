@@ -18,9 +18,7 @@ test('a frequency-only model produces a frequency-only snapshot', async ({ harne
 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'FRG-100');
-
-    if (!model) { throw new Error('the FRG-100 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Yaesu', 'FRG-100');
 
     const capabilities = window.__hamlibHarness.capabilitiesOf(model);
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
@@ -100,9 +98,7 @@ test('a frequency-only model produces a frequency-only snapshot', async ({ harne
 test('a set-only PTT model takes both PTT commands and refuses the read', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-140S');
-
-    if (!model) { throw new Error('the TS-140S is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-140S');
 
     const capabilities = window.__hamlibHarness.capabilitiesOf(model);
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });

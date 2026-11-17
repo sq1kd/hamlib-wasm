@@ -137,22 +137,14 @@ test('refuses a model whose line settings Web Serial cannot express', async ({ h
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const unsupported = hamlib.models.find((model) => model.model === 'AR2700');
-
-    if (!unsupported) {
-      throw new Error('the AOR AR2700 model is missing');
-    }
+    const unsupported = window.__testHelpers.catalogueModel(hamlib.models, 'AOR', 'AR2700');
 
     const rejected = await window.__testHelpers.capture(
       () => hamlib.open({ modelId: unsupported.id, port }),
     );
 
     /* The port must still be usable for a model the browser can drive. */
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
     const frequency = await rig.getFrequency();
@@ -186,22 +178,14 @@ test('fails predictably for a backend that needs a worker thread', async ({ harn
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const threaded = hamlib.models.find((model) => model.model === 'D578A');
-
-    if (!threaded) {
-      throw new Error('the AnyTone D578A model is missing');
-    }
+    const threaded = window.__testHelpers.catalogueModel(hamlib.models, 'AnyTone', 'D578A');
 
     const rejected = await window.__testHelpers.capture(
       () => hamlib.open({ modelId: threaded.id, port }),
     );
 
     /* The failure must not wedge the instance or the port. */
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
     const frequency = await rig.getFrequency();
@@ -233,11 +217,7 @@ test('reports a device that disappears mid-session', async ({ harnessPage: page 
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
-    const ts480 = hamlib.models.find((model) => model.model === 'TS-480');
-
-    if (!ts480) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port });
     await rig.getFrequency();

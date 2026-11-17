@@ -15,6 +15,8 @@ import { createRawHamlib } from 'hamlib-wasm/raw';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 import type { SerialPortConstructorLike } from 'hamlib-wasm/node';
 
+import { catalogueModel } from './catalogue.js';
+
 /** The real class must satisfy the shape the adapter constructs. */
 const classConforms: SerialPortConstructorLike = SerialPort;
 void classConforms;
@@ -35,13 +37,7 @@ test('reports an absent device as a Hamlib error', async () => {
   const hamlib = await createRawHamlib({ transport });
 
   try {
-    const model = hamlib.models.find(
-      (candidate) => candidate.manufacturer === 'Kenwood' && candidate.model === 'TS-480',
-    );
-
-    if (!model) {
-      throw new Error('the TS-480 model is missing');
-    }
+    const model = catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const port = await transport.requestPort({ path: ABSENT_PATH });
     const failure = await hamlib.open({ modelId: model.id, port, baudRate: 9600 }).then(

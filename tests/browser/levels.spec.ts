@@ -14,9 +14,7 @@ test('reads only the configured levels the model advertises', async ({ harnessPa
     const hamlib = await window.__hamlibHarness.createHamlib({
       levels: ['STRENGTH', 'SWR'],
     });
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
     const advertised = [...rig.capabilities.levels];
@@ -57,9 +55,7 @@ test('reads only the configured levels the model advertises', async ({ harnessPa
 test('a level watch reads only the level, a frequency watch reads none', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({ levels: ['STRENGTH'] });
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
@@ -97,9 +93,7 @@ test('a level watch reads only the level, a frequency watch reads none', async (
 test('watching levels on an instance with none configured is refused', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createHamlib({});
-    const model = hamlib.models.find((candidate) => candidate.model === 'TS-480');
-
-    if (!model) { throw new Error('the TS-480 is missing from the catalogue'); }
+    const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
     const refusal = window.__testHelpers.capture(() => {

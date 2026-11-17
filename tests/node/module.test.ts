@@ -11,6 +11,8 @@ import { expect, test } from 'vitest';
 
 import { createRawHamlib } from 'hamlib-wasm/raw';
 
+import { catalogueModel } from './catalogue.js';
+
 test('loads the Wasm module and the rig catalogue in Node', async () => {
   const hamlib = await createRawHamlib();
 
@@ -18,13 +20,10 @@ test('loads the Wasm module and the rig catalogue in Node', async () => {
     expect(hamlib.version).toContain('Hamlib');
     expect(hamlib.models.length).toBeGreaterThan(50);
 
-    const ts480 = hamlib.models.find(
-      (model) => model.manufacturer === 'Kenwood' && model.model === 'TS-480',
-    );
+    const ts480 = catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
-    expect(ts480).toBeDefined();
-    expect(ts480?.serialRateMin).toBe(4800);
-    expect(ts480?.serialRateMax).toBe(115200);
+    expect(ts480.serialRateMin).toBe(4800);
+    expect(ts480.serialRateMax).toBe(115200);
   } finally {
     await hamlib.dispose();
   }

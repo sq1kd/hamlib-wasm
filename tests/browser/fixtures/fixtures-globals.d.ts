@@ -146,9 +146,17 @@ interface HamlibErrorView {
 /** The outcome of an in-page action, normalised for Playwright. */
 type Captured<T> = { ok: true; value: T } | { ok: false; error: HamlibErrorView };
 
+/** What a catalogue lookup matches on. */
+interface CatalogueEntry {
+  manufacturer: string;
+  model: string;
+}
+
 /** The assertion helpers `window.__testHelpers` publishes. */
 interface TestHelpers {
   describeError(value: unknown): HamlibErrorView;
+  /** The catalogue entry for `manufacturer` `model`, or a throw naming its siblings. */
+  catalogueModel<T extends CatalogueEntry>(models: readonly T[], manufacturer: string, model: string): T;
   capture<T>(action: () => T | Promise<T>): Promise<Captured<Awaited<T>>>;
 }
 
