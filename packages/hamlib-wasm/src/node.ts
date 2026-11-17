@@ -419,6 +419,23 @@ class NodeSerialPortAdapter implements SerialPortLike {
      * before the listeners below can fire. */
     let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
     let live = true;
+    /*
+     * Why the port went away, once it has.  An unplugged device does not
+     * complete a write in flight - the binding's callback never runs - so a
+     * write cannot wait on the callback alone: it settles with the failure the
+     * moment the port reports it, and a later write fails straight away.
+     */
+    let gone: Error | null = null;
+    const abandoned = new Set<(failure: Error) => void>();
+    const lose = (failure: Error): void => {
+      gone ??= failure;
+
+      for (const reject of abandoned) {
+        reject(gone);
+      }
+
+      abandoned.clear();
+    };
 
     const data = (chunk: Uint8Array): void => {
       if (!live) { return; }
@@ -426,12 +443,16 @@ class NodeSerialPortAdapter implements SerialPortLike {
       controller?.enqueue(chunk);
     };
     const error = (failure: Error): void => {
+      lose(failure);
+
       if (!live) { return; }
 
       live = false;
       controller?.error(failure);
     };
     const close = (failure?: Error | null): void => {
+      lose(failure ?? new Error('serial port closed'));
+
       if (!live) { return; }
 
       live = false;
@@ -456,10 +477,22 @@ class NodeSerialPortAdapter implements SerialPortLike {
 
     const writable = new WritableStream<Uint8Array>({
       write: async (chunk) => {
-        await this.#call<void>(
-          (callback) => port.write(Buffer.from(chunk), callback),
-          'write',
-        );
+        if (gone) { throw gone; }
+
+        let stop: ((failure: Error) => void) | undefined;
+        const lost = new Promise<never>((_, reject) => {
+          stop = reject;
+          abandoned.add(reject);
+        });
+
+        try {
+          await Promise.race([
+            this.#call<void>((callback) => port.write(Buffer.from(chunk), callback), 'write'),
+            lost,
+          ]);
+        } finally {
+          if (stop) { abandoned.delete(stop); }
+        }
       },
     });
 

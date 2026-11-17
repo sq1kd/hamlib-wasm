@@ -258,3 +258,37 @@ test('finds the rate a rig answers at through the adapter', async () => {
     await settle(hamlib.dispose());
   }
 });
+
+test('an unplugged device fails the next call fast, and the instance stays usable', async () => {
+  useVirtualTime();
+
+  const module = rigSerialPortModule();
+  const transport = nodeSerialTransport({ serialport: module });
+  const hamlib = await createRawHamlib({ transport });
+
+  try {
+    const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
+    const port = await transport.requestPort({ path: FAKE_PATH });
+    const rig = await settle(hamlib.open({ modelId, port, baudRate: 9600 }));
+
+    expect(await settle(rig.getFrequency())).toBe(14_074_000);
+
+    module.binding.port?.unplug();
+
+    /* Past Hamlib's 500 ms cache, so the read is a real transaction. */
+    const failure = await settle(
+      new Promise((resolve) => { setTimeout(resolve, 600); }).then(() => rig.getFrequency()).then(
+        () => null,
+        (error: unknown) => error as { code?: string },
+      ),
+    );
+
+    /* A Hamlib error from the transport, not the watchdog's RIG_TIMEOUT: the
+     * instance is not hung, so the rig still closes and a new one can open. */
+    expect(failure?.code).toBe('HAMLIB_ERROR');
+    await settle(rig.close());
+    expect(rig.connected).toBe(false);
+  } finally {
+    await settle(hamlib.dispose());
+  }
+});

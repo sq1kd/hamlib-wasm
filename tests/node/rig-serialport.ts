@@ -61,10 +61,23 @@ class RigBindingPort implements BindingPortInterface {
 
   #replies: Buffer[] = [];
   #pendingRead: ((error?: Error) => void) | null = null;
+  #unplugged = false;
 
   constructor(rig: FakeRig, openOptions: Required<OpenOptions>) {
     this.rig = rig;
     this.openOptions = openOptions;
+  }
+
+  /**
+   * Pull the cable, as a real device does it: the pending read fails without
+   * `canceled`, which `@serialport/stream` reports as a disconnect (`'close'`
+   * with a `DisconnectedError`), and a write to the vanished device never
+   * completes - what the macOS binding did with a QMX+ unplugged mid-poll.
+   */
+  unplug(): void {
+    this.#unplugged = true;
+    this.#pendingRead?.(new Error('device not configured'));
+    this.#pendingRead = null;
   }
 
   async close(): Promise<void> {
@@ -92,6 +105,10 @@ class RigBindingPort implements BindingPortInterface {
 
     if (!this.isOpen) {
       throw new Error('Port is not open');
+    }
+
+    if (this.#unplugged) {
+      throw new Error('device not configured');
     }
 
     const head = this.#replies[0];
@@ -130,6 +147,10 @@ class RigBindingPort implements BindingPortInterface {
 
     if (!this.isOpen) {
       throw new Error('Port is not open');
+    }
+
+    if (this.#unplugged) {
+      return new Promise<void>(() => { /* never: the device is gone */ });
     }
 
     this.writes.push(Buffer.from(buffer));

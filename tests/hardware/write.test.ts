@@ -39,15 +39,19 @@ describe.skipIf(selection.kind === 'none' || !writes)('hardware: frequency round
       const original = await rig.raw.getFrequency();
       expect(original).toBeGreaterThan(0);
 
-      await rig.raw.setFrequency(device.writeFrequency);
-      expect(await rig.raw.getFrequency()).toBe(device.writeFrequency);
+      /* A rig already sitting on the profile frequency would make the write a
+       * no-op, so move 1 kHz up instead - still inside the declared range. */
+      const written = original === device.writeFrequency ? device.writeFrequency + 1_000 : device.writeFrequency;
+
+      await rig.raw.setFrequency(written);
+      expect(await rig.raw.getFrequency()).toBe(written);
 
       await rig.raw.setFrequency(original);
       const restored = await rig.raw.getFrequency();
 
       console.log(
         `${device.label} · ${target.path} · ${target.baudRate} baud · `
-        + `${String(original)} Hz -> ${String(device.writeFrequency)} Hz -> ${String(restored)} Hz`,
+        + `${String(original)} Hz -> ${String(written)} Hz -> ${String(restored)} Hz`,
       );
 
       expect(restored).toBe(original);

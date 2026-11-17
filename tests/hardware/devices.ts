@@ -46,9 +46,13 @@ export const DEVICES: Readonly<Record<string, HardwareDevice>> = {
     label: 'Yaesu FT-710',
     /* `ft710.c`: 8N1, no handshake, 4800-115200. */
     model: { manufacturer: 'Yaesu', model: 'FT-710' },
-    /* No `usb` block and no `baudRate`: the rig has never been enumerated on the
-     * test machine and its menu rate is unknown, so the port comes from
-     * `HAMLIB_WASM_HARDWARE_PORT` and the rate from `detectBaudRate()`. */
+    /* Measured on the reference machine: a CP2105 dual UART, so both of its
+     * interfaces report these ids; resolution keeps the one the rig answers
+     * on (the first, CAT; the second carries the RTS/DTR keying lines). */
+    usb: { vendorId: '10c4', productId: 'ea70' },
+    /* The rig's CAT RATE menu, as `detectBaudRate()` found it: fixing it keeps
+     * the run one open instead of a scan through the silent rates above it. */
+    baudRate: 38_400,
     writeFrequency: 7_074_000,
   },
 };
