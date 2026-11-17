@@ -91,6 +91,7 @@ export default defineConfig({
             { label: 'React hooks', slug: 'guides/react' },
             { label: 'Node and Electron', slug: 'guides/node' },
             { label: 'Supported rigs', slug: 'guides/rigs' },
+            { label: 'Troubleshooting', slug: 'guides/troubleshooting' },
             { label: 'Licensing', slug: 'guides/licensing' },
           ],
         },

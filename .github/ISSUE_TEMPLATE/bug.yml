@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+name: Bug
+description: Something in hamlib-wasm does not work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you got. Include the error's `code`, `operation` and `hamlibCode` if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest code that shows it.
+      render: ts
+  - type: input
+    id: version
+    attributes:
+      label: hamlib-wasm version
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      placeholder: Chrome 142, Firefox 151, Node 24.21, Electron 39
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: If a rig is involved, the output of the "Copy diagnostics" button in the live demo, or `JSON.stringify(hamlib.diagnostics(), null, 2)` from your app.
+      render: json

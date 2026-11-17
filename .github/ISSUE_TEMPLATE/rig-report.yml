@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: MIT
+name: Rig report
+description: Tell us whether your radio works with hamlib-wasm.
+labels: [rig-report]
+body:
+  - type: input
+    id: rig
+    attributes:
+      label: Rig
+      description: Manufacturer and model.
+      placeholder: Icom IC-7300
+    validations:
+      required: true
+  - type: input
+    id: model-id
+    attributes:
+      label: Hamlib model id
+      description: The `id` of the `RigModel` you opened.
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options:
+        - USB CDC (the radio's own USB port)
+        - USB-serial adapter
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Browser and version, Node version, or Electron version.
+      placeholder: Chrome 142, Firefox 151, Node 24.21, Electron 39
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Does it work?
+      options:
+        - "Yes"
+        - Partly
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Baud rate, the calls you made, what worked and what failed with which error.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste the output of the "Copy diagnostics" button in the live demo, or `JSON.stringify(hamlib.diagnostics(), null, 2)` from your app.
+      render: json
+    validations:
+      required: true

@@ -36,9 +36,10 @@ promised.
 ## Line settings
 
 Both transports accept the same line settings: 7 or 8 data bits, 1 or 2 stop
-bits, none/even/odd parity, and no flow control or hardware handshake. A model
-that declares anything else fails with `-RIG_ECONF` before the port is opened,
-so a user never ends up on a silently downgraded port. Its `limitation` field
+bits, none/even/odd parity, and no flow control or RTS/CTS hardware flow
+control (XON/XOFF is not supported). A model that declares anything else fails
+with `-RIG_ECONF` before the port is opened, so a user never ends up on a
+silently downgraded port. Its `limitation` field
 says so up front, and the [live demo](../../demo/) shows it when you pick the
 model.
 

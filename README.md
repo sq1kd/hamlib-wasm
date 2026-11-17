@@ -37,19 +37,8 @@ object files) and `packages/hamlib-wasm/dist`; neither is committed.
 
 ## Development
 
-Everything runs through the toolchain pinned in `mise.toml`:
-
-```sh
-mise install && mise run bootstrap   # toolchain, locked npm deps, Playwright browsers, commit hook
-mise run check                       # the local gate: lint, types, generated files, unit + browser tests
-mise tasks                           # every other task, with its description
-```
-
-The first build downloads the pinned Hamlib release, verifies its SHA-256,
-applies the patches `hamlib.config.yaml` lists and compiles it with Emscripten;
-later builds reuse `.cache`. Commit messages follow Conventional Commits, which
-semantic-release derives the version from; the hook `bootstrap` installs checks
-them.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md): `mise install && mise run bootstrap`,
+then `mise run check` before pushing.
 
 ## Licensing
 

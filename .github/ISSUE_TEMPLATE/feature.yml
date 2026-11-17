@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+name: Feature request
+description: Something hamlib-wasm should do but does not.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need
+      description: The problem you are solving, not only the API you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could look, and the Hamlib call behind it if you know it.
