@@ -77,7 +77,7 @@ export interface NodeSerialPortOpenOptions {
   baudRate: number;
   dataBits?: 5 | 6 | 7 | 8;
   stopBits?: 1 | 1.5 | 2;
-  parity?: 'none' | 'even' | 'odd';
+  parity?: SerialLineSettings['parity'];
   rtscts?: boolean;
   autoOpen?: boolean;
 }
