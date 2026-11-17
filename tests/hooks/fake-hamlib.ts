@@ -51,15 +51,20 @@ type StubEvent = 'state' | 'error';
 /** The rig surface the hooks touch, plus the handles the tests drive. */
 export interface StubRig {
   readonly model: RigModel;
+  readonly capabilities: { readonly levels: readonly string[] };
   readonly state: RigState | undefined;
   readonly connected: boolean;
   readonly closed: boolean;
+  /** Every `watch()` the rig accepted. */
+  readonly watches: WatchOptions[];
   on(event: StubEvent, listener: (value: unknown) => void): () => void;
   watch(options: WatchOptions): () => void;
   close(): Promise<void>;
   /** Publish a snapshot, the way a poll or a refresh would. */
   emitState(state: RigState): void;
   emitError(error: HamlibError): void;
+  /** Lose the port, the way an unplug does: the rig stays, disconnected. */
+  lose(): void;
 }
 
 /** One `open()` a hook started, and the handles that settle it. */
@@ -77,8 +82,11 @@ export function newRig(): StubRig {
   let state: RigState | undefined;
   let connected = true;
   let closed = false;
+  const watches: WatchOptions[] = [];
   const rig: StubRig = {
     model: MODEL,
+    capabilities: { levels: [] },
+    watches,
     get state(): RigState | undefined {
       return state;
     },
@@ -98,7 +106,13 @@ export function newRig(): StubRig {
         set.delete(listener);
       };
     },
-    watch(_options: WatchOptions): () => void {
+    watch(options: WatchOptions): () => void {
+      /* The real watch() refuses a rig that is not connected, synchronously. */
+      if (!connected) {
+        throw Object.assign(new Error('the rig is closed'), { code: 'RIG_CLOSED' });
+      }
+
+      watches.push(options);
       return () => {};
     },
     async close(): Promise<void> {
@@ -116,6 +130,9 @@ export function newRig(): StubRig {
       for (const listener of listeners.get('error') ?? []) {
         listener(error);
       }
+    },
+    lose(): void {
+      connected = false;
     },
   };
 

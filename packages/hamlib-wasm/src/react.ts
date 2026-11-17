@@ -333,7 +333,7 @@ export interface UseRigStateOptions {
 
 /**
  * The rig's state snapshot, kept current from its `state` event and, when
- * `pollMs` is set, from a poll.
+ * `pollMs` is set and the rig is connected, from a poll.
  */
 export function useRigState(
   rig: Rig | undefined,
@@ -368,7 +368,8 @@ export function useRigState(
     const levels = levelsKey === ''
       ? undefined
       : levelsKey.split(',').filter((name) => advertised.has(name as LevelName)) as LevelName[];
-    const stop = pollMs > 0
+    /* useRig keeps a lost rig published, and watch() throws on it. */
+    const stop = pollMs > 0 && rig.connected
       ? rig.watch({
         intervalMs: pollMs,
         ...(fields === undefined ? {} : { fields }),
