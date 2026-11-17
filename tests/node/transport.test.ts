@@ -148,7 +148,7 @@ test('bounds a call that never settles and refuses the instance afterwards', asy
   expect(control.closeRequests).toBe(1);
 });
 
-test('close releases the native handle', async () => {
+test('close releases the rig and its port, which then opens again', async () => {
   const control = fakePort();
 
   const transport: SerialTransport = {
@@ -158,21 +158,28 @@ test('close releases the native handle', async () => {
   };
 
   const hamlib = await createRawHamlib({ transport });
-  const native = (hamlib as unknown as {
-    readonly native: { liveHandles(): number | Promise<number> };
-  }).native;
 
   try {
     const ts480 = catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
 
     const rig = await hamlib.open({ modelId: ts480.id, port: control.port });
-    expect(await native.liveHandles()).toBe(1);
+    expect(hamlib.diagnostics().rigs).toHaveLength(1);
+    expect(control.isOpen).toBe(true);
 
     await rig.close();
-    expect(await native.liveHandles()).toBe(0);
+    expect(hamlib.diagnostics().rigs).toEqual([]);
+    expect(control.isOpen).toBe(false);
+    expect(control.closeCount).toBe(1);
+    expect(control.closedWithLockedStreams).toBe(false);
+
+    /* Nothing of the first rig holds the port: the same instance opens it again. */
+    const again = await hamlib.open({ modelId: ts480.id, port: control.port });
+    expect(await again.getFrequency()).toBe(14_074_000);
+    await again.close();
   } finally {
     await hamlib.dispose();
   }
 
-  expect(await native.liveHandles()).toBe(0);
+  expect(control.openCount).toBe(2);
+  expect(control.isOpen).toBe(false);
 });
