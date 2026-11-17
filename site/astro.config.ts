@@ -6,6 +6,7 @@ import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
 import { hamlibLicensing } from './integrations/licensing';
 import { readCatalogue } from './integrations/catalogue';
 import { measureDemoDownload } from './integrations/demo-size';
+import { ENTRIES, TSCONFIG } from './typedoc/entries';
 
 /*
  * Where the site is served from.
@@ -51,13 +52,8 @@ export default defineConfig({
       disable404Route: true,
       plugins: [
         starlightTypeDoc({
-          entryPoints: [
-            '../packages/hamlib-wasm/src/index.ts',
-            '../packages/hamlib-wasm/src/raw.ts',
-            '../packages/hamlib-wasm/src/react.ts',
-            '../packages/hamlib-wasm/src/node.ts',
-          ],
-          tsconfig: '../packages/hamlib-wasm/tsconfig.json',
+          entryPoints: ENTRIES.map((entry) => entry.source),
+          tsconfig: TSCONFIG,
           output: 'api',
           sidebar: { label: 'API reference', collapsed: true },
           typeDoc: {
