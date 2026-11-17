@@ -153,18 +153,16 @@ prerelease version stays on npm forever and remains installable through
 
 ## What CI runs
 
-- `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, manual
-  dispatch and a weekly schedule. Every run executes `mise run check-release`
-  through the shared `.github/actions/setup` action (mise, `npm ci`, the Hamlib
-  input cache and the Playwright browser cache); pull requests also lint their
-  commit messages, and everything except pull requests runs the clean-room
-  relink (`mise run verify-release`).
-- `.github/workflows/release.yml` runs on pushes to `main` and `next` (and via
-  `workflow_dispatch`). Its `verify` job restores the same caches and runs
-  `mise run check-release` (which is `mise run check` +
-  `mise run verify-package` + `mise run audit-backends`), then uploads the
-  verified `packages/hamlib-wasm/dist`. Its `release` job checks out full
-  history, runs `mise run release`, and never rebuilds the package.
+- `.github/workflows/ci.yml` runs `mise run check-release` (`check` +
+  `verify-package` + `audit-backends`) through the shared
+  `.github/actions/setup` action. Pull requests run it directly and also lint
+  their commit messages.
+- `.github/workflows/release.yml` runs on pushes to `main` and `next`. It calls
+  `ci.yml` once, then publishes and deploys that run's verified
+  `packages/hamlib-wasm/dist` without rebuilding it: the `release` job runs
+  `mise run release`, and the clean-room relink runs inside semantic-release
+  (`verifyReleaseCmd`) only when a version is published; the `pages` job
+  builds the site on `main` against the same package and deploys it.
 
 Do not add separate build or test commands to the workflows: keep the release
 gate in the `mise` tasks so local and CI behavior stay identical.

@@ -1,18 +1,10 @@
 # SPDX-License-Identifier: MIT
-#
-# Every job runs a mise task, so CI checks exactly what `mise run <task>`
-# checks locally.
 name: ci
 
 on:
   pull_request:
-  push:
-    branches: [main]
+  workflow_call:
   workflow_dispatch:
-  # Weekly, so the clean-room relink notices toolchain or upstream drift even
-  # when nothing is merged.
-  schedule:
-    - cron: '0 4 * * 1'
 
 permissions:
   contents: read
@@ -35,11 +27,13 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: mise run lint-commits -- --from "$BASE" --to "$HEAD"
 
-  # check-release = check (lint, docs, typecheck, unit and browser tests)
-  # + verify-package (the packed tarball and source kit) + audit-backends.
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
+    env:
+      # The specs open the site at /; without this the runner's
+      # GITHUB_REPOSITORY gives it the Pages base.
+      SITE_BASE: /
     steps:
       - uses: actions/checkout@v4
 
@@ -51,18 +45,12 @@ jobs:
       - name: Run the release gate
         run: mise run check-release
 
-  # The clean-room relink recompiles Hamlib from the packed source kit, so it
-  # stays off pull requests.
-  relink:
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup
+      # release.yml publishes and deploys this exact build instead of
+      # rebuilding it.
+      - name: Keep the verified package build
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
         with:
-          hamlib: 'true'
-
-      - name: Verify the package and relink it from the packed tarball
-        run: mise run verify-release
+          name: hamlib-wasm-dist
+          path: packages/hamlib-wasm/dist
+          retention-days: 7

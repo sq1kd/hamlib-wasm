@@ -29,7 +29,7 @@ runtime support and limitations are documented in the package README:
 | `tests/codegen` | `vitest`: the generator against synthetic clang ASTs |
 | `tests/hardware` | Opt-in, read-only checks against a real rig through the Node transport |
 | `tests/consumer` | External consumer fixture, typechecked against the packed tarball |
-| `.github/` | `ci.yml` (check-release, commitlint on PRs, weekly relink), `release.yml`, and the shared `actions/setup` |
+| `.github/` | `ci.yml` (the release gate, commitlint on PRs), `release.yml` (gate, publish, Pages on push) and the shared `actions/setup` |
 | `release.config.cjs` / `RELEASING.md` | semantic-release configuration and the publishing runbook |
 
 Build products live in `.cache/hamlib/<version>` (downloaded upstream source and

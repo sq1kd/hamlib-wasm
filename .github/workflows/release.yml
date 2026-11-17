@@ -1,72 +1,86 @@
 # SPDX-License-Identifier: MIT
 #
-# Publishing uses npm Trusted Publishing (OIDC), not a long-lived publishing
-# secret.  The npm Trusted Publisher must be configured for this repository and
-# the workflow filename release.yml before the first automatic publish.
+# Publishing uses npm Trusted Publishing (OIDC), not a publishing secret: the
+# npm Trusted Publisher must name this repository and this workflow file.
 name: release
 
 on:
   push:
     branches: [main, next]
-  workflow_dispatch:
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
-  verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup
-        with:
-          hamlib: 'true'
-          playwright: 'true'
-
-      # The same gate CI runs: check + verify-package + audit-backends.
-      - name: Run the release gate
-        run: mise run check-release
-
-      # semantic-release publishes whatever is under packages/hamlib-wasm/dist.
-      # Hand the verified build to the release job instead of rebuilding it
-      # there (a second build would also duplicate the native compile).
-      - name: Upload the verified package build
-        uses: actions/upload-artifact@v4
-        with:
-          name: hamlib-wasm-dist
-          path: packages/hamlib-wasm/dist
-          retention-days: 1
+  ci:
+    uses: ./.github/workflows/ci.yml
 
   release:
-    needs: verify
+    needs: ci
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
     steps:
-      # semantic-release needs the full tag history to choose the next version.
+      # semantic-release needs the full tag history to choose the version.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # mise provides Node 24 and therefore npm >= 11.5.1, which is required
-      # for Trusted Publishing.  Do not add a separate Node setup action or a
-      # registry URL: their generated .npmrc conflicts with npm OIDC
-      # authentication.
+      # No setup-node or registry URL: their generated .npmrc breaks npm's
+      # OIDC authentication.  mise provides Node 24 and npm >= 11.5.1.
       - uses: ./.github/actions/setup
 
-      - name: Download the verified package build
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: hamlib-wasm-dist
           path: packages/hamlib-wasm/dist
 
+      # The clean-room relink runs inside semantic-release (verifyReleaseCmd),
+      # so only a push that publishes pays for it.
       - name: Publish and create the GitHub Release
         run: mise run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  pages:
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: hamlib-wasm-dist
+          path: packages/hamlib-wasm/dist
+
+      # Built here, not taken from ci: this build gets the Pages base from
+      # GITHUB_REPOSITORY, the tested one is served at /.
+      - name: Build the documentation site
+        run: npm run build --workspace site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
