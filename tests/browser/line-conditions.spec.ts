@@ -15,7 +15,7 @@ import {
   test,
   useRig,
 } from './fixtures';
-import { RIG_ETIMEOUT } from '../hamlib-errors';
+import { CACHE_LAPSE_MS, RIG_ETIMEOUT } from '../hamlib-constants';
 
 /** One rig per framing: `;`-terminated ASCII, CI-V binary, newcat ASCII, fixed-length binary. */
 const FAMILIES: readonly { rig: FakeRigName; manufacturer: string; model: string; baudRate?: number }[] = [
@@ -108,7 +108,7 @@ test('an echo alone is not a rig answering the open', async ({ harnessPage: page
 });
 
 test('stale bytes in the receive queue do not become the next reply', async ({ harnessPage: page }) => {
-  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+  const captured = await page.evaluate((cacheLapseMs) => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
@@ -116,9 +116,9 @@ test('stale bytes in the receive queue do not become the next reply', async ({ h
     const rig = await hamlib.open({ modelId: ts480.id, port });
 
     /* A late reply to some earlier command, and line noise, waiting unread.
-     * Past Hamlib's 500 ms cache, the next read is a real transaction. */
+     * Past Hamlib's cache, the next read is a real transaction. */
     window.__fakeSerial.pushRaw('\u0000ÿFA00099999999;');
-    await window.__virtualClock.advance(600);
+    await window.__virtualClock.advance(cacheLapseMs);
 
     const frequency = await rig.getFrequency();
 
@@ -126,7 +126,7 @@ test('stale bytes in the receive queue do not become the next reply', async ({ h
     await hamlib.dispose();
 
     return frequency;
-  }));
+  }), CACHE_LAPSE_MS);
 
   expect(expectOk(captured)).toBe(14_074_000);
 });

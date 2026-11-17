@@ -19,7 +19,7 @@ import {
 } from 'hamlib-wasm';
 
 import { expect, expectFailure, expectOk, readFakeSerial, test } from './fixtures';
-import { HAMLIB_MESSAGE, RIG_ECONF, RIG_EINTERNAL, RIG_EIO } from '../hamlib-errors';
+import { CACHE_LAPSE_MS, HAMLIB_MESSAGE, RIG_ECONF, RIG_EINTERNAL, RIG_EIO } from '../hamlib-constants';
 
 interface CatalogueModel {
   id: number;
@@ -215,7 +215,7 @@ test('fails predictably for a backend that needs a worker thread', async ({ harn
 });
 
 test('reports a device that disappears mid-session', async ({ harnessPage: page }) => {
-  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+  const captured = await page.evaluate((cacheLapseMs) => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
@@ -223,10 +223,9 @@ test('reports a device that disappears mid-session', async ({ harnessPage: page 
     const rig = await hamlib.open({ modelId: ts480.id, port });
     await rig.getFrequency();
 
-    /* Let 600 ms of virtual time pass: Hamlib's 500 ms cache has then lapsed,
-     * so the next read is a real transaction and not the cached answer from
-     * the healthy session. */
-    await window.__virtualClock.advance(600);
+    /* Let Hamlib's cache lapse, so the next read is a real transaction and
+     * not the cached answer from the healthy session. */
+    await window.__virtualClock.advance(cacheLapseMs);
 
     const connectedBefore = rig.connected;
 
@@ -240,7 +239,7 @@ test('reports a device that disappears mid-session', async ({ harnessPage: page 
     await hamlib.dispose();
 
     return { failed, closed, connectedBefore, connectedAfter };
-  }));
+  }), CACHE_LAPSE_MS);
 
   const result = expectOk(captured);
 

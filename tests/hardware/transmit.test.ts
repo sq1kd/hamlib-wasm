@@ -20,6 +20,7 @@ import { createHamlib } from 'hamlib-wasm';
 import type { Rig } from 'hamlib-wasm';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
+import { CACHE_LAPSE_MS } from '../hamlib-constants.js';
 import { requireDevice, resolveTarget, selectDevice, selectTransmit } from './target.js';
 
 const selection = selectDevice();
@@ -27,9 +28,6 @@ const transmit = selectTransmit();
 
 /** Power while keyed, where the model can set it: a tenth of its maximum. */
 const TEST_POWER = 0.1;
-
-/** Past Hamlib's 500 ms cache, so a read while keyed asks the rig. */
-const SETTLE_MS = 600;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
 
@@ -89,7 +87,7 @@ describe.skipIf(selection.kind === 'none' || transmit.kind === 'off')('hardware:
         }
 
         await rig.setPtt(true);
-        await sleep(SETTLE_MS);
+        await sleep(CACHE_LAPSE_MS);
         during = await rig.raw.getPtt();
 
         if (metered) {
@@ -97,7 +95,7 @@ describe.skipIf(selection.kind === 'none' || transmit.kind === 'off')('hardware:
         }
       });
 
-      await sleep(SETTLE_MS);
+      await sleep(CACHE_LAPSE_MS);
       const after = await rig.raw.getPtt();
 
       console.log(

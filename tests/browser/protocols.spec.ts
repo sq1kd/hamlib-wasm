@@ -11,7 +11,7 @@
  */
 
 import { expect, expectFailure, expectOk, readFakeSerial, test, useRig } from './fixtures';
-import { RIG_EIO } from '../hamlib-errors';
+import { RIG_EIO } from '../hamlib-constants';
 
 test('drives an Icom CI-V radio, a different protocol family', async ({ harnessPage: page }) => {
   await useRig(page, 'icom-ic703');

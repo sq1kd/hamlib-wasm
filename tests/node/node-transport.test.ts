@@ -16,7 +16,7 @@ import { nodeSerialTransport } from 'hamlib-wasm/node';
 import { catalogueModel } from './catalogue.js';
 import { rigSerialPortModule } from './rig-serialport.js';
 import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
-import { RIG_EINVAL } from '../hamlib-errors.js';
+import { CACHE_LAPSE_MS, RIG_EINVAL } from '../hamlib-constants.js';
 
 test('refuses a port request without a path', async () => {
   const transport = nodeSerialTransport({ serialport: rigSerialPortModule() });
@@ -265,9 +265,9 @@ test('an unplugged device fails the next call fast, and the instance stays usabl
 
     module.binding.port?.unplug();
 
-    /* Past Hamlib's 500 ms cache, so the read is a real transaction. */
+    /* Past Hamlib's cache, so the read is a real transaction. */
     const failure = await settle(
-      new Promise((resolve) => { setTimeout(resolve, 600); }).then(() => rig.getFrequency()).then(
+      new Promise((resolve) => { setTimeout(resolve, CACHE_LAPSE_MS); }).then(() => rig.getFrequency()).then(
         () => null,
         (error: unknown) => error as { code?: string },
       ),

@@ -17,7 +17,7 @@ import {
   TS480_LINE_SETTINGS,
 } from './fixtures';
 import { UPSTREAM_VERSION } from './upstream';
-import { HAMLIB_MESSAGE, RIG_ECONF, RIG_EINVAL, RIG_ETIMEOUT } from '../hamlib-errors';
+import { CACHE_LAPSE_MS, HAMLIB_MESSAGE, RIG_ECONF, RIG_EINVAL, RIG_ETIMEOUT } from '../hamlib-constants';
 
 interface ModelSummary {
   id: number;
@@ -327,7 +327,7 @@ test('opens a rig, drives it over the transport and releases the port', async ({
 });
 
 test('reports a Hamlib timeout and recovers on the next read', async ({ harnessPage: page }) => {
-  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+  const captured = await page.evaluate((cacheLapseMs) => window.__testHelpers.capture(async () => {
     const hamlib = await window.__hamlibHarness.createRawHamlib();
     const port = await hamlib.requestPort();
     const ts480 = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
@@ -336,11 +336,11 @@ test('reports a Hamlib timeout and recovers on the next read', async ({ harnessP
     const before = await rig.getFrequency();
 
     /* The emulator stops answering, so the next read runs into Hamlib's own
-     * timeout (TS-480 caps: 500 ms, 3 retries), on virtual time.  Let 600 ms
-     * of virtual time pass first: Hamlib's 500 ms cache of the frequency read
-     * above has then lapsed, so the read reaches the wire. */
+     * timeout (TS-480 caps: 500 ms, 3 retries), on virtual time.  Hamlib's
+     * cache of the frequency read above lapses first, so the read reaches the
+     * wire. */
     window.__fakeSerial.state.silent = true;
-    await window.__virtualClock.advance(600);
+    await window.__virtualClock.advance(cacheLapseMs);
     const silent = await window.__testHelpers.capture(() => rig.getFrequency());
     const connectedAfterTimeout = rig.connected;
 
@@ -352,7 +352,7 @@ test('reports a Hamlib timeout and recovers on the next read', async ({ harnessP
     await hamlib.dispose();
 
     return { before, silent, connectedAfterTimeout, recovered };
-  }));
+  }), CACHE_LAPSE_MS);
 
   const result = expectOk(captured);
 

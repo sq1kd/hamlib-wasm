@@ -18,7 +18,7 @@
  */
 
 import { expect, expectFailure, expectOk, readFakeSerial, test, useRig } from './fixtures';
-import { RIG_ETIMEOUT } from '../hamlib-errors';
+import { RIG_ETIMEOUT } from '../hamlib-constants';
 
 /** The rate the emulated FT-710's CAT menu is set to, as on the real radio. */
 const FT710_CAT_RATE = 38400;
