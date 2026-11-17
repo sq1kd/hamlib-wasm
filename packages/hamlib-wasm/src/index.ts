@@ -55,6 +55,7 @@ import type {
   SerialPortLike,
 } from './raw.js';
 import type { DetectBaudRateOptions, RigMode, RigModeState, RigModel } from './catalogue.js';
+import { PTT_STATES } from './native/generated/names.js';
 import type { Level } from './native/generated/names.js';
 import type { CompoundHost } from './native/seam.js';
 
@@ -111,8 +112,6 @@ export type {
 export type { PttState } from './native/generated/names.js';
 import type { PttState } from './native/generated/names.js';
 
-const PTT_STATES: readonly PttState[] = ['off', 'on', 'on-mic', 'on-data'];
-
 /** One of Hamlib's own passband helpers, selected by name. */
 export type PassbandSelector = 'normal' | 'narrow' | 'wide';
 
@@ -153,9 +152,22 @@ const DEFAULT_WATCH_FIELDS: readonly RigField[] = ['frequency', 'mode', 'ptt'];
  */
 const LEVEL_FAILURE_LIMIT = 2;
 
-/** Narrow a Hamlib PTT string to the public union. */
+/**
+ * Narrow a Hamlib PTT string to the public union.  A state this layer does not
+ * know fails the read: reporting it as `'off'` would show a transmitting rig
+ * as receiving.
+ */
 function toPttState(value: string): PttState {
-  return PTT_STATES.find((state) => state === value) ?? 'off';
+  const state = PTT_STATES.find((known) => known === value);
+
+  if (state === undefined) {
+    throw new HamlibError(`getPtt reported an unknown state ${JSON.stringify(value)}`, {
+      code: 'HAMLIB_ERROR',
+      operation: 'getPtt',
+    });
+  }
+
+  return state;
 }
 
 /**
