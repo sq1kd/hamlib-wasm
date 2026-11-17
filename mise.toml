@@ -194,6 +194,14 @@ run = "node packages/hamlib-wasm/build/verify-package.ts --relink"
 description = "Fail when a Hamlib release-block change is not a feat/fix/perf commit"
 run = "node packages/hamlib-wasm/build/release-commit-guard.ts"
 
+[tasks.save-build-outputs]
+description = "Archive the package build's outputs for a later CI job"
+run = "node packages/hamlib-wasm/build/build-outputs.ts --save"
+
+[tasks.restore-build-outputs]
+description = "Unpack the archived package build into this checkout"
+run = "node packages/hamlib-wasm/build/build-outputs.ts --restore"
+
 [tasks.release]
 description = "Publish with semantic-release in CI; elsewhere a dry run that reports the next version and notes"
 run = "semantic-release"

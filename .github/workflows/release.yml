@@ -40,11 +40,14 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: hamlib-wasm-dist
-          path: packages/hamlib-wasm/dist
+          name: hamlib-wasm-build
+          path: .cache
 
-      # The clean-room relink runs inside semantic-release (verifyReleaseCmd),
-      # so only a push that publishes pays for it.
+      - name: Restore the verified package build
+        run: mise run restore-build-outputs
+
+      # The package audit and clean-room relink run inside semantic-release
+      # (verifyReleaseCmd), so only a push that publishes pays for them.
       - name: Publish and create the GitHub Release
         run: mise run release
         env:
@@ -68,13 +71,16 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: hamlib-wasm-dist
-          path: packages/hamlib-wasm/dist
+          name: hamlib-wasm-build
+          path: .cache
+
+      - name: Restore the verified package build
+        run: mise run restore-build-outputs
 
       # Built here, not taken from ci: this build gets the Pages base from
       # GITHUB_REPOSITORY, the tested one is served at /.
       - name: Build the documentation site
-        run: npm run build --workspace site
+        run: mise run --skip-deps build-site
 
       - uses: actions/configure-pages@v5
 

@@ -23,10 +23,13 @@ import {
   BRIDGE_INPUTS,
   DIST_MODULE_JS,
   DIST_MODULE_TSD,
+  DIST_DIR,
   DIST_MODULE_WASM,
   FINISH_MODULE_SCRIPT,
   PACKAGE_DIR,
   PACKAGE_JSON,
+  PACKAGE_REBUILDING,
+  TSD_SOURCE_PATH,
 } from './paths.ts';
 import type { Upstream } from './upstream.ts';
 
@@ -114,6 +117,19 @@ export const ROOT_LICENSING_FILES: readonly string[] = [
   'THIRD_PARTY_NOTICES.md',
   ...LICENSE_FILES,
 ];
+
+/**
+ * Every untracked file the native and package builds write into the package:
+ * what packing, publishing or building the site needs without a rebuild.
+ */
+export function packageBuildOutputs(): readonly string[] {
+  return [
+    DIST_DIR,
+    TSD_SOURCE_PATH,
+    PACKAGE_REBUILDING,
+    ...ROOT_LICENSING_FILES.map((relative) => path.join(PACKAGE_DIR, relative)),
+  ];
+}
 
 /** Upstream license texts copied from the release tree into the package. */
 export const UPSTREAM_LICENSE_FILES: readonly string[] = [

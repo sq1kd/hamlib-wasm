@@ -47,10 +47,14 @@ jobs:
 
       # release.yml publishes and deploys this exact build instead of
       # rebuilding it.
+      - name: Archive the verified package build
+        if: github.event_name == 'push'
+        run: mise run save-build-outputs
+
       - name: Keep the verified package build
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: hamlib-wasm-dist
-          path: packages/hamlib-wasm/dist
+          name: hamlib-wasm-build
+          path: .cache/build-outputs.tar.gz
           retention-days: 7

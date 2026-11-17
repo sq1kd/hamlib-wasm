@@ -48,6 +48,9 @@ export const GENERATED_TS = path.join(PACKAGE_DIR, 'src', 'native', 'generated')
 export const CODEGEN_DIR = path.join(REPO_ROOT, 'packages', 'hamlib-codegen', 'src');
 export const CODEGEN_CLI = path.join(CODEGEN_DIR, 'cli.ts');
 
+/** The package build's outputs, archived for the CI jobs that publish them. */
+export const BUILD_OUTPUTS_ARCHIVE = path.join(REPO_ROOT, '.cache', 'build-outputs.tar.gz');
+
 export const PACKAGE_LICENSES_DIR = path.join(PACKAGE_DIR, 'LICENSES');
 export const PACKAGE_REBUILDING = path.join(PACKAGE_DIR, 'REBUILDING.md');
 export const REBUILDING_TEMPLATE = path.join(BUILD_SCRIPTS_DIR, 'REBUILDING.md.in');
