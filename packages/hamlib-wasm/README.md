@@ -466,6 +466,12 @@ only - no C pointers, Hamlib structures or Wasm addresses - and types every
 operation as `T | Promise<T>`, because an Asyncify-suspended call returns a
 promise.
 
+## Versioning
+
+From 1.0.0 the package follows [semantic versioning](https://semver.org/): a
+breaking change to the documented API is a new major version. The bundled
+Hamlib release is versioned independently; each GitHub Release names it.
+
 ## Licensing
 
 `MIT AND LGPL-2.1-or-later`. The original JavaScript/TypeScript wrapper is
