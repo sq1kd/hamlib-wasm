@@ -26,8 +26,9 @@ import {
   runClockUntilElement,
   useRig,
 } from '../fixtures';
+import { SITE_ORIGIN } from '../servers';
 
-const LANDING_URL = 'http://127.0.0.1:4176/';
+const LANDING_URL = `${SITE_ORIGIN}/`;
 
 /* Kenwood writes, as the emulator records them (unframed): a set frequency
  * (FA/FB + 11 digits), a set mode, or keying. */

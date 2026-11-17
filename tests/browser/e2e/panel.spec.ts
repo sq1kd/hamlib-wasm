@@ -39,8 +39,9 @@ import {
   useRig,
   waitForPortOpenPending,
 } from '../fixtures';
+import { SITE_ORIGIN } from '../servers';
 
-const REACT_URL = 'http://127.0.0.1:4176/demo/';
+const REACT_URL = `${SITE_ORIGIN}/demo/`;
 
 test.beforeEach(async ({ page }) => {
   await installVirtualClock(page, 'manual');

@@ -6,8 +6,9 @@
 import { expect, test } from '@playwright/test';
 
 import { UPSTREAM_VERSION } from '../upstream';
+import { SITE_ORIGIN } from '../servers';
 
-const REACT_URL = 'http://127.0.0.1:4176/demo/';
+const REACT_URL = `${SITE_ORIGIN}/demo/`;
 
 test('loads the demo without a click, with the call log and its API switch', async ({ page }) => {
   await page.goto(REACT_URL);

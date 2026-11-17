@@ -27,8 +27,9 @@ import {
   runClockUntilPortClosed,
   setReplyDelay,
 } from '../fixtures';
+import { SITE_ORIGIN } from '../servers';
 
-const REACT_URL = 'http://127.0.0.1:4176/demo/';
+const REACT_URL = `${SITE_ORIGIN}/demo/`;
 
 /** The TS-480 the emulator starts on. */
 const TS480_FREQUENCY = '14.074.000';

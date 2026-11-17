@@ -6,8 +6,9 @@ import { expect, test } from '@playwright/test';
 
 import { removeWebSerial } from '../fixtures';
 import { UPSTREAM_VERSION } from '../upstream';
+import { SITE_ORIGIN } from '../servers';
 
-const REACT_URL = 'http://127.0.0.1:4176/demo/';
+const REACT_URL = `${SITE_ORIGIN}/demo/`;
 
 test('reports that Web Serial is unavailable and keeps connect disabled', async ({ page }) => {
   await removeWebSerial(page);
