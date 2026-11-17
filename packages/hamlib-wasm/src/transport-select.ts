@@ -28,7 +28,7 @@ export async function selectTransport(explicit?: SerialTransport): Promise<Seria
     /* Dynamic, and invisible to bundlers, on purpose.  A static import would
      * pull `serialport` and its native bindings into every browser bundle; a
      * literal specifier would let a bundler resolve this Node-only entry from
-     * the shared chunk and ship it - about 60 kB in the examples - to pages
+     * the shared chunk and ship it - about 60 kB - to pages
      * that can never use it.  `@vite-ignore` keeps the specifier out of the
      * page's module graph; Node resolves it relative to this file at runtime,
      * and a runtime that cannot load it reports Web Serial. */

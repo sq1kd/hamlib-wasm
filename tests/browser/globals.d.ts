@@ -1,8 +1,8 @@
 /**
  * Test-seam declarations for the pages the browser specs drive.
  *
- * `tests/harness/src/main.ts` publishes the package on `window`; the React
- * example publishes nothing and is driven through its DOM instead.  What the
+ * `tests/harness/src/main.ts` publishes the package on `window`; the site's
+ * demo page publishes nothing and is driven through its DOM instead.  What the
  * injected fixtures publish is declared in fixtures/fixtures-globals.d.ts.
  */
 import type { Hamlib, HamlibOptions } from 'hamlib-wasm';
