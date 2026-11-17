@@ -64,6 +64,7 @@ import type {
   NativeOperations,
 } from './native/generated/operations.js';
 import { GeneratedRigMethods } from './native/generated/methods/index.js';
+import type { GeneratedCallResult } from './native/generated/methods/base.js';
 import { bindCompoundHost } from './native/seam.js';
 import type { CompoundOperations } from './native/seam.js';
 import { operationCapabilities } from './catalogue.js';
@@ -393,13 +394,7 @@ export interface RawHamlib {
   dispose(): Promise<void>;
 }
 
-/** Shape shared by every native failure result. */
-interface NativeResult {
-  code: number;
-  error: unknown;
-}
-
-function hamlibError(result: NativeResult, operation: string): HamlibError {
+function hamlibError(result: GeneratedCallResult, operation: string): HamlibError {
   const transport = typeof result.error === 'string' ? result.error : '';
   /* Hamlib reports failures as negative codes (-RIG_EIO); the message table is
    * keyed by the bare value. */
@@ -415,6 +410,15 @@ function hamlibError(result: NativeResult, operation: string): HamlibError {
     hamlibCode: result.code,
     hamlibMessage: description,
   });
+}
+
+/** `result`, or the {@link HamlibError} for `operation` when Hamlib reported a failure. */
+function checked<T extends GeneratedCallResult>(result: T, operation: string): T {
+  if (result.code !== RIG_ERRCODES.OK) {
+    throw hamlibError(result, operation);
+  }
+
+  return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -575,7 +579,6 @@ class CompoundScope extends GeneratedRigMethods {
     private readonly rigNative: () => NativeOperations,
     private readonly rigHandle: () => number,
     private readonly rigAvailable: (operation: string) => void,
-    private readonly rigFailed: (result: NativeResult, operation: string) => Error,
   ) {
     super();
   }
@@ -610,9 +613,9 @@ class CompoundScope extends GeneratedRigMethods {
     return work();
   }
 
-  protected failed(result: NativeResult, operation: string): Error {
+  protected failed(result: GeneratedCallResult, operation: string): Error {
     this.#assertActive();
-    return this.rigFailed(result, operation);
+    return hamlibError(result, operation);
   }
 
   #assertActive(): void {
@@ -663,7 +666,6 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
       (operation) => {
         this.available(operation);
       },
-      (result, operation) => hamlibError(result, operation),
     );
     bindCompoundHost(this, {
       runCompound: (operation, body) => this.#runCompound(operation, body),
@@ -738,9 +740,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
       const sent = await this.#call('sendMorse', async () => {
         const result = await this.#context.native.sendMorse(this.#handle, chunk, checkMode);
 
-        if (result.code !== RIG_ERRCODES.OK) { throw hamlibError(result, 'sendMorse'); }
-
-        return result.value;
+        return checked(result, 'sendMorse').value;
       });
 
       /* A backend that accepted nothing would loop forever. */
@@ -758,9 +758,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
     if (!this.#can('stopMorse')) { return; }
 
     await this.#call('stopMorse', async () => {
-      const result = await this.#context.native.stopMorse(this.#handle);
-
-      if (result.code !== RIG_ERRCODES.OK) { throw hamlibError(result, 'stopMorse'); }
+      checked(await this.#context.native.stopMorse(this.#handle), 'stopMorse');
     });
   }
 
@@ -794,15 +792,13 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
         terminator === undefined ? (replyLength ?? 0) : 0,
       );
 
-      if (result.code !== RIG_ERRCODES.OK) { throw hamlibError(result, 'sendRaw'); }
-
-      return String(result.value);
+      return String(checked(result, 'sendRaw').value);
     });
 
     return hexToBytes(reply);
   }
 
-  protected failed(result: { code: number; error: unknown }, operation: string): Error {
+  protected failed(result: GeneratedCallResult, operation: string): Error {
     return hamlibError(result, operation);
   }
 
@@ -847,10 +843,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
       await this.#context.queue.drain('close', async () => {
         const result = await this.#context.native.closeRig(this.#handle);
         this.#handle = 0;
-
-        if (result.code !== RIG_ERRCODES.OK) {
-          throw hamlibError(result, 'close');
-        }
+        checked(result, 'close');
       });
     } catch (error) {
       throw asHamlibError(error, 'close');
@@ -1154,11 +1147,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     /* Every bound native call is awaited: Asyncify returns a promise when the
      * call suspended and a plain value when it did not. */
-    const initialization = await native.initialize();
-
-    if (initialization.code !== RIG_ERRCODES.OK) {
-      throw hamlibError(initialization, 'initialize');
-    }
+    checked(await native.initialize(), 'initialize');
 
     registry.onTrace = (direction, path, bytes) => {
       recorder.trace(direction, path, bytes);
@@ -1173,11 +1162,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       recorder.log(lineLevel, message);
     };
 
-    const debug = await native.setDebug(debugLevel);
-
-    if (debug.code !== RIG_ERRCODES.OK) {
-      throw hamlibError(debug, 'initialize');
-    }
+    checked(await native.setDebug(debugLevel), 'initialize');
 
     const models = drainVector(await native.listModels(), (model) => describeModel(model, native));
 
@@ -1237,11 +1222,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     /* The rig keeps the path it was opened on. */
     const rig = await this.#withBorrowedPort('open', port, { keep: true }, async (path) => {
-      const opened = await this.#native.openRig(modelId, path, baudRate ?? 0, conf);
-
-      if (opened.code !== RIG_ERRCODES.OK) {
-        throw hamlibError(opened, 'open');
-      }
+      const opened = checked(await this.#native.openRig(modelId, path, baudRate ?? 0, conf), 'open');
 
       /* Register inside the queued work: dispose() drains the chain before it
        * snapshots the live rigs, so this rig is always reachable. */
@@ -1298,7 +1279,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
        * whatever it opened, so a silent rate simply moves on.  A refusal that
        * is not silence - a setting the port rejects, a port the OS denies -
        * ends the search instead of being retried at every rate. */
-      let lastFailure: NativeResult | undefined;
+      let lastFailure: GeneratedCallResult | undefined;
 
       for (const rate of candidates) {
         const probed = await this.#native.probeBaudRate(modelId, path, rate, conf);
@@ -1474,11 +1455,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     try {
       const result = await this.queue.enqueue<T>(operation, async () => {
-        const registered = await this.#native.registerPort(path, token);
-
-        if (registered.code !== RIG_ERRCODES.OK) {
-          throw hamlibError(registered, operation);
-        }
+        checked(await this.#native.registerPort(path, token), operation);
 
         return work(path);
       });
@@ -1500,11 +1477,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
    */
   async #releasePath(path: string, operation: string): Promise<void> {
     await this.queue.drain(operation, async () => {
-      const result = await this.#native.unregisterPort(path);
-
-      if (result.code !== RIG_ERRCODES.OK) {
-        throw hamlibError(result, operation);
-      }
+      checked(await this.#native.unregisterPort(path), operation);
 
       this.#paths.delete(path);
     });
