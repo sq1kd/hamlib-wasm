@@ -183,3 +183,31 @@ test('close releases the rig and its port, which then opens again', async () => 
   expect(control.openCount).toBe(2);
   expect(control.isOpen).toBe(false);
 });
+
+test('close unregisters the port path, so connect cycles leave nothing behind', async () => {
+  const control = fakePort();
+
+  const transport: SerialTransport = {
+    name: 'test',
+    isSupported: () => true,
+    requestPort: async () => control.port,
+  };
+
+  const hamlib = await createRawHamlib({ transport });
+
+  try {
+    const ts480 = catalogueModel(hamlib.models, 'Kenwood', 'TS-480');
+
+    for (let cycle = 0; cycle < 3; cycle++) {
+      const rig = await hamlib.open({ modelId: ts480.id, port: control.port });
+      expect(hamlib.diagnostics().ports).toHaveLength(1);
+
+      await rig.close();
+      expect(hamlib.diagnostics().ports).toEqual([]);
+    }
+  } finally {
+    await hamlib.dispose();
+  }
+
+  expect(control.openCount).toBe(3);
+});

@@ -88,6 +88,8 @@ export interface Diagnostics {
   /** `true` once a call overran `callTimeoutMs`; the instance is then unusable. */
   hung: boolean;
   rigs: DiagnosticsRig[];
+  /** Logical port paths still registered: one per open rig, plus any whose release failed. */
+  ports: string[];
   errors: ErrorEntry[];
   /** The most recent port traffic, oldest first. */
   trace: TraceEntry[];
@@ -168,6 +170,7 @@ export class DiagnosticsRecorder {
     transport: string;
     hung: boolean;
     rigs: DiagnosticsRig[];
+    ports: string[];
   }): Diagnostics {
     return {
       generatedAt: new Date().toISOString(),
@@ -177,6 +180,7 @@ export class DiagnosticsRecorder {
       debugLevel: this.debugLevel,
       hung: fields.hung,
       rigs: fields.rigs,
+      ports: fields.ports,
       errors: [...this.#errors],
       trace: [...this.#trace],
       log: [...this.#log],

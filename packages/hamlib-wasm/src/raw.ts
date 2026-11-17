@@ -539,6 +539,8 @@ interface RigContext {
   readonly native: NativeModule;
   readonly queue: Serializer;
   forget(rig: RawRigHandle): void;
+  /** Unregister `path` from inside a queued call; a failure is reported under `operation`. */
+  unregister(path: string, operation: string): Promise<void>;
   record(operation: string, error: unknown): void;
   portLost(path: string): boolean;
 }
@@ -820,11 +822,13 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
     this.#context.forget(this);
 
     /* Cleanup must run even when the instance is already disposed; the native
-     * side releases the port even when rig_close reports an error. */
+     * side releases the port even when rig_close reports an error, so the
+     * path is let go either way. */
     try {
       await this.#context.queue.drain('close', async () => {
         const result = await this.#context.native.closeRig(this.#handle);
         this.#handle = 0;
+        await this.#context.unregister(this.#path, 'close');
         checked(result, 'close');
       });
     } catch (error) {
@@ -1170,6 +1174,12 @@ class RawHamlibInstance implements RawHamlib, RigContext {
     this.#rigs.delete(rig);
   }
 
+  async unregister(path: string, operation: string): Promise<void> {
+    checked(await this.#native.unregisterPort(path), operation);
+
+    this.#paths.delete(path);
+  }
+
   record(operation: string, error: unknown): void {
     this.#recorder.error(operation, error);
   }
@@ -1223,8 +1233,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     if (this.#disposed) {
       /* Disposal was accepted while this open waited in the queue.  Hand the
-       * rig over closed instead of letting an open survive it; dispose()
-       * releases its path with the others. */
+       * rig over closed instead of letting an open survive it. */
       await rig.close();
       throw disposedError('open');
     }
@@ -1311,6 +1320,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       transport: this.#transport.name,
       hung: this.queue.hung,
       rigs,
+      ports: [...this.#paths],
     });
   }
 
@@ -1453,11 +1463,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
    * failure is reported under `operation`, the call that let the path go.
    */
   async #releasePath(path: string, operation: string): Promise<void> {
-    await this.queue.drain(operation, async () => {
-      checked(await this.#native.unregisterPort(path), operation);
-
-      this.#paths.delete(path);
-    });
+    await this.queue.drain(operation, () => this.unregister(path, operation));
   }
 
   /** Every port-using operation needs a transport that can run here. */
