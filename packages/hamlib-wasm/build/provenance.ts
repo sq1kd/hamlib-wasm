@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 /** `SOURCE.json`: the provenance of the bundled Hamlib build. */
+import { assert } from './errors.ts';
 import { readJson } from './files.ts';
 import { SOURCE_JSON } from './paths.ts';
 
@@ -43,4 +44,12 @@ export interface SourceManifest {
 
 export function readSourceManifest(file: string = SOURCE_JSON): SourceManifest {
   return readJson<SourceManifest>(file);
+}
+
+/** The x.y.z release in an `emcc --version` banner. */
+export function emscriptenRelease(banner: string): string {
+  const release = /\b\d+\.\d+\.\d+\b/.exec(banner)?.[0];
+
+  assert(release, `no Emscripten release in: ${banner}`);
+  return release;
 }

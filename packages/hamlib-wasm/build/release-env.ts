@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 import { sha256File } from './files.ts';
-import {
-  packageLicensingEntries,
-  type PackageLicensingEntry,
-} from './package-manifest.ts';
 import { releaseSourceDirName } from './paths.ts';
 import type { Upstream } from './upstream.ts';
 
@@ -28,12 +24,4 @@ export function patchesSha256(upstream: Upstream): string {
   return upstream.patches
     .map((patch) => `${sha256File(patch.path)}  ${patch.file}\n`)
     .join('');
-}
-
-export interface PackageLicensingManifest {
-  readonly copy: readonly PackageLicensingEntry[];
-}
-
-export function packageLicensingManifest(upstream: Upstream): PackageLicensingManifest {
-  return { copy: packageLicensingEntries(upstream) };
 }

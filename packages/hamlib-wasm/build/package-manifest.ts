@@ -246,6 +246,10 @@ export interface PackageLicensingEntry {
   readonly recursive?: boolean;
 }
 
+export interface PackageLicensingManifest {
+  readonly copy: readonly PackageLicensingEntry[];
+}
+
 /**
  * The copy manifest shipped as `PACKAGE-LICENSING.json`: the licensing and
  * relink material at the package root, plus every third-party file that moves
@@ -255,9 +259,7 @@ export interface PackageLicensingEntry {
  * definition of them: the selection is the licensing/relink documents and the
  * license-text directory.
  */
-export function packageLicensingEntries(
-  upstream: Upstream,
-): readonly PackageLicensingEntry[] {
+export function packageLicensingManifest(upstream: Upstream): PackageLicensingManifest {
   const rootEntries: Record<string, true> = {
     'LICENSE.md': true,
     LICENSES: true,
@@ -281,5 +283,5 @@ export function packageLicensingEntries(
     });
   }
 
-  return entries;
+  return { copy: entries };
 }

@@ -9,7 +9,7 @@
  *   2. builds Hamlib's static library and every built-in rig backend,
  *   3. links the Embind facade plus the link-time POSIX wrappers, emits the
  *      TypeScript declarations and checks them against the config,
- *   4. assembles the Hamlib licence/provenance data into the package.
+ *   4. copies the upstream notices and records which objects were linked.
  *
  * Authored as TypeScript and run directly by Node's type stripping, so this
  * file must stay erasable (no enums, namespaces or parameter properties).

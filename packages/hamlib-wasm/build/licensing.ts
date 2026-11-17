@@ -12,12 +12,12 @@
  * to relink the WASM without the monorepo.
  */
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
 import { assert } from './errors.ts';
-import { assertFile, sha256File, walk, writeJson } from './files.ts';
+import { assertFile, readJson, sha256File, walk, writeJson } from './files.ts';
 import { log } from './exec.ts';
 import {
   LICENSE_FILES,
@@ -25,13 +25,10 @@ import {
   UPSTREAM_BASE_FILES,
   UPSTREAM_LICENSE_FILES,
   kitBridgePath,
+  packageLicensingManifest,
 } from './package-manifest.ts';
 import { emccVersion, kitCommandFiles } from './native-flags.ts';
-import {
-  packageLicensingManifest,
-  patchesSha256,
-  releaseEnv,
-} from './release-env.ts';
+import { patchesSha256, releaseEnv } from './release-env.ts';
 import {
   CORRESPONDING_SOURCE,
   FINISH_MODULE_SCRIPT,
@@ -53,7 +50,7 @@ import {
   releaseSourceDir,
   releaseSourceDirName,
 } from './paths.ts';
-import { type SourceManifest, readSourceManifest } from './provenance.ts';
+import { type SourceManifest, emscriptenRelease } from './provenance.ts';
 import { loadUpstream, type Upstream } from './upstream.ts';
 
 export interface LinkInput {
@@ -264,20 +261,9 @@ export function syncPackageLicenseFiles(): void {
   log('licensing', 'copied the licensing files into the package');
 }
 
-/**
- * Render `REBUILDING.md` for this release.  It needs the provenance written by
- * the native build (`SOURCE.json`), so it runs in the package step.
- */
+/** Render `REBUILDING.md` for this release. */
 export function writeRebuildingGuide(): void {
   const upstream = loadUpstream();
-  const source = readSourceManifest();
-
-  assert(source.patches && source.patches.length > 0, 'SOURCE.json lists no patches');
-
-  const emscripten = /(\d+\.\d+\.\d+)/.exec(source.emscriptenVersion);
-
-  assert(emscripten, 'SOURCE.json has no Emscripten version');
-
   const values: Record<string, string> = {
     HAMLIB_VERSION: upstream.version,
     HAMLIB_COMMIT: upstream.commit,
@@ -285,11 +271,11 @@ export function writeRebuildingGuide(): void {
     HAMLIB_ARCHIVE_NAME: upstream.archive.name,
     HAMLIB_ARCHIVE_URL: upstream.archive.url,
     HAMLIB_ARCHIVE_SHA256: upstream.archive.sha256,
-    HAMLIB_PATCHES: source.patches
-      .map((patch) => `  - \`${patch.file}\`, SHA-256\n    \`${patch.sha256}\``)
+    HAMLIB_PATCHES: upstream.patches
+      .map((patch) => `  - \`${patch.file}\`, SHA-256\n    \`${sha256File(patch.path)}\``)
       .join('\n'),
     HAMLIB_SOURCE_DIR: releaseSourceDirName(upstream),
-    EMSCRIPTEN_VERSION: emscripten[1] as string,
+    EMSCRIPTEN_VERSION: emscriptenRelease(emccVersion()),
     NODE_MAJOR: process.versions.node.split('.')[0] as string,
   };
   const rendered = readFileSync(REBUILDING_TEMPLATE, 'utf8').replace(
@@ -306,23 +292,25 @@ export function writeRebuildingGuide(): void {
   log('licensing', 'rendered REBUILDING.md');
 }
 
+/**
+ * The native step's share of `dist/third_party/hamlib`: the upstream notices,
+ * the shipped patches and the audit of what the link pulled in.
+ */
 export function writeThirdPartyData(linkMapFile: string): void {
   const upstream = loadUpstream();
   const sourceDir = releaseSourceDir(upstream);
-  const archive = releaseArchivePath(upstream);
 
-  assertFile(archive, 'source archive');
   for (const file of UPSTREAM_BASE_FILES) {
     assertFile(path.join(sourceDir, file), `upstream ${file}`);
   }
-  assert(
-    sha256File(archive) === upstream.archive.sha256,
-    `source archive hash does not match the pinned manifest: ${archive}`,
-  );
 
-  syncPackageLicenseFiles();
   mkdirSync(THIRD_PARTY_DIR, { recursive: true });
-  writeJson(PACKAGE_LICENSING_MANIFEST, packageLicensingManifest(upstream));
+
+  /* The package step writes these from this build; until it runs, an older
+   * copy would describe a different module. */
+  for (const file of [SOURCE_JSON, CORRESPONDING_SOURCE, PACKAGE_LICENSING_MANIFEST]) {
+    rmSync(file, { force: true });
+  }
 
   for (const file of UPSTREAM_BASE_FILES) {
     cpSync(path.join(sourceDir, file), path.join(THIRD_PARTY_DIR, file));
@@ -332,14 +320,13 @@ export function writeThirdPartyData(linkMapFile: string): void {
     cpSync(patch.path, path.join(THIRD_PARTY_DIR, patch.file));
   }
 
-  /* The kit is assembled by the package step from the current source inputs.
-   * Drop an older archive here so SOURCE.json cannot advertise a stale kit if
-   * someone stops after the native build. */
-  rmSync(CORRESPONDING_SOURCE, { force: true });
+  writeJson(LINK_INPUTS_JSON, readLinkInputs(linkMapFile));
+  log('licensing', 'wrote the upstream notices and the linked-input audit');
+}
 
-  const linkInputs = readLinkInputs(linkMapFile);
-  writeJson(LINK_INPUTS_JSON, linkInputs);
-
+/** `SOURCE.json` for this build; the kit's hash is filled in once it exists. */
+function sourceManifest(upstream: Upstream): SourceManifest {
+  const linkInputs = readJson<LinkInputs>(LINK_INPUTS_JSON);
   const licenseHashes = Object.fromEntries(
     [
       ...LICENSE_FILES,
@@ -349,7 +336,7 @@ export function writeThirdPartyData(linkMapFile: string): void {
     ].map((relative) => [relative, sha256File(path.join(PACKAGE_DIR, relative))]),
   );
 
-  const source: SourceManifest = {
+  return {
     component: 'Hamlib',
     version: upstream.version,
     series: upstream.series,
@@ -366,9 +353,7 @@ export function writeThirdPartyData(linkMapFile: string): void {
       sha256: sha256File(path.join(THIRD_PARTY_DIR, patch.file)),
     })),
     correspondingSource: packageRelative(CORRESPONDING_SOURCE),
-    correspondingSourceSha256: existsSync(CORRESPONDING_SOURCE)
-      ? sha256File(CORRESPONDING_SOURCE)
-      : null,
+    correspondingSourceSha256: null,
     rebuildInstructions: 'REBUILDING.md',
     emscriptenVersion: emccVersion(),
     nodeVersion: process.version,
@@ -391,9 +376,6 @@ export function writeThirdPartyData(linkMapFile: string): void {
       + 'the pinned release is described by packages/hamlib-wasm/hamlib.config.yaml. '
       + 'The published package carries a complete relink kit; see REBUILDING.md.',
   };
-
-  writeJson(SOURCE_JSON, source);
-  log('licensing', 'wrote third-party notices and provenance');
 }
 
 function kitReadme(upstream: Upstream): string {
@@ -434,9 +416,9 @@ WASM. Their original licenses are retained in the archive and disclosed in
 }
 
 /**
- * Build the corresponding-source/relink archive.  This must be called after
- * the native build, because it copies the linked JS library and the generated
- * provenance files.
+ * Build the corresponding-source/relink archive and write the provenance that
+ * describes it.  Runs after the native build, whose JS library, notices and
+ * link audit it packs.
  */
 export function buildCorrespondingSourceKit(): void {
   const upstream = loadUpstream();
@@ -446,12 +428,14 @@ export function buildCorrespondingSourceKit(): void {
 
   assertFile(archive, 'source archive');
   assertFile(LIBRARY_JS, 'compiled serial transport library');
-  assertFile(SOURCE_JSON, 'third-party source manifest');
+  assertFile(LINK_INPUTS_JSON, 'linked-input audit');
   assertFile(REBUILD_SCRIPT, 'relink script');
   assert(
     sha256File(archive) === upstream.archive.sha256,
     `source archive hash does not match the pinned manifest: ${archive}`,
   );
+
+  const source = sourceManifest(upstream);
 
   rmSync(staging, { recursive: true, force: true });
   for (const dir of ['source', 'patches']) {
@@ -474,7 +458,7 @@ export function buildCorrespondingSourceKit(): void {
   cpSync(REBUILD_SCRIPT, path.join(staging, 'rebuild.sh'));
   cpSync(FINISH_MODULE_SCRIPT, path.join(staging, path.basename(FINISH_MODULE_SCRIPT)));
   cpSync(PACKAGE_REBUILDING, path.join(staging, 'REBUILDING.md'));
-  cpSync(SOURCE_JSON, path.join(staging, 'SOURCE.json'));
+  writeJson(path.join(staging, 'SOURCE.json'), source);
 
   for (const relative of ROOT_LICENSING_FILES) {
     mkdirSync(path.dirname(path.join(staging, relative)), { recursive: true });
@@ -493,16 +477,15 @@ export function buildCorrespondingSourceKit(): void {
   }
 
   writeFileSync(path.join(staging, 'KIT-README.md'), kitReadme(upstream));
-  writeJson(PACKAGE_LICENSING_MANIFEST, packageLicensingManifest(upstream));
 
   execFileSync('tar', ['-czf', CORRESPONDING_SOURCE, '-C', staging, '.'], {
     stdio: 'inherit',
   });
 
-  writeJson(SOURCE_JSON, {
-    ...readSourceManifest(),
-    correspondingSourceSha256: sha256File(CORRESPONDING_SOURCE),
-  } satisfies SourceManifest);
+  const kitSha256 = sha256File(CORRESPONDING_SOURCE);
 
-  log('licensing', `built corresponding-source kit (${sha256File(CORRESPONDING_SOURCE)})`);
+  writeJson(SOURCE_JSON, { ...source, correspondingSourceSha256: kitSha256 } satisfies SourceManifest);
+  writeJson(PACKAGE_LICENSING_MANIFEST, packageLicensingManifest(upstream));
+
+  log('licensing', `built corresponding-source kit (${kitSha256})`);
 }
