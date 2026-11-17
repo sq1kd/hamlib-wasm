@@ -6,10 +6,9 @@ description: Why hamlib-wasm wraps Hamlib instead of rewriting it, and how one c
 import Layers from '../../components/Layers.astro';
 import BuildSteps from '../../components/BuildSteps.astro';
 import { CATALOGUE } from '../../facts';
-import { REPOSITORY_URL } from '../../links';
+import { repositoryFile, repositoryPage } from '../../links';
 
-export const { version, models } = CATALOGUE;
-export const patch = `packages/hamlib-wasm/native/patches/hamlib-${version}-web.patch`;
+export const { models, patches: [patch] } = CATALOGUE;
 
 ## Why not write it from scratch?
 
@@ -68,7 +67,7 @@ means for you.
 
 Apart from putting our `serial.c` in place of upstream's, the only change to
 Hamlib's source is
-{REPOSITORY_URL === null ? 'one small patch' : <a href={`${REPOSITORY_URL}/blob/main/${patch}`}>one small patch</a>}: it skips the Morse
+<a href={repositoryFile(`packages/hamlib-wasm/native/patches/${patch}`, `licensing/third_party/hamlib/${patch}`)}>one small patch</a>: it skips the Morse
 keyer thread, which a single-threaded build can't start, and leaves out the
 network and dummy models that could never open over a serial port.
 
@@ -85,5 +84,5 @@ to `coverage.json`, rather than bound as a guess. That is where the `RawRig`
 methods come from, and why each one matches a Hamlib call by name.
 
 Want to build it yourself, or relink the Wasm with your own Hamlib? The
-{REPOSITORY_URL === null ? 'repository README' : <a href={REPOSITORY_URL}>repository README</a>} has the steps, and the package ships
+<a href={repositoryPage('')}>repository README</a> has the steps, and the package ships
 `REBUILDING.md` for the relink, as the [licence](../guides/licensing/) asks.
