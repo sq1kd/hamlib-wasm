@@ -8,6 +8,7 @@
  * one to the public shape.  It lives outside `src/index.ts` because the
  * generated method classes call it and must not import the public entry point.
  */
+import { drainVector } from '../embind.js';
 import type { RigConfparams, RigConfparamsList } from './hamlib-wasm.mjs';
 
 /**
@@ -55,20 +56,5 @@ export function projectConfparam(value: RigConfparams): RigConfparam {
  * value objects, never the vector or its elements.
  */
 export function collectConfparams(list: RigConfparamsList): RigConfparam[] {
-  const entries: RigConfparam[] = [];
-
-  try {
-    for (let index = 0; index < list.size(); index++) {
-      const entry = list.get(index);
-
-      if (entry) {
-        entries.push(projectConfparam(entry));
-      }
-    }
-  } finally {
-    /* The Embind vector owns Wasm memory. */
-    list.delete();
-  }
-
-  return entries;
+  return drainVector(list, projectConfparam);
 }

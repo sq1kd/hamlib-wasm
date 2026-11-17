@@ -28,7 +28,7 @@
  */
 
 import createNativeModule from './native/hamlib-wasm.mjs';
-import type { MainModule, RigModelInfo, RigModelList } from './native/hamlib-wasm.mjs';
+import type { MainModule, RigModelInfo } from './native/hamlib-wasm.mjs';
 
 import {
   describeLineSettingsLimitation,
@@ -39,6 +39,7 @@ import type { BrowserSupport, DeclaredLineSettings } from './browser-support.js'
 import { confKeysPttLine, encodeConf } from './conf.js';
 import type { RigConf } from './conf.js';
 import { DiagnosticsRecorder, debugLevelIndex } from './diagnostics.js';
+import { drainVector } from './embind.js';
 import type { DebugOptions, Diagnostics, DiagnosticsRig } from './diagnostics.js';
 import {
   HamlibError,
@@ -143,8 +144,6 @@ export type {
 } from './catalogue.js';
 
 type NativeModule = MainModule;
-
-type NativeModelList = RigModelList;
 type NativeModel = RigModelInfo;
 
 /** The one asset the pinned Emscripten build loads. */
@@ -585,10 +584,6 @@ class CompoundScope extends GeneratedRigMethods {
     super();
   }
 
-  get active(): boolean {
-    return this.#active;
-  }
-
   activate(): void {
     this.#active = true;
   }
@@ -710,10 +705,13 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
   }
 
   protected available(operation: string): void {
-    this.#requireCapability(
-      this.#model.capabilities.has(operation) || this.#gained.has(operation),
-      operation,
-      `use ${operation}`,
+    if (this.#can(operation)) {
+      return;
+    }
+
+    throw new HamlibError(
+      `${this.#model.manufacturer} ${this.#model.model} cannot use ${operation}`,
+      { code: 'UNSUPPORTED_OPERATION', operation },
     );
   }
 
@@ -893,17 +891,6 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
       return work();
     });
   }
-
-  #requireCapability(allowed: boolean, operation: string, what: string): void {
-    if (allowed) {
-      return;
-    }
-
-    throw new HamlibError(
-      `${this.#model.manufacturer} ${this.#model.model} cannot ${what}`,
-      { code: 'UNSUPPORTED_OPERATION', operation },
-    );
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -970,6 +957,16 @@ const FATAL_PROBE_CODES: ReadonlySet<number> = new Set([
 ]);
 
 /**
+ * The rate range `model` declares, when it declares a usable one: some
+ * backends leave it zero or inverted, and that range constrains nothing.
+ */
+function declaredRange(model: RigModel): { min: number; max: number } | undefined {
+  const { serialRateMin: min, serialRateMax: max } = model;
+
+  return min > 0 && max >= min ? { min, max } : undefined;
+}
+
+/**
  * Rates to try for `model`, highest first.
  *
  * The declared maximum comes first because that is the rate Hamlib itself
@@ -983,12 +980,11 @@ function baudRateCandidates(model: RigModel, rates?: readonly number[]): number[
     return [...new Set(rates)];
   }
 
-  const { serialRateMin, serialRateMax } = model;
-  const usable = serialRateMin > 0 && serialRateMax >= serialRateMin;
+  const range = declaredRange(model);
   const inRange = (rate: number): boolean =>
-    !usable || (rate >= serialRateMin && rate <= serialRateMax);
+    range === undefined || (rate >= range.min && rate <= range.max);
 
-  return [...new Set([serialRateMax, ...BAUD_RATE_LADDER.filter(inRange)])]
+  return [...new Set([model.serialRateMax, ...BAUD_RATE_LADDER.filter(inRange)])]
     .filter((rate) => Number.isInteger(rate) && rate > 0)
     .sort((left, right) => right - left);
 }
@@ -1001,15 +997,11 @@ function assertBaudRate(baudRate: number, model: RigModel): void {
     });
   }
 
-  /* Some backends leave the advertised range open; only enforce a range that
-   * is actually usable. */
-  if (
-    model.serialRateMin > 0
-    && model.serialRateMax >= model.serialRateMin
-    && (baudRate < model.serialRateMin || baudRate > model.serialRateMax)
-  ) {
+  const range = declaredRange(model);
+
+  if (range !== undefined && (baudRate < range.min || baudRate > range.max)) {
     throw new HamlibError(
-      `baudRate ${baudRate} is outside the ${model.serialRateMin}-${model.serialRateMax} `
+      `baudRate ${baudRate} is outside the ${range.min}-${range.max} `
       + `range supported by ${model.manufacturer} ${model.model}`,
       { code: 'INVALID_ARGUMENT', operation: 'open' },
     );
@@ -1063,21 +1055,7 @@ function classifyModel(
  * catalogue entry carries that capability itself.
  */
 function collectCapabilities(model: NativeModel, native: NativeModule): ReadonlySet<string> {
-  const capabilities = new Set<string>();
-  const list = native.capabilities(model.id);
-
-  try {
-    for (let index = 0; index < list.size(); index++) {
-      const name = list.get(index);
-
-      if (name !== undefined) {
-        capabilities.add(String(name));
-      }
-    }
-  } finally {
-    /* The Embind vector owns Wasm memory; Array.from would leak it. */
-    list.delete();
-  }
+  const capabilities = new Set(drainVector(native.capabilities(model.id), String));
 
   for (const [operation, flag] of FLAG_GATED_OPERATIONS) {
     if (model[flag]) {
@@ -1092,58 +1070,41 @@ function collectCapabilities(model: NativeModel, native: NativeModule): Readonly
   return capabilities;
 }
 
-function collectModels(list: NativeModelList, native: NativeModule): RigModel[] {
-  const models: RigModel[] = [];
+function describeModel(model: NativeModel, native: NativeModule): RigModel {
+  const manufacturer = String(model.manufacturer);
+  const name = String(model.model);
+  const settings = {
+    serialDataBits: model.serialDataBits,
+    serialStopBits: model.serialStopBits,
+    serialParity: toParity(model.serialParity),
+    serialHandshake: toHandshake(model.serialHandshake),
+  };
+  const { support, limitation } = classifyModel(manufacturer, name, settings);
+  const capabilities = collectCapabilities(model, native);
+  const operations = operationCapabilities((operation) => capabilities.has(operation));
 
-  try {
-    for (let index = 0; index < list.size(); index++) {
-      const model: NativeModel | undefined = list.get(index);
-
-      if (!model) {
-        continue;
-      }
-
-      const manufacturer = String(model.manufacturer);
-      const name = String(model.model);
-      const settings = {
-        serialDataBits: model.serialDataBits,
-        serialStopBits: model.serialStopBits,
-        serialParity: toParity(model.serialParity),
-        serialHandshake: toHandshake(model.serialHandshake),
-      };
-      const { support, limitation } = classifyModel(manufacturer, name, settings);
-      const capabilities = collectCapabilities(model, native);
-      const operations = operationCapabilities((operation) => capabilities.has(operation));
-
-      models.push({
-        id: model.id,
-        manufacturer,
-        model: name,
-        backendVersion: String(model.backendVersion),
-        status: model.status,
-        serialRateMin: model.serialRateMin,
-        serialRateMax: model.serialRateMax,
-        serialDataBits: settings.serialDataBits,
-        serialStopBits: settings.serialStopBits,
-        serialParity: settings.serialParity,
-        serialHandshake: settings.serialHandshake,
-        support,
-        ...(limitation === undefined ? {} : { limitation }),
-        capabilities,
-        canGetFrequency: operations.getFrequency,
-        canSetFrequency: operations.setFrequency,
-        canGetMode: operations.getMode,
-        canSetMode: operations.setMode,
-        canGetPtt: operations.getPtt,
-        canSetPtt: operations.setPtt,
-      });
-    }
-  } finally {
-    /* The Embind vector owns Wasm memory. */
-    list.delete();
-  }
-
-  return models;
+  return {
+    id: model.id,
+    manufacturer,
+    model: name,
+    backendVersion: String(model.backendVersion),
+    status: model.status,
+    serialRateMin: model.serialRateMin,
+    serialRateMax: model.serialRateMax,
+    serialDataBits: settings.serialDataBits,
+    serialStopBits: settings.serialStopBits,
+    serialParity: settings.serialParity,
+    serialHandshake: settings.serialHandshake,
+    support,
+    ...(limitation === undefined ? {} : { limitation }),
+    capabilities,
+    canGetFrequency: operations.getFrequency,
+    canSetFrequency: operations.setFrequency,
+    canGetMode: operations.getMode,
+    canSetMode: operations.setMode,
+    canGetPtt: operations.getPtt,
+    canSetPtt: operations.setPtt,
+  };
 }
 
 class RawHamlibInstance implements RawHamlib, RigContext {
@@ -1230,7 +1191,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       throw hamlibError(debug, 'initialize');
     }
 
-    const models = collectModels(await native.listModels(), native);
+    const models = drainVector(await native.listModels(), (model) => describeModel(model, native));
 
     return new RawHamlibInstance(
       native,
