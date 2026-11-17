@@ -26,6 +26,7 @@ import {
   DIST_DIR,
   DIST_MODULE_WASM,
   FINISH_MODULE_SCRIPT,
+  LIBRARY_JS,
   PACKAGE_DIR,
   PACKAGE_JSON,
   PACKAGE_REBUILDING,
@@ -40,9 +41,14 @@ export interface PackageManifestEntry {
   readonly kind: 'file' | 'directory';
 }
 
+type ExportTarget = string | { readonly [condition: string]: ExportTarget };
+
 interface PackageJson {
   readonly files?: readonly string[];
+  readonly exports?: { readonly [subpath: string]: ExportTarget };
 }
+
+const PACKAGE_MANIFEST = readJson<PackageJson>(PACKAGE_JSON);
 
 /** Path of a package file, relative to the package root, as npm sees it. */
 function packageRelative(file: string): string {
@@ -55,9 +61,7 @@ function packageRelative(file: string): string {
  * classified by its extension so `dist` is still a directory.
  */
 function readPackageFiles(): readonly PackageManifestEntry[] {
-  const manifest = readJson<PackageJson>(PACKAGE_JSON);
-
-  return (manifest.files ?? []).map((relative) => {
+  return (PACKAGE_MANIFEST.files ?? []).map((relative) => {
     const absolute = path.join(PACKAGE_DIR, relative);
     const kind: PackageManifestEntry['kind'] = existsSync(absolute)
       ? (statSync(absolute).isDirectory() ? 'directory' : 'file')
@@ -70,21 +74,29 @@ function readPackageFiles(): readonly PackageManifestEntry[] {
 /** The authority for npm package contents, read from `package.json`. */
 export const PACKAGE_JSON_FILES: readonly PackageManifestEntry[] = readPackageFiles();
 
+/** Every concrete file an `exports` target names; wildcard targets are skipped. */
+function exportTargets(target: ExportTarget): readonly string[] {
+  if (typeof target === 'string') {
+    return target.includes('*') ? [] : [path.posix.normalize(target)];
+  }
+
+  return Object.values(target).flatMap(exportTargets);
+}
+
 /**
- * Files the package build itself must emit.  `package.ts` asserts these after
- * tsc and the native build; `verify-package.ts` asserts they reached the
- * tarball.  Keep this list relative to the package root.
+ * Files the package build must emit: every file `package.json` `exports`
+ * names, plus the Emscripten outputs no export names.  `package.ts` asserts
+ * these after tsc and the native build; `verify-package.ts` asserts they
+ * reached the tarball.  Relative to the package root.
  */
 export const GENERATED_OUTPUTS: readonly string[] = [
-  'dist/index.js',
-  'dist/index.d.ts',
-  'dist/raw.js',
-  'dist/raw.d.ts',
-  'dist/node.js',
-  'dist/node.d.ts',
-  packageRelative(DIST_MODULE_JS),
-  packageRelative(DIST_MODULE_WASM),
-  packageRelative(DIST_MODULE_TSD),
+  ...new Set([
+    ...Object.values(PACKAGE_MANIFEST.exports ?? {}).flatMap(exportTargets),
+    packageRelative(DIST_MODULE_JS),
+    packageRelative(DIST_MODULE_WASM),
+    packageRelative(DIST_MODULE_TSD),
+    packageRelative(LIBRARY_JS),
+  ]),
 ];
 
 /** Absolute paths of `GENERATED_OUTPUTS`, for the build's existence checks. */
@@ -177,9 +189,6 @@ export function requiredPackageFiles(
 
   for (const relative of [
     ...GENERATED_OUTPUTS,
-    /* The compiled Emscripten JS library is required in the tarball, but the
-     * package build does not emit it (the native build does). */
-    'dist/native/library/web_serial.js',
     ...LICENSE_FILES,
     ...thirdPartyFiles(upstream),
   ]) {
