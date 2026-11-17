@@ -55,6 +55,30 @@ struct BoolResult
     std::string error;
 };
 
+struct ExtLookupResult
+{
+    int code;
+    double token;
+    std::string name;
+    std::string label;
+    std::string tooltip;
+    std::string dflt;
+    double type;
+    std::string error;
+};
+
+struct ExtLookupTokResult
+{
+    int code;
+    double token;
+    std::string name;
+    std::string label;
+    std::string tooltip;
+    std::string dflt;
+    double type;
+    std::string error;
+};
+
 struct GetAntResult
 {
     int code;
@@ -152,6 +176,15 @@ struct GetVfoInfoResult
     double width;
     bool split;
     double satmode;
+    std::string error;
+};
+
+struct LookupMemCapsResult
+{
+    int code;
+    double startc;
+    double endc;
+    double type;
     std::string error;
 };
 

@@ -21,6 +21,7 @@
  * file must stay erasable (no enums, namespaces or parameter properties).
  */
 import type { AstFunction } from './ast.ts';
+import { camelCase, pascalCase } from './naming.ts';
 import type { ProjectionResolver } from './project.ts';
 import {
   bindType,
@@ -81,15 +82,35 @@ export interface Rejection {
 
 /**
  * A naming override for a generated operation.  The generator's names are
- * mechanical (`rig_valueagclevel` -> `valueagclevel`, `tx_freq` stays snake),
- * so a public name or field that reads badly is fixed here rather than by
- * hand-writing the operation.
+ * mechanical camelCase (`rig_idx2setting` -> `idx2setting`, `tx_freq` ->
+ * `txFreq`), so a public name or field that still reads badly is renamed here
+ * rather than by hand-writing the operation.
  */
 export interface OperationOverride {
   /** Replaces the camelCase method name. */
   readonly method?: string;
   /** Renames argument/output fields, keyed by the generated field name. */
   readonly fields?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Why an override does not apply to `operation`, or `null` when every part of
+ * it renames something the generator emits differently.
+ */
+function overrideProblem(operation: GeneratedOperation, override: OperationOverride): string | null {
+  if (override.method === operation.method) {
+    return `method ${override.method} is already the generated name`;
+  }
+
+  const fields = new Set([...operation.arguments, ...operation.outputs].map((value) => value.field));
+
+  for (const field of Object.keys(override.fields ?? {})) {
+    if (!fields.has(field)) {
+      return `has no field ${field} (fields: ${[...fields].join(', ') || 'none'})`;
+    }
+  }
+
+  return null;
 }
 
 function applyOverride(
@@ -116,6 +137,8 @@ function applyOverride(
 export interface Classification {
   readonly operations: readonly GeneratedOperation[];
   readonly rejections: readonly Rejection[];
+  /** Overrides that name nothing generated, or rename nothing; generation fails on any. */
+  readonly staleOverrides: readonly string[];
 }
 
 /**
@@ -314,17 +337,7 @@ function flagOverride(symbol: string, parameter: string, binding: TypeBinding): 
 
 /** `rig_get_rptr_offs` -> `getRptrOffs`; `rig_scan` -> `scan`. */
 function methodName(symbol: string): string {
-  const stem = symbol.startsWith('rig_') ? symbol.slice(4) : symbol;
-  const words = stem.split('_').filter((word) => word.length > 0);
-
-  return words
-    .map((word, index) => (index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)))
-    .join('');
-}
-
-/** `getSplitMode` -> `GetSplitMode`. */
-export function pascalCase(method: string): string {
-  return method.charAt(0).toUpperCase() + method.slice(1);
+  return camelCase(symbol.startsWith('rig_') ? symbol.slice(4) : symbol);
 }
 
 /**
@@ -383,10 +396,10 @@ function flatResultFor(binding: TypeBinding): FlatResult {
   }
 }
 
-/** A stable, non-empty result field name for a getter output. */
+/** A stable, non-empty field name for a C parameter: `tx_freq` -> `txFreq`. */
 function fieldName(name: string, index: number): string {
   const trimmed = name.trim();
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed) ? trimmed : `value${index}`;
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed) ? camelCase(trimmed) : `value${index}`;
 }
 
 /**
@@ -559,7 +572,7 @@ export function classifyFunction(
       shape: 'pure',
       arguments: args,
       outputs: [],
-      result: '',
+      result: pure.category === 'struct' ? `${pascalCase(methodName(symbol))}Result` : flatResultFor(pure),
       pure,
       plan,
     };
@@ -759,6 +772,7 @@ export function classifyAll(
 ): Classification {
   const operations: GeneratedOperation[] = [];
   const rejections: Rejection[] = [];
+  const staleOverrides: string[] = [];
   const methods = new Set<string>();
 
   for (const [symbol, declarations] of functions) {
@@ -780,7 +794,14 @@ export function classifyAll(
       continue;
     }
 
-    const operation = applyOverride(outcome, overrides[symbol]);
+    const override = overrides[symbol];
+    const problem = override === undefined ? null : overrideProblem(outcome, override);
+
+    if (problem !== null) {
+      staleOverrides.push(`${symbol}: ${problem}`);
+    }
+
+    const operation = applyOverride(outcome, override);
 
     if (methods.has(operation.method)) {
       rejections.push({ symbol, reason: `method name ${operation.method} already generated` });
@@ -791,5 +812,14 @@ export function classifyAll(
     operations.push(operation);
   }
 
-  return { operations, rejections };
+  const generated = new Set(operations.map((operation) => operation.symbol));
+
+  for (const symbol of Object.keys(overrides)) {
+    if (!generated.has(symbol)) {
+      const refused = rejections.find((rejection) => rejection.symbol === symbol);
+      staleOverrides.push(`${symbol}: not generated${refused ? ` (${refused.reason})` : ''}`);
+    }
+  }
+
+  return { operations, rejections, staleOverrides };
 }

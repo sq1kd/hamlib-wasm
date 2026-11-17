@@ -3,1701 +3,1543 @@
 
     CodeResult setFrequency(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            freq_t value0 = static_cast<freq_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_freq(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        freq_t value0 = static_cast<freq_t>(arg0);
-        int rc = rig_set_freq(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getFrequency(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            freq_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_freq(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        freq_t out0{};
-
-        int rc = rig_get_freq(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setMode(int handle, const std::string & arg0, double arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            rmode_t value0 = rig_parse_mode(arg0.c_str());
+            if (value0 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            pbwidth_t value1 = static_cast<pbwidth_t>(arg1);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_mode(rig, RIG_VFO_CURR, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        rmode_t value0 = rig_parse_mode(arg0.c_str());
-
-        if (value0 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        pbwidth_t value1 = static_cast<pbwidth_t>(arg1);
-        int rc = rig_set_mode(rig, RIG_VFO_CURR, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     GetModeResult getMode(int handle)
     {
-        webserial_clear_error();
+        return withRig<GetModeResult>(handle, [&](RIG *rig)
+        {
+            rmode_t out0{};
+            pbwidth_t out1{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_mode(rig, RIG_VFO_CURR, &out0, &out1);
 
-        if (!rig) { return failure<GetModeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<GetModeResult>(rc); }
 
-        rmode_t out0{};
-        pbwidth_t out1{};
-
-        int rc = rig_get_mode(rig, RIG_VFO_CURR, &out0, &out1);
-
-        if (rc != RIG_OK) { return failure<GetModeResult>(rc); }
-
-        GetModeResult result;
-        result.code = RIG_OK;
-        const char *mode_text = rig_strrmode(out0);
-        result.mode = mode_text ? mode_text : "";
-        result.passband = (double) out1;
-        return result;
+            GetModeResult result = ok<GetModeResult>();
+            result.mode = textOrEmpty(rig_strrmode(out0));
+            result.passband = (double) out1;
+            return result;
+        });
     }
 
     CodeResult setVfo(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            vfo_t value0 = rig_parse_vfo(arg0.c_str());
+            if (value0 == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_vfo(rig, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        vfo_t value0 = rig_parse_vfo(arg0.c_str());
-
-        if (value0 == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int rc = rig_set_vfo(rig, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     TextResult getVfo(int handle)
     {
-        webserial_clear_error();
+        return withRig<TextResult>(handle, [&](RIG *rig)
+        {
+            vfo_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_vfo(rig, &out0);
 
-        if (!rig) { return failure<TextResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<TextResult>(rc); }
 
-        vfo_t out0{};
-
-        int rc = rig_get_vfo(rig, &out0);
-
-        if (rc != RIG_OK) { return failure<TextResult>(rc); }
-
-        TextResult result;
-        result.code = RIG_OK;
-        const char *value_text = rig_strvfo(out0);
-        result.value = value_text ? value_text : "";
-        return result;
+            TextResult result = ok<TextResult>();
+            result.value = textOrEmpty(rig_strvfo(out0));
+            return result;
+        });
     }
 
     GetVfoInfoResult getVfoInfo(int handle)
     {
-        webserial_clear_error();
+        return withRig<GetVfoInfoResult>(handle, [&](RIG *rig)
+        {
+            freq_t out0{};
+            rmode_t out1{};
+            pbwidth_t out2{};
+            split_t out3{};
+            int out4{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_vfo_info(rig, RIG_VFO_CURR, &out0, &out1, &out2, &out3, &out4);
 
-        if (!rig) { return failure<GetVfoInfoResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<GetVfoInfoResult>(rc); }
 
-        freq_t out0{};
-        rmode_t out1{};
-        pbwidth_t out2{};
-        split_t out3{};
-        int out4{};
-
-        int rc = rig_get_vfo_info(rig, RIG_VFO_CURR, &out0, &out1, &out2, &out3, &out4);
-
-        if (rc != RIG_OK) { return failure<GetVfoInfoResult>(rc); }
-
-        GetVfoInfoResult result;
-        result.code = RIG_OK;
-        result.freq = (double) out0;
-        const char *mode_text = rig_strrmode(out1);
-        result.mode = mode_text ? mode_text : "";
-        result.width = (double) out2;
-        result.split = out3 != RIG_SPLIT_OFF;
-        result.satmode = (double) out4;
-        return result;
+            GetVfoInfoResult result = ok<GetVfoInfoResult>();
+            result.freq = (double) out0;
+            result.mode = textOrEmpty(rig_strrmode(out1));
+            result.width = (double) out2;
+            result.split = out3 != RIG_SPLIT_OFF;
+            result.satmode = (double) out4;
+            return result;
+        });
     }
 
     BoolResult getDcd(int handle)
     {
-        webserial_clear_error();
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            dcd_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_dcd(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<BoolResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<BoolResult>(rc); }
 
-        dcd_t out0{};
-
-        int rc = rig_get_dcd(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<BoolResult>(rc); }
-
-        BoolResult result;
-        result.code = RIG_OK;
-        result.value = out0 != RIG_DCD_OFF;
-        return result;
+            BoolResult result = ok<BoolResult>();
+            result.value = out0 != RIG_DCD_OFF;
+            return result;
+        });
     }
 
     CodeResult setRptrShift(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            rptr_shift_t value0 = rig_parse_rptr_shift(arg0.c_str());
+            if (value0 == RIG_RPT_SHIFT_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_rptr_shift(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        rptr_shift_t value0 = rig_parse_rptr_shift(arg0.c_str());
-
-        if (value0 == RIG_RPT_SHIFT_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int rc = rig_set_rptr_shift(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     TextResult getRptrShift(int handle)
     {
-        webserial_clear_error();
+        return withRig<TextResult>(handle, [&](RIG *rig)
+        {
+            rptr_shift_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_rptr_shift(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<TextResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<TextResult>(rc); }
 
-        rptr_shift_t out0{};
-
-        int rc = rig_get_rptr_shift(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<TextResult>(rc); }
-
-        TextResult result;
-        result.code = RIG_OK;
-        const char *value_text = rig_strptrshift(out0);
-        result.value = value_text ? value_text : "";
-        return result;
+            TextResult result = ok<TextResult>();
+            result.value = textOrEmpty(rig_strptrshift(out0));
+            return result;
+        });
     }
 
     CodeResult setRptrOffs(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_rptr_offs(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
-        int rc = rig_set_rptr_offs(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getRptrOffs(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            shortfreq_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_rptr_offs(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        shortfreq_t out0{};
-
-        int rc = rig_get_rptr_offs(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setCtcssTone(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            tone_t value0 = static_cast<tone_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_ctcss_tone(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        tone_t value0 = static_cast<tone_t>(arg0);
-        int rc = rig_set_ctcss_tone(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getCtcssTone(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            tone_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_ctcss_tone(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        tone_t out0{};
-
-        int rc = rig_get_ctcss_tone(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setDcsCode(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            tone_t value0 = static_cast<tone_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_dcs_code(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        tone_t value0 = static_cast<tone_t>(arg0);
-        int rc = rig_set_dcs_code(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getDcsCode(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            tone_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_dcs_code(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        tone_t out0{};
-
-        int rc = rig_get_dcs_code(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setCtcssSql(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            tone_t value0 = static_cast<tone_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_ctcss_sql(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        tone_t value0 = static_cast<tone_t>(arg0);
-        int rc = rig_set_ctcss_sql(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getCtcssSql(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            tone_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_ctcss_sql(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        tone_t out0{};
-
-        int rc = rig_get_ctcss_sql(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setDcsSql(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            tone_t value0 = static_cast<tone_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_dcs_sql(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        tone_t value0 = static_cast<tone_t>(arg0);
-        int rc = rig_set_dcs_sql(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getDcsSql(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            tone_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_dcs_sql(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        tone_t out0{};
-
-        int rc = rig_get_dcs_sql(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setSplitFreq(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            freq_t value0 = static_cast<freq_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_split_freq(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        freq_t value0 = static_cast<freq_t>(arg0);
-        int rc = rig_set_split_freq(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getSplitFreq(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            freq_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_split_freq(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        freq_t out0{};
-
-        int rc = rig_get_split_freq(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setSplitMode(int handle, const std::string & arg0, double arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            rmode_t value0 = rig_parse_mode(arg0.c_str());
+            if (value0 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            pbwidth_t value1 = static_cast<pbwidth_t>(arg1);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_split_mode(rig, RIG_VFO_CURR, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        rmode_t value0 = rig_parse_mode(arg0.c_str());
-
-        if (value0 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        pbwidth_t value1 = static_cast<pbwidth_t>(arg1);
-        int rc = rig_set_split_mode(rig, RIG_VFO_CURR, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     GetSplitModeResult getSplitMode(int handle)
     {
-        webserial_clear_error();
+        return withRig<GetSplitModeResult>(handle, [&](RIG *rig)
+        {
+            rmode_t out0{};
+            pbwidth_t out1{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_split_mode(rig, RIG_VFO_CURR, &out0, &out1);
 
-        if (!rig) { return failure<GetSplitModeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<GetSplitModeResult>(rc); }
 
-        rmode_t out0{};
-        pbwidth_t out1{};
-
-        int rc = rig_get_split_mode(rig, RIG_VFO_CURR, &out0, &out1);
-
-        if (rc != RIG_OK) { return failure<GetSplitModeResult>(rc); }
-
-        GetSplitModeResult result;
-        result.code = RIG_OK;
-        const char *txMode_text = rig_strrmode(out0);
-        result.txMode = txMode_text ? txMode_text : "";
-        result.txWidth = (double) out1;
-        return result;
+            GetSplitModeResult result = ok<GetSplitModeResult>();
+            result.txMode = textOrEmpty(rig_strrmode(out0));
+            result.txWidth = (double) out1;
+            return result;
+        });
     }
 
     CodeResult setSplitFreqMode(int handle, double arg0, const std::string & arg1, double arg2)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            freq_t value0 = static_cast<freq_t>(arg0);
+            rmode_t value1 = rig_parse_mode(arg1.c_str());
+            if (value1 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            pbwidth_t value2 = static_cast<pbwidth_t>(arg2);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_split_freq_mode(rig, RIG_VFO_CURR, value0, value1, value2);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        freq_t value0 = static_cast<freq_t>(arg0);
-        rmode_t value1 = rig_parse_mode(arg1.c_str());
-
-        if (value1 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        pbwidth_t value2 = static_cast<pbwidth_t>(arg2);
-        int rc = rig_set_split_freq_mode(rig, RIG_VFO_CURR, value0, value1, value2);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     GetSplitFreqModeResult getSplitFreqMode(int handle)
     {
-        webserial_clear_error();
+        return withRig<GetSplitFreqModeResult>(handle, [&](RIG *rig)
+        {
+            freq_t out0{};
+            rmode_t out1{};
+            pbwidth_t out2{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_split_freq_mode(rig, RIG_VFO_CURR, &out0, &out1, &out2);
 
-        if (!rig) { return failure<GetSplitFreqModeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<GetSplitFreqModeResult>(rc); }
 
-        freq_t out0{};
-        rmode_t out1{};
-        pbwidth_t out2{};
-
-        int rc = rig_get_split_freq_mode(rig, RIG_VFO_CURR, &out0, &out1, &out2);
-
-        if (rc != RIG_OK) { return failure<GetSplitFreqModeResult>(rc); }
-
-        GetSplitFreqModeResult result;
-        result.code = RIG_OK;
-        result.txFreq = (double) out0;
-        const char *txMode_text = rig_strrmode(out1);
-        result.txMode = txMode_text ? txMode_text : "";
-        result.txWidth = (double) out2;
-        return result;
+            GetSplitFreqModeResult result = ok<GetSplitFreqModeResult>();
+            result.txFreq = (double) out0;
+            result.txMode = textOrEmpty(rig_strrmode(out1));
+            result.txWidth = (double) out2;
+            return result;
+        });
     }
 
     CodeResult setSplitVfo(int handle, bool arg0, const std::string & arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            split_t value0 = arg0 ? RIG_SPLIT_ON : RIG_SPLIT_OFF;
+            vfo_t value1 = rig_parse_vfo(arg1.c_str());
+            if (value1 == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_split_vfo(rig, RIG_VFO_CURR, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        split_t value0 = arg0 ? RIG_SPLIT_ON : RIG_SPLIT_OFF;
-        vfo_t value1 = rig_parse_vfo(arg1.c_str());
-
-        if (value1 == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int rc = rig_set_split_vfo(rig, RIG_VFO_CURR, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     GetSplitVfoResult getSplitVfo(int handle)
     {
-        webserial_clear_error();
+        return withRig<GetSplitVfoResult>(handle, [&](RIG *rig)
+        {
+            split_t out0{};
+            vfo_t out1{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_split_vfo(rig, RIG_VFO_CURR, &out0, &out1);
 
-        if (!rig) { return failure<GetSplitVfoResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<GetSplitVfoResult>(rc); }
 
-        split_t out0{};
-        vfo_t out1{};
-
-        int rc = rig_get_split_vfo(rig, RIG_VFO_CURR, &out0, &out1);
-
-        if (rc != RIG_OK) { return failure<GetSplitVfoResult>(rc); }
-
-        GetSplitVfoResult result;
-        result.code = RIG_OK;
-        result.split = out0 != RIG_SPLIT_OFF;
-        const char *txVfo_text = rig_strvfo(out1);
-        result.txVfo = txVfo_text ? txVfo_text : "";
-        return result;
+            GetSplitVfoResult result = ok<GetSplitVfoResult>();
+            result.split = out0 != RIG_SPLIT_OFF;
+            result.txVfo = textOrEmpty(rig_strvfo(out1));
+            return result;
+        });
     }
 
     CodeResult setRit(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_rit(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
-        int rc = rig_set_rit(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getRit(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            shortfreq_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_rit(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        shortfreq_t out0{};
-
-        int rc = rig_get_rit(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setXit(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_xit(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
-        int rc = rig_set_xit(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getXit(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            shortfreq_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_xit(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        shortfreq_t out0{};
-
-        int rc = rig_get_xit(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setTs(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_ts(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        shortfreq_t value0 = static_cast<shortfreq_t>(arg0);
-        int rc = rig_set_ts(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getTs(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            shortfreq_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_ts(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        shortfreq_t out0{};
-
-        int rc = rig_get_ts(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     NumberResult powerToMilliwatts(int handle, double arg0, double arg1, const std::string & arg2)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            float value0 = static_cast<float>(arg0);
+            freq_t value1 = static_cast<freq_t>(arg1);
+            rmode_t value2 = rig_parse_mode(arg2.c_str());
+            if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            unsigned int out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_power2mW(rig, &out0, value0, value1, value2);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        float value0 = static_cast<float>(arg0);
-        freq_t value1 = static_cast<freq_t>(arg1);
-        rmode_t value2 = rig_parse_mode(arg2.c_str());
-
-        if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
-
-        unsigned int out0{};
-
-        int rc = rig_power2mW(rig, &out0, value0, value1, value2);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     NumberResult milliwattsToPower(int handle, double arg0, double arg1, const std::string & arg2)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            unsigned int value0 = static_cast<unsigned int>(arg0);
+            freq_t value1 = static_cast<freq_t>(arg1);
+            rmode_t value2 = rig_parse_mode(arg2.c_str());
+            if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            float out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_mW2power(rig, &out0, value0, value1, value2);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        unsigned int value0 = static_cast<unsigned int>(arg0);
-        freq_t value1 = static_cast<freq_t>(arg1);
-        rmode_t value2 = rig_parse_mode(arg2.c_str());
-
-        if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
-
-        float out0{};
-
-        int rc = rig_mW2power(rig, &out0, value0, value1, value2);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setLevel(int handle, const std::string & arg0, double arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_level(arg0.c_str());
+            if (value0 == RIG_LEVEL_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            value_t value1{};
+            if (RIG_LEVEL_IS_FLOAT(value0)) { value1.f = (float) arg1; } else { value1.i = (int) arg1; }
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_level(rig, RIG_VFO_CURR, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        setting_t value0 = rig_parse_level(arg0.c_str());
-
-        if (value0 == RIG_LEVEL_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        value_t value1{};
-        if (RIG_LEVEL_IS_FLOAT(value0)) { value1.f = (float) arg1; } else { value1.i = (int) arg1; }
-        int rc = rig_set_level(rig, RIG_VFO_CURR, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getLevel(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_level(arg0.c_str());
+            if (value0 == RIG_LEVEL_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            value_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_level(rig, RIG_VFO_CURR, value0, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        setting_t value0 = rig_parse_level(arg0.c_str());
-
-        if (value0 == RIG_LEVEL_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
-
-        value_t out0{};
-
-        int rc = rig_get_level(rig, RIG_VFO_CURR, value0, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = RIG_LEVEL_IS_FLOAT(value0) ? (double) out0.f : (double) out0.i;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = RIG_LEVEL_IS_FLOAT(value0) ? (double) out0.f : (double) out0.i;
+            return result;
+        });
     }
 
     CodeResult setParm(int handle, const std::string & arg0, double arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_parm(arg0.c_str());
+            if (value0 == RIG_PARM_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            value_t value1{};
+            if (RIG_PARM_IS_FLOAT(value0)) { value1.f = (float) arg1; } else { value1.i = (int) arg1; }
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_parm(rig, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        setting_t value0 = rig_parse_parm(arg0.c_str());
-
-        if (value0 == RIG_PARM_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        value_t value1{};
-        if (RIG_PARM_IS_FLOAT(value0)) { value1.f = (float) arg1; } else { value1.i = (int) arg1; }
-        int rc = rig_set_parm(rig, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getParm(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_parm(arg0.c_str());
+            if (value0 == RIG_PARM_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            value_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_parm(rig, value0, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        setting_t value0 = rig_parse_parm(arg0.c_str());
-
-        if (value0 == RIG_PARM_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
-
-        value_t out0{};
-
-        int rc = rig_get_parm(rig, value0, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = RIG_PARM_IS_FLOAT(value0) ? (double) out0.f : (double) out0.i;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = RIG_PARM_IS_FLOAT(value0) ? (double) out0.f : (double) out0.i;
+            return result;
+        });
     }
 
     CodeResult setPowerstat(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            powerstat_t value0 = parsePowerStatus(arg0.c_str());
+            if (value0 == (powerstat_t) -1) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_powerstat(rig, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        powerstat_t value0 = parsePowerStatus(arg0.c_str());
-
-        if (value0 == (powerstat_t) -1) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int rc = rig_set_powerstat(rig, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     TextResult getPowerstat(int handle)
     {
-        webserial_clear_error();
+        return withRig<TextResult>(handle, [&](RIG *rig)
+        {
+            powerstat_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_powerstat(rig, &out0);
 
-        if (!rig) { return failure<TextResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<TextResult>(rc); }
 
-        powerstat_t out0{};
-
-        int rc = rig_get_powerstat(rig, &out0);
-
-        if (rc != RIG_OK) { return failure<TextResult>(rc); }
-
-        TextResult result;
-        result.code = RIG_OK;
-        const char *value_text = strPowerStatus(out0);
-        result.value = value_text ? value_text : "";
-        return result;
+            TextResult result = ok<TextResult>();
+            if (const char *text = strPowerStatus(out0)) { result.value = text; }
+            else { return failure<TextResult>(-RIG_EPROTO, "rig_get_powerstat returned a powerstat_t Hamlib does not name"); }
+            return result;
+        });
     }
 
     CodeResult reset(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            reset_t value0 = parseResetKind(arg0.c_str());
+            if (value0 == (reset_t) -1) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_reset(rig, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        reset_t value0 = parseResetKind(arg0.c_str());
-
-        if (value0 == (reset_t) -1) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int rc = rig_reset(rig, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     CodeResult setExtFunc(int handle, double arg0, bool arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
+            int value1 = arg1 ? 1 : 0;
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_ext_func(rig, RIG_VFO_CURR, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
-        int value1 = arg1 ? 1 : 0;
-        int rc = rig_set_ext_func(rig, RIG_VFO_CURR, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     BoolResult getExtFunc(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
+            int out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_ext_func(rig, RIG_VFO_CURR, value0, &out0);
 
-        if (!rig) { return failure<BoolResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<BoolResult>(rc); }
 
-        hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
-        int out0{};
-
-        int rc = rig_get_ext_func(rig, RIG_VFO_CURR, value0, &out0);
-
-        if (rc != RIG_OK) { return failure<BoolResult>(rc); }
-
-        BoolResult result;
-        result.code = RIG_OK;
-        result.value = out0 != 0;
-        return result;
+            BoolResult result = ok<BoolResult>();
+            result.value = out0 != 0;
+            return result;
+        });
     }
 
-    RigConfparams extLookup(int handle, const std::string & arg0)
+    ExtLookupResult extLookup(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<ExtLookupResult>(handle, [&](RIG *rig)
+        {
+            const char *value0 = arg0.c_str();
 
-        if (!rig) { return {}; }
+            const struct confparams *source = rig_ext_lookup(rig, value0);
+            ExtLookupResult result = ok<ExtLookupResult>();
 
-        const char *value0 = arg0.c_str();
-
-        const struct confparams *source = rig_ext_lookup(rig, value0);
-        RigConfparams result{};
-        if (!source) { return result; }
-        result.token = (double) source->token;
-        result.name = source->name ? std::string(source->name) : std::string();
-        result.label = source->label ? std::string(source->label) : std::string();
-        result.tooltip = source->tooltip ? std::string(source->tooltip) : std::string();
-        result.dflt = source->dflt ? std::string(source->dflt) : std::string();
-        result.type = (double) source->type;
-        return result;
+            if (source)
+            {
+                result.token = (double) source->token;
+                result.name = textOrEmpty(source->name);
+                result.label = textOrEmpty(source->label);
+                result.tooltip = textOrEmpty(source->tooltip);
+                result.dflt = textOrEmpty(source->dflt);
+                result.type = (double) source->type;
+            }
+            return result;
+        });
     }
 
-    RigConfparams extLookupTok(int handle, double arg0)
+    ExtLookupTokResult extLookupTok(int handle, double arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<ExtLookupTokResult>(handle, [&](RIG *rig)
+        {
+            hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
 
-        if (!rig) { return {}; }
+            const struct confparams *source = rig_ext_lookup_tok(rig, value0);
+            ExtLookupTokResult result = ok<ExtLookupTokResult>();
 
-        hamlib_token_t value0 = static_cast<hamlib_token_t>(arg0);
-
-        const struct confparams *source = rig_ext_lookup_tok(rig, value0);
-        RigConfparams result{};
-        if (!source) { return result; }
-        result.token = (double) source->token;
-        result.name = source->name ? std::string(source->name) : std::string();
-        result.label = source->label ? std::string(source->label) : std::string();
-        result.tooltip = source->tooltip ? std::string(source->tooltip) : std::string();
-        result.dflt = source->dflt ? std::string(source->dflt) : std::string();
-        result.type = (double) source->type;
-        return result;
+            if (source)
+            {
+                result.token = (double) source->token;
+                result.name = textOrEmpty(source->name);
+                result.label = textOrEmpty(source->label);
+                result.tooltip = textOrEmpty(source->tooltip);
+                result.dflt = textOrEmpty(source->dflt);
+                result.type = (double) source->type;
+            }
+            return result;
+        });
     }
 
     CodeResult setAnt(int handle, double arg0, double arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            ant_t value0 = static_cast<ant_t>(arg0);
+            value_t value1{};
+            value1.i = (int) arg1;
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_ant(rig, RIG_VFO_CURR, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        ant_t value0 = static_cast<ant_t>(arg0);
-        value_t value1{};
-        value1.i = (int) arg1;
-        int rc = rig_set_ant(rig, RIG_VFO_CURR, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     GetAntResult getAnt(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<GetAntResult>(handle, [&](RIG *rig)
+        {
+            ant_t value0 = static_cast<ant_t>(arg0);
+            value_t out0{};
+            ant_t out1{};
+            ant_t out2{};
+            ant_t out3{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_ant(rig, RIG_VFO_CURR, value0, &out0, &out1, &out2, &out3);
 
-        if (!rig) { return failure<GetAntResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<GetAntResult>(rc); }
 
-        ant_t value0 = static_cast<ant_t>(arg0);
-        value_t out0{};
-        ant_t out1{};
-        ant_t out2{};
-        ant_t out3{};
-
-        int rc = rig_get_ant(rig, RIG_VFO_CURR, value0, &out0, &out1, &out2, &out3);
-
-        if (rc != RIG_OK) { return failure<GetAntResult>(rc); }
-
-        GetAntResult result;
-        result.code = RIG_OK;
-        result.option = (double) out0.i;
-        result.antCurr = (double) out1;
-        result.antTx = (double) out2;
-        result.antRx = (double) out3;
-        return result;
+            GetAntResult result = ok<GetAntResult>();
+            result.option = (double) out0.i;
+            result.antCurr = (double) out1;
+            result.antTx = (double) out2;
+            result.antRx = (double) out3;
+            return result;
+        });
     }
 
-    bool hasGetLevel(int handle, const std::string & arg0)
+    BoolResult hasGetLevel(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_level(arg0.c_str());
+            if (value0 == RIG_LEVEL_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
 
-        if (!rig) { return {}; }
-
-        setting_t value0 = rig_parse_level(arg0.c_str());
-
-        return rig_has_get_level(rig, value0) != 0;
+            const auto returned = rig_has_get_level(rig, value0);
+            BoolResult result = ok<BoolResult>();
+            result.value = returned != 0;
+            return result;
+        });
     }
 
-    bool hasSetLevel(int handle, const std::string & arg0)
+    BoolResult hasSetLevel(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_level(arg0.c_str());
+            if (value0 == RIG_LEVEL_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
 
-        if (!rig) { return {}; }
-
-        setting_t value0 = rig_parse_level(arg0.c_str());
-
-        return rig_has_set_level(rig, value0) != 0;
+            const auto returned = rig_has_set_level(rig, value0);
+            BoolResult result = ok<BoolResult>();
+            result.value = returned != 0;
+            return result;
+        });
     }
 
-    bool hasGetParm(int handle, const std::string & arg0)
+    BoolResult hasGetParm(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_parm(arg0.c_str());
+            if (value0 == RIG_PARM_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
 
-        if (!rig) { return {}; }
-
-        setting_t value0 = rig_parse_parm(arg0.c_str());
-
-        return rig_has_get_parm(rig, value0) != 0;
+            const auto returned = rig_has_get_parm(rig, value0);
+            BoolResult result = ok<BoolResult>();
+            result.value = returned != 0;
+            return result;
+        });
     }
 
-    bool hasSetParm(int handle, const std::string & arg0)
+    BoolResult hasSetParm(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_parm(arg0.c_str());
+            if (value0 == RIG_PARM_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
 
-        if (!rig) { return {}; }
-
-        setting_t value0 = rig_parse_parm(arg0.c_str());
-
-        return rig_has_set_parm(rig, value0) != 0;
+            const auto returned = rig_has_set_parm(rig, value0);
+            BoolResult result = ok<BoolResult>();
+            result.value = returned != 0;
+            return result;
+        });
     }
 
-    bool hasGetFunc(int handle, const std::string & arg0)
+    BoolResult hasGetFunc(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_func(arg0.c_str());
+            if (value0 == RIG_FUNC_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
 
-        if (!rig) { return {}; }
-
-        setting_t value0 = rig_parse_func(arg0.c_str());
-
-        return rig_has_get_func(rig, value0) != 0;
+            const auto returned = rig_has_get_func(rig, value0);
+            BoolResult result = ok<BoolResult>();
+            result.value = returned != 0;
+            return result;
+        });
     }
 
-    bool hasSetFunc(int handle, const std::string & arg0)
+    BoolResult hasSetFunc(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_func(arg0.c_str());
+            if (value0 == RIG_FUNC_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
 
-        if (!rig) { return {}; }
-
-        setting_t value0 = rig_parse_func(arg0.c_str());
-
-        return rig_has_set_func(rig, value0) != 0;
+            const auto returned = rig_has_set_func(rig, value0);
+            BoolResult result = ok<BoolResult>();
+            result.value = returned != 0;
+            return result;
+        });
     }
 
     CodeResult setFunc(int handle, const std::string & arg0, bool arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_func(arg0.c_str());
+            if (value0 == RIG_FUNC_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            int value1 = arg1 ? 1 : 0;
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_func(rig, RIG_VFO_CURR, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        setting_t value0 = rig_parse_func(arg0.c_str());
-
-        if (value0 == RIG_FUNC_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int value1 = arg1 ? 1 : 0;
-        int rc = rig_set_func(rig, RIG_VFO_CURR, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     BoolResult getFunc(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            setting_t value0 = rig_parse_func(arg0.c_str());
+            if (value0 == RIG_FUNC_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
+            int out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_func(rig, RIG_VFO_CURR, value0, &out0);
 
-        if (!rig) { return failure<BoolResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<BoolResult>(rc); }
 
-        setting_t value0 = rig_parse_func(arg0.c_str());
-
-        if (value0 == RIG_FUNC_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
-
-        int out0{};
-
-        int rc = rig_get_func(rig, RIG_VFO_CURR, value0, &out0);
-
-        if (rc != RIG_OK) { return failure<BoolResult>(rc); }
-
-        BoolResult result;
-        result.code = RIG_OK;
-        result.value = out0 != 0;
-        return result;
+            BoolResult result = ok<BoolResult>();
+            result.value = out0 != 0;
+            return result;
+        });
     }
 
     CodeResult sendDtmf(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            const char *value0 = arg0.c_str();
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_send_dtmf(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        const char *value0 = arg0.c_str();
-        int rc = rig_send_dtmf(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     CodeResult sendVoiceMem(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            int value0 = static_cast<int>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_send_voice_mem(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        int value0 = static_cast<int>(arg0);
-        int rc = rig_send_voice_mem(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     CodeResult stopVoiceMem(int handle)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            int rc = rig_stop_voice_mem(rig, RIG_VFO_CURR);
 
-        RIG *rig = lookupRig(handle);
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int rc = rig_stop_voice_mem(rig, RIG_VFO_CURR);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     CodeResult setBank(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            int value0 = static_cast<int>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_bank(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        int value0 = static_cast<int>(arg0);
-        int rc = rig_set_bank(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     CodeResult setMem(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            int value0 = static_cast<int>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_mem(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        int value0 = static_cast<int>(arg0);
-        int rc = rig_set_mem(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getMem(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            int out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_mem(rig, RIG_VFO_CURR, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        int out0{};
-
-        int rc = rig_get_mem(rig, RIG_VFO_CURR, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult vfoOp(int handle, const std::string & arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            vfo_op_t value0 = rig_parse_vfo_op(arg0.c_str());
+            if (value0 == RIG_OP_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_vfo_op(rig, RIG_VFO_CURR, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        vfo_op_t value0 = rig_parse_vfo_op(arg0.c_str());
-
-        if (value0 == RIG_OP_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int rc = rig_vfo_op(rig, RIG_VFO_CURR, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
-    bool hasVfoOp(int handle, const std::string & arg0)
+    BoolResult hasVfoOp(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            vfo_op_t value0 = rig_parse_vfo_op(arg0.c_str());
+            if (value0 == RIG_OP_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
 
-        if (!rig) { return {}; }
-
-        vfo_op_t value0 = rig_parse_vfo_op(arg0.c_str());
-
-        return rig_has_vfo_op(rig, value0) != 0;
+            const auto returned = rig_has_vfo_op(rig, value0);
+            BoolResult result = ok<BoolResult>();
+            result.value = returned != 0;
+            return result;
+        });
     }
 
     CodeResult scan(int handle, const std::string & arg0, double arg1)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            scan_t value0 = rig_parse_scan(arg0.c_str());
+            if (value0 == RIG_SCAN_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            int value1 = static_cast<int>(arg1);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_scan(rig, RIG_VFO_CURR, value0, value1);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        scan_t value0 = rig_parse_scan(arg0.c_str());
-
-        if (value0 == RIG_SCAN_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int value1 = static_cast<int>(arg1);
-        int rc = rig_scan(rig, RIG_VFO_CURR, value0, value1);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
-    bool hasScan(int handle, const std::string & arg0)
+    BoolResult hasScan(int handle, const std::string & arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<BoolResult>(handle, [&](RIG *rig)
+        {
+            scan_t value0 = rig_parse_scan(arg0.c_str());
+            if (value0 == RIG_SCAN_NONE) { return failure<BoolResult>(-RIG_EINVAL); }
 
-        if (!rig) { return {}; }
-
-        scan_t value0 = rig_parse_scan(arg0.c_str());
-
-        return rig_has_scan(rig, value0) != 0;
+            const auto returned = rig_has_scan(rig, value0);
+            BoolResult result = ok<BoolResult>();
+            result.value = returned != 0;
+            return result;
+        });
     }
 
     CodeResult setChannel(int handle, const RigChannel & arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            channel_t value0{};
+            value0.channel_num = static_cast<int>(arg0.channelNum);
+            value0.bank_num = static_cast<int>(arg0.bankNum);
+            value0.vfo = rig_parse_vfo(arg0.vfo.c_str());
+            if (value0.vfo == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            value0.ant = static_cast<ant_t>(arg0.ant);
+            value0.freq = static_cast<freq_t>(arg0.freq);
+            value0.mode = rig_parse_mode(arg0.mode.c_str());
+            if (value0.mode == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            value0.width = static_cast<pbwidth_t>(arg0.width);
+            value0.tx_freq = static_cast<freq_t>(arg0.txFreq);
+            value0.tx_mode = rig_parse_mode(arg0.txMode.c_str());
+            if (value0.tx_mode == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            value0.tx_width = static_cast<pbwidth_t>(arg0.txWidth);
+            value0.split = arg0.split ? RIG_SPLIT_ON : RIG_SPLIT_OFF;
+            value0.tx_vfo = rig_parse_vfo(arg0.txVfo.c_str());
+            if (value0.tx_vfo == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            value0.rptr_shift = rig_parse_rptr_shift(arg0.rptrShift.c_str());
+            if (value0.rptr_shift == RIG_RPT_SHIFT_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            value0.rptr_offs = static_cast<shortfreq_t>(arg0.rptrOffs);
+            value0.tuning_step = static_cast<shortfreq_t>(arg0.tuningStep);
+            value0.rit = static_cast<shortfreq_t>(arg0.rit);
+            value0.xit = static_cast<shortfreq_t>(arg0.xit);
+            value0.funcs = static_cast<setting_t>(arg0.funcs);
+            value0.ctcss_tone = static_cast<tone_t>(arg0.ctcssTone);
+            value0.ctcss_sql = static_cast<tone_t>(arg0.ctcssSql);
+            value0.dcs_code = static_cast<tone_t>(arg0.dcsCode);
+            value0.dcs_sql = static_cast<tone_t>(arg0.dcsSql);
+            value0.scan_group = static_cast<int>(arg0.scanGroup);
+            value0.flags = static_cast<unsigned int>(arg0.flags);
+            std::strncpy(value0.channel_desc, arg0.channelDesc.c_str(), sizeof(value0.channel_desc) - 1);
+            std::strncpy(value0.tag, arg0.tag.c_str(), sizeof(value0.tag) - 1);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_channel(rig, RIG_VFO_CURR, &value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        channel_t value0{};
-        value0.channel_num = (int) arg0.channelNum;
-        value0.bank_num = (int) arg0.bankNum;
-        value0.vfo = rig_parse_vfo(arg0.vfo.c_str());
-        value0.ant = (ant_t) arg0.ant;
-        value0.freq = (freq_t) arg0.freq;
-        value0.mode = rig_parse_mode(arg0.mode.c_str());
-        value0.width = (pbwidth_t) arg0.width;
-        value0.tx_freq = (freq_t) arg0.txFreq;
-        value0.tx_mode = rig_parse_mode(arg0.txMode.c_str());
-        value0.tx_width = (pbwidth_t) arg0.txWidth;
-        value0.split = arg0.split ? RIG_SPLIT_ON : RIG_SPLIT_OFF;
-        value0.tx_vfo = rig_parse_vfo(arg0.txVfo.c_str());
-        value0.rptr_shift = rig_parse_rptr_shift(arg0.rptrShift.c_str());
-        value0.rptr_offs = (shortfreq_t) arg0.rptrOffs;
-        value0.tuning_step = (shortfreq_t) arg0.tuningStep;
-        value0.rit = (shortfreq_t) arg0.rit;
-        value0.xit = (shortfreq_t) arg0.xit;
-        value0.funcs = (setting_t) arg0.funcs;
-        value0.ctcss_tone = (tone_t) arg0.ctcssTone;
-        value0.ctcss_sql = (tone_t) arg0.ctcssSql;
-        value0.dcs_code = (tone_t) arg0.dcsCode;
-        value0.dcs_sql = (tone_t) arg0.dcsSql;
-        value0.scan_group = (int) arg0.scanGroup;
-        value0.flags = (unsigned int) arg0.flags;
-        std::strncpy(value0.channel_desc, arg0.channelDesc.c_str(), sizeof(value0.channel_desc) - 1);
-        std::strncpy(value0.tag, arg0.tag.c_str(), sizeof(value0.tag) - 1);
-
-        int rc = rig_set_channel(rig, RIG_VFO_CURR, &value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     GetChannelResult getChannel(int handle, bool arg0)
     {
-        webserial_clear_error();
+        return withRig<GetChannelResult>(handle, [&](RIG *rig)
+        {
+            int value0 = arg0 ? 1 : 0;
+            channel_t out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_channel(rig, RIG_VFO_CURR, &out0, value0);
 
-        if (!rig) { return failure<GetChannelResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<GetChannelResult>(rc); }
 
-        int value0 = arg0 ? 1 : 0;
-        channel_t out0{};
-
-        int rc = rig_get_channel(rig, RIG_VFO_CURR, &out0, value0);
-
-        if (rc != RIG_OK) { return failure<GetChannelResult>(rc); }
-
-        GetChannelResult result;
-        result.code = RIG_OK;
-        result.channelNum = (double) out0.channel_num;
-        result.bankNum = (double) out0.bank_num;
-        const char *vfo_text = rig_strvfo(out0.vfo);
-        result.vfo = vfo_text ? vfo_text : "";
-        result.ant = (double) out0.ant;
-        result.freq = (double) out0.freq;
-        const char *mode_text = rig_strrmode(out0.mode);
-        result.mode = mode_text ? mode_text : "";
-        result.width = (double) out0.width;
-        result.txFreq = (double) out0.tx_freq;
-        const char *txMode_text = rig_strrmode(out0.tx_mode);
-        result.txMode = txMode_text ? txMode_text : "";
-        result.txWidth = (double) out0.tx_width;
-        result.split = out0.split != RIG_SPLIT_OFF;
-        const char *txVfo_text = rig_strvfo(out0.tx_vfo);
-        result.txVfo = txVfo_text ? txVfo_text : "";
-        const char *rptrShift_text = rig_strptrshift(out0.rptr_shift);
-        result.rptrShift = rptrShift_text ? rptrShift_text : "";
-        result.rptrOffs = (double) out0.rptr_offs;
-        result.tuningStep = (double) out0.tuning_step;
-        result.rit = (double) out0.rit;
-        result.xit = (double) out0.xit;
-        result.funcs = (double) out0.funcs;
-        result.ctcssTone = (double) out0.ctcss_tone;
-        result.ctcssSql = (double) out0.ctcss_sql;
-        result.dcsCode = (double) out0.dcs_code;
-        result.dcsSql = (double) out0.dcs_sql;
-        result.scanGroup = (double) out0.scan_group;
-        result.flags = (double) out0.flags;
-        result.channelDesc = std::string(out0.channel_desc);
-        result.tag = std::string(out0.tag);
-        return result;
+            GetChannelResult result = ok<GetChannelResult>();
+            result.channelNum = (double) out0.channel_num;
+            result.bankNum = (double) out0.bank_num;
+            result.vfo = textOrEmpty(rig_strvfo(out0.vfo));
+            result.ant = (double) out0.ant;
+            result.freq = (double) out0.freq;
+            result.mode = textOrEmpty(rig_strrmode(out0.mode));
+            result.width = (double) out0.width;
+            result.txFreq = (double) out0.tx_freq;
+            result.txMode = textOrEmpty(rig_strrmode(out0.tx_mode));
+            result.txWidth = (double) out0.tx_width;
+            result.split = out0.split != RIG_SPLIT_OFF;
+            result.txVfo = textOrEmpty(rig_strvfo(out0.tx_vfo));
+            result.rptrShift = textOrEmpty(rig_strptrshift(out0.rptr_shift));
+            result.rptrOffs = (double) out0.rptr_offs;
+            result.tuningStep = (double) out0.tuning_step;
+            result.rit = (double) out0.rit;
+            result.xit = (double) out0.xit;
+            result.funcs = (double) out0.funcs;
+            result.ctcssTone = (double) out0.ctcss_tone;
+            result.ctcssSql = (double) out0.ctcss_sql;
+            result.dcsCode = (double) out0.dcs_code;
+            result.dcsSql = (double) out0.dcs_sql;
+            result.scanGroup = (double) out0.scan_group;
+            result.flags = (double) out0.flags;
+            result.channelDesc = std::string(out0.channel_desc);
+            result.tag = std::string(out0.tag);
+            return result;
+        });
     }
 
-    RigChanList lookupMemCaps(int handle, double arg0)
+    LookupMemCapsResult lookupMemCaps(int handle, double arg0)
     {
-        RIG *rig = lookupRig(handle);
+        return withRig<LookupMemCapsResult>(handle, [&](RIG *rig)
+        {
+            int value0 = static_cast<int>(arg0);
 
-        if (!rig) { return {}; }
+            const chan_t *source = rig_lookup_mem_caps(rig, value0);
+            LookupMemCapsResult result = ok<LookupMemCapsResult>();
 
-        int value0 = static_cast<int>(arg0);
-
-        const chan_t *source = rig_lookup_mem_caps(rig, value0);
-        RigChanList result{};
-        if (!source) { return result; }
-        result.startc = (double) source->startc;
-        result.endc = (double) source->endc;
-        result.type = (double) source->type;
-        return result;
+            if (source)
+            {
+                result.startc = (double) source->startc;
+                result.endc = (double) source->endc;
+                result.type = (double) source->type;
+            }
+            return result;
+        });
     }
 
     CodeResult setTwiddle(int handle, double arg0)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            int value0 = static_cast<int>(arg0);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_twiddle(rig, value0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        int value0 = static_cast<int>(arg0);
-        int rc = rig_set_twiddle(rig, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     NumberResult getTwiddle(int handle)
     {
-        webserial_clear_error();
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            int out0{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_twiddle(rig, &out0);
 
-        if (!rig) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<NumberResult>(rc); }
 
-        int out0{};
-
-        int rc = rig_get_twiddle(rig, &out0);
-
-        if (rc != RIG_OK) { return failure<NumberResult>(rc); }
-
-        NumberResult result;
-        result.code = RIG_OK;
-        result.value = (double) out0;
-        return result;
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) out0;
+            return result;
+        });
     }
 
     CodeResult setUplink(int handle, double arg0)
     {
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            int value0 = static_cast<int>(arg0);
+
+            int rc = rig_set_uplink(rig, value0);
+
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
+
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
+    }
+
+    TextResult getInfo(int handle)
+    {
+        return withRig<TextResult>(handle, [&](RIG *rig)
+        {
+            const auto returned = rig_get_info(rig);
+            TextResult result = ok<TextResult>();
+            result.value = textOrEmpty(returned);
+            return result;
+        });
+    }
+
+    NumberResult passbandNormal(int handle, const std::string & arg0)
+    {
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            rmode_t value0 = rig_parse_mode(arg0.c_str());
+            if (value0 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+
+            const auto returned = rig_passband_normal(rig, value0);
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) returned;
+            return result;
+        });
+    }
+
+    NumberResult passbandNarrow(int handle, const std::string & arg0)
+    {
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            rmode_t value0 = rig_parse_mode(arg0.c_str());
+            if (value0 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+
+            const auto returned = rig_passband_narrow(rig, value0);
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) returned;
+            return result;
+        });
+    }
+
+    NumberResult passbandWide(int handle, const std::string & arg0)
+    {
+        return withRig<NumberResult>(handle, [&](RIG *rig)
+        {
+            rmode_t value0 = rig_parse_mode(arg0.c_str());
+            if (value0 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+
+            const auto returned = rig_passband_wide(rig, value0);
+            NumberResult result = ok<NumberResult>();
+            result.value = (double) returned;
+            return result;
+        });
+    }
+
+    NumberResult settingToIdx(double arg0)
+    {
         webserial_clear_error();
 
-        RIG *rig = lookupRig(handle);
+        setting_t value0 = static_cast<setting_t>(arg0);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
-
-        int value0 = static_cast<int>(arg0);
-        int rc = rig_set_uplink(rig, value0);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
+        const auto returned = rig_setting2idx(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
         return result;
     }
 
-    std::string getInfo(int handle)
+    NumberResult idxToSetting(double arg0)
     {
-        RIG *rig = lookupRig(handle);
+        webserial_clear_error();
 
-        if (!rig) { return std::string(); }
-
-
-        const char *text = rig_get_info(rig);
-        return text ? std::string(text) : std::string();
-    }
-
-    double passbandNormal(int handle, const std::string & arg0)
-    {
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return {}; }
-
-        rmode_t value0 = rig_parse_mode(arg0.c_str());
-
-        return (double) rig_passband_normal(rig, value0);
-    }
-
-    double passbandNarrow(int handle, const std::string & arg0)
-    {
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return {}; }
-
-        rmode_t value0 = rig_parse_mode(arg0.c_str());
-
-        return (double) rig_passband_narrow(rig, value0);
-    }
-
-    double passbandWide(int handle, const std::string & arg0)
-    {
-        RIG *rig = lookupRig(handle);
-
-        if (!rig) { return {}; }
-
-        rmode_t value0 = rig_parse_mode(arg0.c_str());
-
-        return (double) rig_passband_wide(rig, value0);
-    }
-
-    double settingToIdx(double arg0)
-    {
-        setting_t value0 = static_cast<setting_t>(arg0);
-
-        return (double) rig_setting2idx(value0);
-    }
-
-    double idxToSetting(double arg0)
-    {
         int value0 = static_cast<int>(arg0);
 
-        return (double) rig_idx2setting(value0);
+        const auto returned = rig_idx2setting(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
-    std::string strRmode(double arg0)
+    TextResult strRmode(double arg0)
     {
+        webserial_clear_error();
+
         rmode_t value0 = static_cast<rmode_t>(arg0);
 
-        const char *text = rig_strrmode(value0);
-        return text ? std::string(text) : std::string();
+        const auto returned = rig_strrmode(value0);
+        TextResult result = ok<TextResult>();
+        result.value = textOrEmpty(returned);
+        return result;
     }
 
-    std::string strVfo(double arg0)
+    TextResult strVfo(double arg0)
     {
+        webserial_clear_error();
+
         vfo_t value0 = static_cast<vfo_t>(arg0);
 
-        const char *text = rig_strvfo(value0);
-        return text ? std::string(text) : std::string();
+        const auto returned = rig_strvfo(value0);
+        TextResult result = ok<TextResult>();
+        result.value = textOrEmpty(returned);
+        return result;
     }
 
-    std::string strLevel(double arg0)
+    TextResult strLevel(double arg0)
     {
+        webserial_clear_error();
+
         setting_t value0 = static_cast<setting_t>(arg0);
 
-        const char *text = rig_strlevel(value0);
-        return text ? std::string(text) : std::string();
+        const auto returned = rig_strlevel(value0);
+        TextResult result = ok<TextResult>();
+        result.value = textOrEmpty(returned);
+        return result;
     }
 
-    std::string strPtrShift(double arg0)
+    TextResult strPtrShift(double arg0)
     {
+        webserial_clear_error();
+
         rptr_shift_t value0 = static_cast<rptr_shift_t>(arg0);
 
-        const char *text = rig_strptrshift(value0);
-        return text ? std::string(text) : std::string();
+        const auto returned = rig_strptrshift(value0);
+        TextResult result = ok<TextResult>();
+        result.value = textOrEmpty(returned);
+        return result;
     }
 
-    std::string strStatus(double arg0)
+    TextResult strStatus(double arg0)
     {
+        webserial_clear_error();
+
         enum rig_status_e value0 = static_cast<enum rig_status_e>(arg0);
 
-        const char *text = rig_strstatus(value0);
-        return text ? std::string(text) : std::string();
+        const auto returned = rig_strstatus(value0);
+        TextResult result = ok<TextResult>();
+        result.value = textOrEmpty(returned);
+        return result;
     }
 
-    double parseMode(const std::string & arg0)
+    NumberResult parseMode(const std::string & arg0)
     {
+        webserial_clear_error();
+
         const char *value0 = arg0.c_str();
 
-        return (double) rig_parse_mode(value0);
+        const auto returned = rig_parse_mode(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
-    double parseVfo(const std::string & arg0)
+    NumberResult parseVfo(const std::string & arg0)
     {
+        webserial_clear_error();
+
         const char *value0 = arg0.c_str();
 
-        return (double) rig_parse_vfo(value0);
+        const auto returned = rig_parse_vfo(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
-    double parseFunc(const std::string & arg0)
+    NumberResult parseFunc(const std::string & arg0)
     {
+        webserial_clear_error();
+
         const char *value0 = arg0.c_str();
 
-        return (double) rig_parse_func(value0);
+        const auto returned = rig_parse_func(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
-    double parseLevel(const std::string & arg0)
+    NumberResult parseLevel(const std::string & arg0)
     {
+        webserial_clear_error();
+
         const char *value0 = arg0.c_str();
 
-        return (double) rig_parse_level(value0);
+        const auto returned = rig_parse_level(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
-    double parseParm(const std::string & arg0)
+    NumberResult parseParm(const std::string & arg0)
     {
+        webserial_clear_error();
+
         const char *value0 = arg0.c_str();
 
-        return (double) rig_parse_parm(value0);
+        const auto returned = rig_parse_parm(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
-    double parseVfoOp(const std::string & arg0)
+    NumberResult parseVfoOp(const std::string & arg0)
     {
+        webserial_clear_error();
+
         const char *value0 = arg0.c_str();
 
-        return (double) rig_parse_vfo_op(value0);
+        const auto returned = rig_parse_vfo_op(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
-    double parseScan(const std::string & arg0)
+    NumberResult parseScan(const std::string & arg0)
     {
+        webserial_clear_error();
+
         const char *value0 = arg0.c_str();
 
-        return (double) rig_parse_scan(value0);
+        const auto returned = rig_parse_scan(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
-    double parseRptrShift(const std::string & arg0)
+    NumberResult parseRptrShift(const std::string & arg0)
     {
+        webserial_clear_error();
+
         const char *value0 = arg0.c_str();
 
-        return (double) rig_parse_rptr_shift(value0);
+        const auto returned = rig_parse_rptr_shift(value0);
+        NumberResult result = ok<NumberResult>();
+        result.value = (double) returned;
+        return result;
     }
 
     CodeResult setClock(int handle, double arg0, double arg1, double arg2, double arg3, double arg4, double arg5, double arg6, double arg7)
     {
-        webserial_clear_error();
+        return withRig<CodeResult>(handle, [&](RIG *rig)
+        {
+            int value0 = static_cast<int>(arg0);
+            int value1 = static_cast<int>(arg1);
+            int value2 = static_cast<int>(arg2);
+            int value3 = static_cast<int>(arg3);
+            int value4 = static_cast<int>(arg4);
+            int value5 = static_cast<int>(arg5);
+            double value6 = static_cast<double>(arg6);
+            int value7 = static_cast<int>(arg7);
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_set_clock(rig, value0, value1, value2, value3, value4, value5, value6, value7);
 
-        if (!rig) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<CodeResult>(rc); }
 
-        int value0 = static_cast<int>(arg0);
-        int value1 = static_cast<int>(arg1);
-        int value2 = static_cast<int>(arg2);
-        int value3 = static_cast<int>(arg3);
-        int value4 = static_cast<int>(arg4);
-        int value5 = static_cast<int>(arg5);
-        double value6 = static_cast<double>(arg6);
-        int value7 = static_cast<int>(arg7);
-        int rc = rig_set_clock(rig, value0, value1, value2, value3, value4, value5, value6, value7);
-
-        if (rc != RIG_OK) { return failure<CodeResult>(rc); }
-
-        CodeResult result;
-        result.code = RIG_OK;
-        return result;
+            CodeResult result = ok<CodeResult>();
+            return result;
+        });
     }
 
     GetClockResult getClock(int handle)
     {
-        webserial_clear_error();
+        return withRig<GetClockResult>(handle, [&](RIG *rig)
+        {
+            int out0{};
+            int out1{};
+            int out2{};
+            int out3{};
+            int out4{};
+            int out5{};
+            double out6{};
+            int out7{};
 
-        RIG *rig = lookupRig(handle);
+            int rc = rig_get_clock(rig, &out0, &out1, &out2, &out3, &out4, &out5, &out6, &out7);
 
-        if (!rig) { return failure<GetClockResult>(-RIG_EINVAL); }
+            if (rc != RIG_OK) { return failure<GetClockResult>(rc); }
 
-        int out0{};
-        int out1{};
-        int out2{};
-        int out3{};
-        int out4{};
-        int out5{};
-        double out6{};
-        int out7{};
-
-        int rc = rig_get_clock(rig, &out0, &out1, &out2, &out3, &out4, &out5, &out6, &out7);
-
-        if (rc != RIG_OK) { return failure<GetClockResult>(rc); }
-
-        GetClockResult result;
-        result.code = RIG_OK;
-        result.year = (double) out0;
-        result.month = (double) out1;
-        result.day = (double) out2;
-        result.hour = (double) out3;
-        result.min = (double) out4;
-        result.sec = (double) out5;
-        result.msec = (double) out6;
-        result.utcOffset = (double) out7;
-        return result;
+            GetClockResult result = ok<GetClockResult>();
+            result.year = (double) out0;
+            result.month = (double) out1;
+            result.day = (double) out2;
+            result.hour = (double) out3;
+            result.min = (double) out4;
+            result.sec = (double) out5;
+            result.msec = (double) out6;
+            result.utcOffset = (double) out7;
+            return result;
+        });
     }
 

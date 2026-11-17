@@ -316,8 +316,10 @@ operations:
       - rig_ext_parm_foreach
 
 # Renames for the mechanically generated surface.  The generated names are
-# derived from the upstream symbols; a public name or field that reads badly is
-# fixed here rather than by hand-writing the operation.
+# the upstream symbols and parameters in camelCase (rig_get_split_freq ->
+# getSplitFreq, tx_freq -> txFreq); a public name that still reads badly is
+# renamed here rather than by hand-writing the operation.  Generation fails on
+# an override that names nothing generated or renames nothing.
 overrides:
   operations:
     rig_power2mW:
@@ -333,113 +335,23 @@ overrides:
     rig_set_freq:
       method: setFrequency
     rig_get_mode:
-      method: getMode
       fields:
         width: passband
-    rig_valueagclevel:
-      method: valueAgcLevel
-    rig_levelagcstr:
-      method: levelAgcStr
-    rig_levelagcvalue:
-      method: levelAgcValue
     rig_idx2setting:
       method: idxToSetting
     rig_setting2idx:
       method: settingToIdx
     rig_strvfo:
       method: strVfo
-    rig_strfunc:
-      method: strFunc
-      fields:
-        value0: func
     rig_strlevel:
       method: strLevel
       fields:
         value0: level
-    rig_strparm:
-      method: strParm
-      fields:
-        value0: parm
-    rig_stragclevel:
-      method: strAgcLevel
     rig_strptrshift:
       method: strPtrShift
       fields:
         value0: shift
-    rig_strvfop:
-      method: strVfoOp
-    rig_strscan:
-      method: strScan
     rig_strrmode:
       method: strRmode
     rig_strstatus:
       method: strStatus
-    rig_strcommstatus:
-      method: strCommStatus
-    rig_strmtype:
-      method: strMType
-    rig_strspectrummode:
-      method: strSpectrumMode
-    rig_parse_mtype:
-      method: parseMType
-    rig_get_split_freq:
-      fields:
-        tx_freq: txFreq
-    rig_set_split_freq:
-      fields:
-        tx_freq: txFreq
-    rig_get_split_mode:
-      fields:
-        tx_mode: txMode
-        tx_width: txWidth
-    rig_set_split_mode:
-      fields:
-        tx_mode: txMode
-        tx_width: txWidth
-    rig_get_split_freq_mode:
-      fields:
-        tx_freq: txFreq
-        tx_mode: txMode
-        tx_width: txWidth
-    rig_set_split_freq_mode:
-      fields:
-        tx_freq: txFreq
-        tx_mode: txMode
-        tx_width: txWidth
-    rig_get_split_vfo:
-      fields:
-        tx_vfo: txVfo
-    rig_set_split_vfo:
-      fields:
-        tx_vfo: txVfo
-    rig_get_ant:
-      fields:
-        ant_curr: antCurr
-        ant_tx: antTx
-        ant_rx: antRx
-    rig_set_clock:
-      fields:
-        utc_offset: utcOffset
-    rig_get_clock:
-      fields:
-        utc_offset: utcOffset
-    rig_get_channel:
-      fields:
-        read_only: readOnly
-  projections:
-    channel:
-      channel_num: channelNum
-      bank_num: bankNum
-      tx_freq: txFreq
-      tx_mode: txMode
-      tx_width: txWidth
-      tx_vfo: txVfo
-      rptr_shift: rptrShift
-      rptr_offs: rptrOffs
-      tuning_step: tuningStep
-      ctcss_tone: ctcssTone
-      ctcss_sql: ctcssSql
-      dcs_code: dcsCode
-      dcs_sql: dcsSql
-      scan_group: scanGroup
-      channel_desc: channelDesc

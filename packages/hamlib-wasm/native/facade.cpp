@@ -140,11 +140,10 @@ std::string takeTransportError()
     return std::string(why);
 }
 
-/* A name the generated codecs return, or the empty string for a value they
- * have no name for. */
-std::string nameOrEmpty(const char *name)
+/* A C string Hamlib may leave NULL, as a std::string. */
+std::string textOrEmpty(const char *text)
 {
-    return name ? std::string(name) : std::string();
+    return text ? std::string(text) : std::string();
 }
 
 /* A serial RTS/DTR PTT line and a serial DSR/CTS/CAR DCD line are driven by
@@ -182,8 +181,8 @@ int collectModel(const struct rig_caps *caps, void *data)
     info.serialStopBits = caps->serial_stop_bits;
     /* The declared line settings travel as names, not Hamlib enum values, so
      * the public TypeScript API never exposes an upstream enum. */
-    info.serialParity = nameOrEmpty(strSerialParity(caps->serial_parity));
-    info.serialHandshake = nameOrEmpty(strSerialHandshake(caps->serial_handshake));
+    info.serialParity = textOrEmpty(strSerialParity(caps->serial_parity));
+    info.serialHandshake = textOrEmpty(strSerialHandshake(caps->serial_handshake));
     /* get_freq/set_freq/get_mode/set_mode are not projected here: the
      * capability list the generator emits already carries those operations,
      * and TypeScript derives the booleans from it. */
@@ -1141,6 +1140,32 @@ private:
                + std::to_string(caps->serial_rate_max)
                + " baud; check the rig's CAT rate, that it is switched on, "
                + "and that the right serial port was granted.";
+    }
+
+    /* A successful result: every field value-initialized, the code RIG_OK. */
+    template <typename T>
+    static T ok()
+    {
+        T result{};
+        result.code = RIG_OK;
+        return result;
+    }
+
+    /*
+     * The prologue every rig operation shares: forget the last transport
+     * error, resolve the handle, and fail with -RIG_EINVAL when it names no
+     * open rig.  `body` runs with the rig and returns the result.
+     */
+    template <typename T, typename Body>
+    T withRig(int handle, Body body)
+    {
+        webserial_clear_error();
+
+        RIG *rig = lookupRig(handle);
+
+        if (!rig) { return failure<T>(-RIG_EINVAL); }
+
+        return body(rig);
     }
 
     template <typename T>

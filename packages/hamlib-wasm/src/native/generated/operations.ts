@@ -4,28 +4,8 @@
 // pinned release; the code is MIT.
 // Do not edit: run `mise run generate` after changing the config.
 
-import type { BoolResult } from '../hamlib-wasm.mjs';
-import type { CodeResult } from '../hamlib-wasm.mjs';
-import type { GetAntResult } from '../hamlib-wasm.mjs';
-import type { GetChannelResult } from '../hamlib-wasm.mjs';
-import type { GetClockResult } from '../hamlib-wasm.mjs';
-import type { GetModeResult } from '../hamlib-wasm.mjs';
-import type { GetSplitFreqModeResult } from '../hamlib-wasm.mjs';
-import type { GetSplitModeResult } from '../hamlib-wasm.mjs';
-import type { GetSplitVfoResult } from '../hamlib-wasm.mjs';
-import type { GetVfoInfoResult } from '../hamlib-wasm.mjs';
+import type { BoolResult, CodeResult, ExtLookupResult, ExtLookupTokResult, GetAntResult, GetChannelResult, GetClockResult, GetModeResult, GetSplitFreqModeResult, GetSplitModeResult, GetSplitVfoResult, GetVfoInfoResult, LookupMemCapsResult, MainModule, NumberResult, OpenResult, PttResult, RigChannel, RigConfparamsList, RigModelList, StringList, TextResult } from '../hamlib-wasm.mjs';
 import type { Func, Level, Parm, PowerStatus, PttState, ResetKind, RigMode, RptrShift, ScanOp, Vfo, VfoOp } from './names.js';
-import type { MainModule } from '../hamlib-wasm.mjs';
-import type { NumberResult } from '../hamlib-wasm.mjs';
-import type { OpenResult } from '../hamlib-wasm.mjs';
-import type { PttResult } from '../hamlib-wasm.mjs';
-import type { RigChanList } from '../hamlib-wasm.mjs';
-import type { RigChannel } from '../hamlib-wasm.mjs';
-import type { RigConfparams } from '../hamlib-wasm.mjs';
-import type { RigConfparamsList } from '../hamlib-wasm.mjs';
-import type { RigModelList } from '../hamlib-wasm.mjs';
-import type { StringList } from '../hamlib-wasm.mjs';
-import type { TextResult } from '../hamlib-wasm.mjs';
 import type { RigConfparam } from '../confparams.js';
 
 /**
@@ -184,25 +164,25 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   getExtFunc(handle: number, arg0: number): Asyncify<BoolResult>;
   /** Pure computation: no transport access. */
-  extLookup(handle: number, arg0: string): Asyncify<RigConfparams>;
+  extLookup(handle: number, arg0: string): Asyncify<ExtLookupResult>;
   /** Pure computation: no transport access. */
-  extLookupTok(handle: number, arg0: number): Asyncify<RigConfparams>;
+  extLookupTok(handle: number, arg0: number): Asyncify<ExtLookupTokResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setAnt(handle: number, arg0: number, arg1: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getAnt(handle: number, arg0: number): Asyncify<GetAntResult>;
   /** Pure computation: no transport access. */
-  hasGetLevel(handle: number, arg0: Level): Asyncify<boolean>;
+  hasGetLevel(handle: number, arg0: Level): Asyncify<BoolResult>;
   /** Pure computation: no transport access. */
-  hasSetLevel(handle: number, arg0: Level): Asyncify<boolean>;
+  hasSetLevel(handle: number, arg0: Level): Asyncify<BoolResult>;
   /** Pure computation: no transport access. */
-  hasGetParm(handle: number, arg0: Parm): Asyncify<boolean>;
+  hasGetParm(handle: number, arg0: Parm): Asyncify<BoolResult>;
   /** Pure computation: no transport access. */
-  hasSetParm(handle: number, arg0: Parm): Asyncify<boolean>;
+  hasSetParm(handle: number, arg0: Parm): Asyncify<BoolResult>;
   /** Pure computation: no transport access. */
-  hasGetFunc(handle: number, arg0: Func): Asyncify<boolean>;
+  hasGetFunc(handle: number, arg0: Func): Asyncify<BoolResult>;
   /** Pure computation: no transport access. */
-  hasSetFunc(handle: number, arg0: Func): Asyncify<boolean>;
+  hasSetFunc(handle: number, arg0: Func): Asyncify<BoolResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setFunc(handle: number, arg0: Func, arg1: boolean): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -222,17 +202,17 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   vfoOp(handle: number, arg0: VfoOp): Asyncify<CodeResult>;
   /** Pure computation: no transport access. */
-  hasVfoOp(handle: number, arg0: VfoOp): Asyncify<boolean>;
+  hasVfoOp(handle: number, arg0: VfoOp): Asyncify<BoolResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   scan(handle: number, arg0: ScanOp, arg1: number): Asyncify<CodeResult>;
   /** Pure computation: no transport access. */
-  hasScan(handle: number, arg0: ScanOp): Asyncify<boolean>;
+  hasScan(handle: number, arg0: ScanOp): Asyncify<BoolResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setChannel(handle: number, arg0: RigChannel): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   getChannel(handle: number, arg0: boolean): Asyncify<GetChannelResult>;
   /** Pure computation: no transport access. */
-  lookupMemCaps(handle: number, arg0: number): Asyncify<RigChanList>;
+  lookupMemCaps(handle: number, arg0: number): Asyncify<LookupMemCapsResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setTwiddle(handle: number, arg0: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -240,43 +220,43 @@ export interface NativeOperations {
   /** Can suspend: the result is a promise when the transport has to wait. */
   setUplink(handle: number, arg0: number): Asyncify<CodeResult>;
   /** Pure computation: no transport access. */
-  getInfo(handle: number): Asyncify<string>;
+  getInfo(handle: number): Asyncify<TextResult>;
   /** Pure computation: no transport access. */
-  passbandNormal(handle: number, arg0: RigMode): Asyncify<number>;
+  passbandNormal(handle: number, arg0: RigMode): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  passbandNarrow(handle: number, arg0: RigMode): Asyncify<number>;
+  passbandNarrow(handle: number, arg0: RigMode): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  passbandWide(handle: number, arg0: RigMode): Asyncify<number>;
+  passbandWide(handle: number, arg0: RigMode): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  settingToIdx(arg0: number): Asyncify<number>;
+  settingToIdx(arg0: number): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  idxToSetting(arg0: number): Asyncify<number>;
+  idxToSetting(arg0: number): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  strRmode(arg0: number): Asyncify<string>;
+  strRmode(arg0: number): Asyncify<TextResult>;
   /** Pure computation: no transport access. */
-  strVfo(arg0: number): Asyncify<string>;
+  strVfo(arg0: number): Asyncify<TextResult>;
   /** Pure computation: no transport access. */
-  strLevel(arg0: number): Asyncify<string>;
+  strLevel(arg0: number): Asyncify<TextResult>;
   /** Pure computation: no transport access. */
-  strPtrShift(arg0: number): Asyncify<string>;
+  strPtrShift(arg0: number): Asyncify<TextResult>;
   /** Pure computation: no transport access. */
-  strStatus(arg0: number): Asyncify<string>;
+  strStatus(arg0: number): Asyncify<TextResult>;
   /** Pure computation: no transport access. */
-  parseMode(arg0: string): Asyncify<number>;
+  parseMode(arg0: string): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  parseVfo(arg0: string): Asyncify<number>;
+  parseVfo(arg0: string): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  parseFunc(arg0: string): Asyncify<number>;
+  parseFunc(arg0: string): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  parseLevel(arg0: string): Asyncify<number>;
+  parseLevel(arg0: string): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  parseParm(arg0: string): Asyncify<number>;
+  parseParm(arg0: string): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  parseVfoOp(arg0: string): Asyncify<number>;
+  parseVfoOp(arg0: string): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  parseScan(arg0: string): Asyncify<number>;
+  parseScan(arg0: string): Asyncify<NumberResult>;
   /** Pure computation: no transport access. */
-  parseRptrShift(arg0: string): Asyncify<number>;
+  parseRptrShift(arg0: string): Asyncify<NumberResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
   setClock(handle: number, arg0: number, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number, arg6: number, arg7: number): Asyncify<CodeResult>;
   /** Can suspend: the result is a promise when the transport has to wait. */
@@ -444,11 +424,11 @@ export interface GeneratedPublicOperations {
    *
    * From Hamlib's documentation of `rig_set_rptr_shift()`.
    *
-   * @param rptr_shift - The repeater shift to set to. Named as
+   * @param rptrShift - The repeater shift to set to. Named as
    *   {@link RawRig.strPtrShift} spells it: `RIG_RPT_SHIFT_PLUS` is `"+"`.
    * @see {@link RawRig.getRptrShift}
    */
-  setRptrShift(rptr_shift: RptrShift): Promise<void>;
+  setRptrShift(rptrShift: RptrShift): Promise<void>;
   /**
    * Get the current repeater shift.
    *
@@ -468,10 +448,10 @@ export interface GeneratedPublicOperations {
    *
    * From Hamlib's documentation of `rig_set_rptr_offs()`.
    *
-   * @param rptr_offs - The VFO to set to. In hertz.
+   * @param rptrOffs - The VFO to set to. In hertz.
    * @see {@link RawRig.getRptrOffs}
    */
-  setRptrOffs(rptr_offs: number): Promise<void>;
+  setRptrOffs(rptrOffs: number): Promise<void>;
   /**
    * Get the current repeater offset.
    *
@@ -1313,7 +1293,7 @@ export interface GeneratedPublicOperations {
    *   successful, otherwise a NULL pointer, most probably because of incorrect
    *   channel number or buggy backend.
    */
-  lookupMemCaps(ch: number): Promise<RigChanList>;
+  lookupMemCaps(ch: number): Promise<{ startc: number; endc: number; type: number }>;
   /**
    * Timeout (secs) to stop rigctld when VFO is manually changed.
    *

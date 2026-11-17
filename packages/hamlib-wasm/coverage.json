@@ -85,14 +85,14 @@
       "symbol": "rig_ext_lookup",
       "method": "extLookup",
       "shape": "pure",
-      "result": "",
+      "result": "ExtLookupResult",
       "capability": null
     },
     {
       "symbol": "rig_ext_lookup_tok",
       "method": "extLookupTok",
       "shape": "pure",
-      "result": "",
+      "result": "ExtLookupTokResult",
       "capability": null
     },
     {
@@ -176,7 +176,7 @@
       "symbol": "rig_get_info",
       "method": "getInfo",
       "shape": "pure",
-      "result": "",
+      "result": "TextResult",
       "capability": null
     },
     {
@@ -302,70 +302,70 @@
       "symbol": "rig_has_get_func",
       "method": "hasGetFunc",
       "shape": "pure",
-      "result": "",
+      "result": "BoolResult",
       "capability": null
     },
     {
       "symbol": "rig_has_get_level",
       "method": "hasGetLevel",
       "shape": "pure",
-      "result": "",
+      "result": "BoolResult",
       "capability": null
     },
     {
       "symbol": "rig_has_get_parm",
       "method": "hasGetParm",
       "shape": "pure",
-      "result": "",
+      "result": "BoolResult",
       "capability": null
     },
     {
       "symbol": "rig_has_scan",
       "method": "hasScan",
       "shape": "pure",
-      "result": "",
+      "result": "BoolResult",
       "capability": null
     },
     {
       "symbol": "rig_has_set_func",
       "method": "hasSetFunc",
       "shape": "pure",
-      "result": "",
+      "result": "BoolResult",
       "capability": null
     },
     {
       "symbol": "rig_has_set_level",
       "method": "hasSetLevel",
       "shape": "pure",
-      "result": "",
+      "result": "BoolResult",
       "capability": null
     },
     {
       "symbol": "rig_has_set_parm",
       "method": "hasSetParm",
       "shape": "pure",
-      "result": "",
+      "result": "BoolResult",
       "capability": null
     },
     {
       "symbol": "rig_has_vfo_op",
       "method": "hasVfoOp",
       "shape": "pure",
-      "result": "",
+      "result": "BoolResult",
       "capability": null
     },
     {
       "symbol": "rig_idx2setting",
       "method": "idxToSetting",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_lookup_mem_caps",
       "method": "lookupMemCaps",
       "shape": "pure",
-      "result": "",
+      "result": "LookupMemCapsResult",
       "capability": null
     },
     {
@@ -379,77 +379,77 @@
       "symbol": "rig_parse_func",
       "method": "parseFunc",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_parse_level",
       "method": "parseLevel",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_parse_mode",
       "method": "parseMode",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_parse_parm",
       "method": "parseParm",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_parse_rptr_shift",
       "method": "parseRptrShift",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_parse_scan",
       "method": "parseScan",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_parse_vfo",
       "method": "parseVfo",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_parse_vfo_op",
       "method": "parseVfoOp",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_passband_narrow",
       "method": "passbandNarrow",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_passband_normal",
       "method": "passbandNormal",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
       "symbol": "rig_passband_wide",
       "method": "passbandWide",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
@@ -687,7 +687,7 @@
       "symbol": "rig_setting2idx",
       "method": "settingToIdx",
       "shape": "pure",
-      "result": "",
+      "result": "NumberResult",
       "capability": null
     },
     {
@@ -701,35 +701,35 @@
       "symbol": "rig_strlevel",
       "method": "strLevel",
       "shape": "pure",
-      "result": "",
+      "result": "TextResult",
       "capability": null
     },
     {
       "symbol": "rig_strptrshift",
       "method": "strPtrShift",
       "shape": "pure",
-      "result": "",
+      "result": "TextResult",
       "capability": null
     },
     {
       "symbol": "rig_strrmode",
       "method": "strRmode",
       "shape": "pure",
-      "result": "",
+      "result": "TextResult",
       "capability": null
     },
     {
       "symbol": "rig_strstatus",
       "method": "strStatus",
       "shape": "pure",
-      "result": "",
+      "result": "TextResult",
       "capability": null
     },
     {
       "symbol": "rig_strvfo",
       "method": "strVfo",
       "shape": "pure",
-      "result": "",
+      "result": "TextResult",
       "capability": null
     },
     {

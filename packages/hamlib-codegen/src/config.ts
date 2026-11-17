@@ -71,6 +71,11 @@ export interface Model {
   readonly results: Readonly<Record<string, ModelResult>>;
   readonly vectors: readonly ModelVector[];
   readonly operations: readonly ModelOperation[];
+  /**
+   * The capability flags an operation may be gated on: the `can*` fields of
+   * the `ModelInfo` catalogue value object.
+   */
+  readonly flags: readonly string[];
   /** Declarative renames for the mechanically generated surface. */
   readonly overrides?: {
     /** Per-symbol method/field renames for generated operations. */
@@ -300,6 +305,7 @@ export function loadConfig(file: string): CodegenConfig {
       results,
       vectors: readVectors(file, root.vectors),
       operations: readOperations(file, root.operations, flags),
+      flags,
       overrides: readOverrides(file, root.overrides ?? {}),
     },
   };

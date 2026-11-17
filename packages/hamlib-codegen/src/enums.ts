@@ -190,6 +190,11 @@ export function codecOf(record: EnumRecord, spelling = record.enumName): Upstrea
   return { str: `str${type}`, parse: `parse${type}`, none: `(${spelling}) -1` };
 }
 
+/** The record whose names form the union `type`, e.g. `PttState`. */
+export function recordOfVocabulary(type: string): EnumRecord | undefined {
+  return ENUMS.find((record) => record.names?.type === type);
+}
+
 /** The union names a config pair may narrow a string to. */
 export const VOCABULARY_TYPES: ReadonlySet<string> = new Set(
   ENUMS.flatMap((record) => (record.names ? [record.names.type] : [])),

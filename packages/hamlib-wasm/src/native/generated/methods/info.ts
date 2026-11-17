@@ -10,37 +10,49 @@ export abstract class InfoMethods extends ControlMethods {
 
   async getInfo(): Promise<string> {
     return this.serialized('getInfo', async () => {
-      return this.native().getInfo(this.handle());
+      const result = await this.native().getInfo(this.handle());
+      if (result.code !== 0) { throw this.failed(result, 'getInfo'); }
+      return String(result.value);
     });
   }
 
   async passbandNormal(mode: RigMode): Promise<number> {
     return this.serialized('passbandNormal', async () => {
-      return this.native().passbandNormal(this.handle(), mode);
+      const result = await this.native().passbandNormal(this.handle(), mode);
+      if (result.code !== 0) { throw this.failed(result, 'passbandNormal'); }
+      return result.value;
     });
   }
 
   async passbandNarrow(mode: RigMode): Promise<number> {
     return this.serialized('passbandNarrow', async () => {
-      return this.native().passbandNarrow(this.handle(), mode);
+      const result = await this.native().passbandNarrow(this.handle(), mode);
+      if (result.code !== 0) { throw this.failed(result, 'passbandNarrow'); }
+      return result.value;
     });
   }
 
   async passbandWide(mode: RigMode): Promise<number> {
     return this.serialized('passbandWide', async () => {
-      return this.native().passbandWide(this.handle(), mode);
+      const result = await this.native().passbandWide(this.handle(), mode);
+      if (result.code !== 0) { throw this.failed(result, 'passbandWide'); }
+      return result.value;
     });
   }
 
   async settingToIdx(s: number): Promise<number> {
     return this.serialized('settingToIdx', async () => {
-      return this.native().settingToIdx(s);
+      const result = await this.native().settingToIdx(s);
+      if (result.code !== 0) { throw this.failed(result, 'settingToIdx'); }
+      return result.value;
     });
   }
 
   async idxToSetting(i: number): Promise<number> {
     return this.serialized('idxToSetting', async () => {
-      return this.native().idxToSetting(i);
+      const result = await this.native().idxToSetting(i);
+      if (result.code !== 0) { throw this.failed(result, 'idxToSetting'); }
+      return result.value;
     });
   }
 }

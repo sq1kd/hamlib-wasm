@@ -33,10 +33,10 @@ export abstract class VfoMethods extends MemoryMethods {
     });
   }
 
-  async setRptrShift(rptr_shift: RptrShift): Promise<void> {
+  async setRptrShift(rptrShift: RptrShift): Promise<void> {
     this.available('setRptrShift');
     return this.serialized('setRptrShift', async () => {
-      const result = await this.native().setRptrShift(this.handle(), rptr_shift);
+      const result = await this.native().setRptrShift(this.handle(), rptrShift);
       if (result.code !== 0) { throw this.failed(result, 'setRptrShift'); }
     });
   }
@@ -50,10 +50,10 @@ export abstract class VfoMethods extends MemoryMethods {
     });
   }
 
-  async setRptrOffs(rptr_offs: number): Promise<void> {
+  async setRptrOffs(rptrOffs: number): Promise<void> {
     this.available('setRptrOffs');
     return this.serialized('setRptrOffs', async () => {
-      const result = await this.native().setRptrOffs(this.handle(), rptr_offs);
+      const result = await this.native().setRptrOffs(this.handle(), rptrOffs);
       if (result.code !== 0) { throw this.failed(result, 'setRptrOffs'); }
     });
   }
@@ -179,7 +179,9 @@ export abstract class VfoMethods extends MemoryMethods {
 
   async hasVfoOp(op: VfoOp): Promise<boolean> {
     return this.serialized('hasVfoOp', async () => {
-      return this.native().hasVfoOp(this.handle(), op);
+      const result = await this.native().hasVfoOp(this.handle(), op);
+      if (result.code !== 0) { throw this.failed(result, 'hasVfoOp'); }
+      return result.value;
     });
   }
 
@@ -193,7 +195,9 @@ export abstract class VfoMethods extends MemoryMethods {
 
   async hasScan(scan: ScanOp): Promise<boolean> {
     return this.serialized('hasScan', async () => {
-      return this.native().hasScan(this.handle(), scan);
+      const result = await this.native().hasScan(this.handle(), scan);
+      if (result.code !== 0) { throw this.failed(result, 'hasScan'); }
+      return result.value;
     });
   }
 

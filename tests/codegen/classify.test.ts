@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { AstFunction } from '../../packages/hamlib-codegen/src/ast.ts';
 import {
   canonicalDeclaration,
+  classifyAll,
   classifyFunction,
   type GeneratedOperation,
 } from '../../packages/hamlib-codegen/src/classify.ts';
@@ -123,5 +124,44 @@ describe('classifyFunction exclusions', () => {
     expect(rejectionReason('rig_get_resolution')).toBe(
       'excluded: not called by the upstream rigctl reference client',
     );
+  });
+});
+
+describe('classifyAll overrides', () => {
+  const functions = new Map([
+    ['rig_set_split_freq', [declaration('rig_set_split_freq', ['RIG *', 'vfo_t', 'freq_t'])]],
+    ['rig_license', [declaration('rig_license', [], 'const char *')]],
+  ]);
+
+  function stale(overrides: Parameters<typeof classifyAll>[3]): readonly string[] {
+    return classifyAll(functions, manualSymbols, () => null, overrides).staleOverrides;
+  }
+
+  it('names fields in camelCase without an override', () => {
+    const [operation] = classifyAll(new Map([[
+      'rig_set_split_freq',
+      [{ name: 'rig_set_split_freq', result: 'int', variadic: false, params: [
+        { name: 'rig', qualType: 'RIG *' },
+        { name: 'vfo', qualType: 'vfo_t' },
+        { name: 'tx_freq', qualType: 'freq_t' },
+      ] }],
+    ]]), manualSymbols, () => null).operations;
+
+    expect(operation?.arguments.map((argument) => argument.field)).toEqual(['txFreq']);
+  });
+
+  it('accepts an override that renames a generated method', () => {
+    expect(stale({ rig_set_split_freq: { method: 'setTxFrequency' } })).toEqual([]);
+  });
+
+  it('reports an override for a symbol that is not generated', () => {
+    expect(stale({ rig_license: { method: 'license' } })).toEqual([
+      'rig_license: not generated (excluded: not called by the upstream rigctl reference client)',
+    ]);
+  });
+
+  it('reports an override that renames nothing', () => {
+    expect(stale({ rig_set_split_freq: { method: 'setSplitFreq' } })).toHaveLength(1);
+    expect(stale({ rig_set_split_freq: { fields: { tx_freq: 'txFreq' } } })).toHaveLength(1);
   });
 });

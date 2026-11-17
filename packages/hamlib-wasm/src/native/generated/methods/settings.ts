@@ -44,37 +44,49 @@ export abstract class SettingsMethods extends ExtMethods {
 
   async hasGetLevel(level: Level): Promise<boolean> {
     return this.serialized('hasGetLevel', async () => {
-      return this.native().hasGetLevel(this.handle(), level);
+      const result = await this.native().hasGetLevel(this.handle(), level);
+      if (result.code !== 0) { throw this.failed(result, 'hasGetLevel'); }
+      return result.value;
     });
   }
 
   async hasSetLevel(level: Level): Promise<boolean> {
     return this.serialized('hasSetLevel', async () => {
-      return this.native().hasSetLevel(this.handle(), level);
+      const result = await this.native().hasSetLevel(this.handle(), level);
+      if (result.code !== 0) { throw this.failed(result, 'hasSetLevel'); }
+      return result.value;
     });
   }
 
   async hasGetParm(parm: Parm): Promise<boolean> {
     return this.serialized('hasGetParm', async () => {
-      return this.native().hasGetParm(this.handle(), parm);
+      const result = await this.native().hasGetParm(this.handle(), parm);
+      if (result.code !== 0) { throw this.failed(result, 'hasGetParm'); }
+      return result.value;
     });
   }
 
   async hasSetParm(parm: Parm): Promise<boolean> {
     return this.serialized('hasSetParm', async () => {
-      return this.native().hasSetParm(this.handle(), parm);
+      const result = await this.native().hasSetParm(this.handle(), parm);
+      if (result.code !== 0) { throw this.failed(result, 'hasSetParm'); }
+      return result.value;
     });
   }
 
   async hasGetFunc(func: Func): Promise<boolean> {
     return this.serialized('hasGetFunc', async () => {
-      return this.native().hasGetFunc(this.handle(), func);
+      const result = await this.native().hasGetFunc(this.handle(), func);
+      if (result.code !== 0) { throw this.failed(result, 'hasGetFunc'); }
+      return result.value;
     });
   }
 
   async hasSetFunc(func: Func): Promise<boolean> {
     return this.serialized('hasSetFunc', async () => {
-      return this.native().hasSetFunc(this.handle(), func);
+      const result = await this.native().hasSetFunc(this.handle(), func);
+      if (result.code !== 0) { throw this.failed(result, 'hasSetFunc'); }
+      return result.value;
     });
   }
 

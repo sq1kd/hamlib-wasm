@@ -17,24 +17,44 @@
  * file must stay erasable (no enums, namespaces or parameter properties).
  */
 import type { AstIndex } from './ast.ts';
-import { bindType, type ProjectionField, type ProjectionSpec, type TypeBinding } from './types.ts';
+import { camelCase, pascalCase } from './naming.ts';
+import { bareType, bindType, type ProjectionField, type ProjectionSpec, type TypeBinding } from './types.ts';
 
 const CHAR_ARRAY = /^char\s*\[\s*(\d+)\s*\]$/;
-
-/** `chan_list` -> `ChanList`; `confparams` -> `Confparams`. */
-function pascalTag(tag: string): string {
-  return tag
-    .split('_')
-    .filter((word) => word.length > 0)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('');
-}
 
 /** Resolve a C type name to a projection, or `null` when it is not a struct. */
 export type ProjectionResolver = (typeName: string) => ProjectionSpec | null;
 
 /** Per-tag public field renames, keyed by tag then by the C member name. */
 export type ProjectionRenames = Readonly<Record<string, Readonly<Record<string, string>>>>;
+
+/**
+ * The renames that changed nothing in the projections `resolved` built: a
+ * tag never projected, a member it does not have or drops, or a rename to the
+ * name camelCase already gives.
+ */
+export function staleProjectionRenames(
+  renames: ProjectionRenames,
+  resolved: readonly ProjectionSpec[],
+): string[] {
+  const problems: string[] = [];
+
+  for (const [tag, members] of Object.entries(renames)) {
+    const spec = resolved.find((candidate) => candidate.tag === tag);
+
+    for (const [member, renamed] of Object.entries(members)) {
+      const field = spec?.fields.find((candidate) => candidate.member === member);
+
+      if (!field) {
+        problems.push(`projection ${tag}: ${spec ? `no projected member ${member}` : 'never projected'}`);
+      } else if (renamed === camelCase(member)) {
+        problems.push(`projection ${tag}: ${member} is already ${renamed}`);
+      }
+    }
+  }
+
+  return problems;
+}
 
 export function createProjectionResolver(
   ast: AstIndex,
@@ -54,11 +74,7 @@ export function createProjectionResolver(
 }
 
 function build(ast: AstIndex, typeName: string, renames: ProjectionRenames): ProjectionSpec | null {
-  const type = typeName
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^const /, '')
-    .replace(/^(struct|enum|union) /, '');
+  const type = bareType(typeName);
 
   if (type.endsWith('*')) {
     return null;
@@ -84,7 +100,7 @@ function build(ast: AstIndex, typeName: string, renames: ProjectionRenames): Pro
   const rename = renames[tag] ?? {};
 
   for (const field of record.fields) {
-    const name = rename[field.name] ?? field.name;
+    const name = rename[field.name] ?? camelCase(field.name);
     const charArray = CHAR_ARRAY.exec(field.qualType);
 
     if (charArray) {
@@ -114,5 +130,5 @@ function build(ast: AstIndex, typeName: string, renames: ProjectionRenames): Pro
     fields.push({ name, member: field.name, binding, charArray: null });
   }
 
-  return { type, tag, cpp: `Rig${pascalTag(tag)}`, fields, dropped };
+  return { type, tag, cpp: `Rig${pascalCase(tag)}`, fields, dropped };
 }

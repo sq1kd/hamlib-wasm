@@ -37,6 +37,26 @@
     .field("value", &BoolResult::value)
     .field("error", &BoolResult::error);
 
+    emscripten::value_object<ExtLookupResult>("ExtLookupResult")
+    .field("code", &ExtLookupResult::code)
+    .field("token", &ExtLookupResult::token)
+    .field("name", &ExtLookupResult::name)
+    .field("label", &ExtLookupResult::label)
+    .field("tooltip", &ExtLookupResult::tooltip)
+    .field("dflt", &ExtLookupResult::dflt)
+    .field("type", &ExtLookupResult::type)
+    .field("error", &ExtLookupResult::error);
+
+    emscripten::value_object<ExtLookupTokResult>("ExtLookupTokResult")
+    .field("code", &ExtLookupTokResult::code)
+    .field("token", &ExtLookupTokResult::token)
+    .field("name", &ExtLookupTokResult::name)
+    .field("label", &ExtLookupTokResult::label)
+    .field("tooltip", &ExtLookupTokResult::tooltip)
+    .field("dflt", &ExtLookupTokResult::dflt)
+    .field("type", &ExtLookupTokResult::type)
+    .field("error", &ExtLookupTokResult::error);
+
     emscripten::value_object<GetAntResult>("GetAntResult")
     .field("code", &GetAntResult::code)
     .field("option", &GetAntResult::option)
@@ -120,6 +140,13 @@
     .field("split", &GetVfoInfoResult::split)
     .field("satmode", &GetVfoInfoResult::satmode)
     .field("error", &GetVfoInfoResult::error);
+
+    emscripten::value_object<LookupMemCapsResult>("LookupMemCapsResult")
+    .field("code", &LookupMemCapsResult::code)
+    .field("startc", &LookupMemCapsResult::startc)
+    .field("endc", &LookupMemCapsResult::endc)
+    .field("type", &LookupMemCapsResult::type)
+    .field("error", &LookupMemCapsResult::error);
 
     emscripten::value_object<NumberResult>("NumberResult")
     .field("code", &NumberResult::code)

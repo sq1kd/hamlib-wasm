@@ -41,24 +41,18 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 import { loadAst, type AstIndex } from './ast.ts';
-import { classifyAll } from './classify.ts';
+import { canonicalDeclaration, classifyAll, type GeneratedOperation } from './classify.ts';
 import { loadConfig, type Model } from './config.ts';
 import { loadUpstreamDocs, type UpstreamDoc } from './docs.ts';
-import {
-  capabilityMember,
-  embindArity,
-  emitCapabilities,
-  emitCodecs,
-  emitContract,
-  emitEmbind,
-  emitMethodFiles,
-  emitNames,
-  emitOperations,
-  emitResults,
-} from './emit.ts';
+import { operationFacts } from './emit/common.ts';
+import { emitContract } from './emit/contract.ts';
+import { emitCapabilities, emitCodecs, emitEmbind, emitOperations, emitResults } from './emit/cpp.ts';
+import { emitMethodFiles } from './emit/methods.ts';
+import { emitNames } from './emit/names.ts';
 import { loadVocabularies } from './names.ts';
 import type { NameVocabulary } from './names.ts';
-import { createProjectionResolver } from './project.ts';
+import { createProjectionResolver, staleProjectionRenames } from './project.ts';
+import type { ProjectionSpec } from './types.ts';
 
 function fail(message: string): never {
   process.stderr.write(`[codegen] error: ${message}\n`);
@@ -196,6 +190,13 @@ function signatureOf(ast: AstIndex, symbol: string): string[] {
     .sort();
 }
 
+/** Every projection an operation's arguments, outputs or result were built from. */
+function projections(operations: readonly GeneratedOperation[]): ProjectionSpec[] {
+  return operations.flatMap((operation) =>
+    [...operation.arguments, ...operation.outputs].map((value) => value.binding).concat(operation.pure ?? []))
+    .flatMap((binding) => (binding.projection ? [binding.projection] : []));
+}
+
 interface CoverageReport {
   readonly signatures?: Readonly<Record<string, readonly string[]>>;
 }
@@ -300,7 +301,7 @@ function methodNameOf(member: ts.MethodSignature | ts.MethodDeclaration): string
  * a signature or re-indenting the interface then leaves the result unchanged,
  * while a changed parameter count or return type still shows up.  `arity` is
  * the full declared parameter count, including the leading `handle`, which is
- * what `embindArity` reports for comparison.
+ * what the generator reports for comparison.
  */
 export function parseEmitted(declaration: string): Map<string, EmittedOperation> {
   const source = ts.createSourceFile(
@@ -419,12 +420,20 @@ function render(
   }
 
   const members = capsMembers(ast);
-  const { operations, rejections } = classifyAll(
+  const projectionRenames = model.overrides?.projections ?? {};
+  const { operations, rejections, staleOverrides } = classifyAll(
     ast.functions,
     new Set(model.operations.flatMap((operation) => operation.calls)),
-    createProjectionResolver(ast, model.overrides?.projections ?? {}),
+    createProjectionResolver(ast, projectionRenames),
     model.overrides?.operations ?? {},
   );
+  const stale = [...staleOverrides, ...staleProjectionRenames(projectionRenames, projections(operations))];
+
+  if (stale.length > 0) {
+    fail(`overrides in ${path.basename(options.config)} that rename nothing:\n  - ${stale.join('\n  - ')}`);
+  }
+
+  const facts = operations.map((operation) => operationFacts(operation, members));
 
   const signatures: Record<string, readonly string[]> = {};
 
@@ -444,13 +453,13 @@ function render(
       refused: rejections.length,
     },
     signatures,
-    generated: [...operations]
-      .map((operation) => ({
+    generated: facts
+      .map(({ operation, gate }) => ({
         symbol: operation.symbol,
         method: operation.method,
         shape: operation.shape,
         result: operation.result,
-        capability: members.has(capabilityMember(operation) ?? '') ? operation.method : null,
+        capability: gate === null ? null : operation.method,
       }))
       .sort((a, b) => a.symbol.localeCompare(b.symbol)),
     refused: [...rejections]
@@ -458,29 +467,32 @@ function render(
       .sort((a, b) => a.symbol.localeCompare(b.symbol)),
   };
 
-  const methodFiles = emitMethodFiles(model, operations, members);
   const files: (readonly [string, string])[] = [
-    [paths.results, emitResults(operations)],
+    [paths.results, emitResults(model, facts)],
     [paths.codecs, emitCodecs(vocabularies)],
-    [paths.operations, emitOperations(operations)],
-    [paths.capabilities, emitCapabilities(operations, members)],
-    [paths.embind, emitEmbind(model, operations)],
-    [paths.contract, emitContract(model, operations, {
+    [paths.operations, emitOperations(facts)],
+    [paths.capabilities, emitCapabilities(facts)],
+    [paths.embind, emitEmbind(model, facts)],
+    [paths.contract, emitContract(model, facts, {
       upstream,
-      parameters: (symbol) => ast.functions.get(symbol)?.[0]?.params.map((param) => param.name) ?? [],
+      parameters: (symbol) => {
+        const declarations = ast.functions.get(symbol);
+
+        return declarations ? canonicalDeclaration(declarations).params.map((param) => param.name) : [];
+      },
     })],
     [paths.names, emitNames(vocabularies)],
     [paths.coverage, `${JSON.stringify(coverage, null, 2)}\n`],
-    ...methodFiles.map(
-      ([relative, content]) => [path.join(paths.methodsDir, relative), content] as const,
+    ...emitMethodFiles(model, facts).map(
+      ({ path: relative, content }) => [path.join(paths.methodsDir, relative), content] as const,
     ),
   ];
 
   return {
     files,
-    generated: operations.map((operation) => ({
+    generated: facts.map(({ operation, needsHandle, parameters }) => ({
       method: operation.method,
-      arity: embindArity(operation),
+      arity: (needsHandle ? 1 : 0) + parameters.length,
     })),
   };
 }

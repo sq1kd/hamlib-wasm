@@ -39,7 +39,8 @@ describe('struct projections', () => {
     expect(spec).not.toBeNull();
     expect(spec?.tag).toBe('channel');
     expect(spec?.cpp).toBe('RigChannel');
-    expect(spec?.fields.map((field) => field.name)).toEqual(['freq', 'tx_freq', 'label']);
+    expect(spec?.fields.map((field) => field.name)).toEqual(['freq', 'txFreq', 'label']);
+    expect(spec?.fields[1]?.member).toBe('tx_freq');
     expect(spec?.fields[2]?.charArray).toBe(16);
     expect(spec?.dropped.map((field) => field.name)).toEqual(['opaque']);
   });
@@ -55,7 +56,7 @@ describe('struct projections', () => {
     });
     const spec = createProjectionResolver(ast)('channel_t');
 
-    expect(spec?.fields.map((field) => field.name)).toEqual(['freq', 'tx_freq', 'label']);
+    expect(spec?.fields.map((field) => field.name)).toEqual(['freq', 'txFreq', 'label']);
   });
 
   it('keeps the definition when a forward declaration follows it', () => {
@@ -69,6 +70,6 @@ describe('struct projections', () => {
     });
     const spec = createProjectionResolver(ast)('channel_t');
 
-    expect(spec?.fields.map((field) => field.name)).toEqual(['freq', 'tx_freq', 'label']);
+    expect(spec?.fields.map((field) => field.name)).toEqual(['freq', 'txFreq', 'label']);
   });
 });

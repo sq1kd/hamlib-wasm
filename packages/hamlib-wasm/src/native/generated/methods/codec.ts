@@ -8,79 +8,105 @@ export abstract class CodecMethods extends BespokeMethods {
 
   async strRmode(mode: number): Promise<string> {
     return this.serialized('strRmode', async () => {
-      return this.native().strRmode(mode);
+      const result = await this.native().strRmode(mode);
+      if (result.code !== 0) { throw this.failed(result, 'strRmode'); }
+      return String(result.value);
     });
   }
 
   async strVfo(vfo: number): Promise<string> {
     return this.serialized('strVfo', async () => {
-      return this.native().strVfo(vfo);
+      const result = await this.native().strVfo(vfo);
+      if (result.code !== 0) { throw this.failed(result, 'strVfo'); }
+      return String(result.value);
     });
   }
 
   async strLevel(level: number): Promise<string> {
     return this.serialized('strLevel', async () => {
-      return this.native().strLevel(level);
+      const result = await this.native().strLevel(level);
+      if (result.code !== 0) { throw this.failed(result, 'strLevel'); }
+      return String(result.value);
     });
   }
 
   async strPtrShift(shift: number): Promise<string> {
     return this.serialized('strPtrShift', async () => {
-      return this.native().strPtrShift(shift);
+      const result = await this.native().strPtrShift(shift);
+      if (result.code !== 0) { throw this.failed(result, 'strPtrShift'); }
+      return String(result.value);
     });
   }
 
   async strStatus(status: number): Promise<string> {
     return this.serialized('strStatus', async () => {
-      return this.native().strStatus(status);
+      const result = await this.native().strStatus(status);
+      if (result.code !== 0) { throw this.failed(result, 'strStatus'); }
+      return String(result.value);
     });
   }
 
   async parseMode(s: string): Promise<number> {
     return this.serialized('parseMode', async () => {
-      return this.native().parseMode(s);
+      const result = await this.native().parseMode(s);
+      if (result.code !== 0) { throw this.failed(result, 'parseMode'); }
+      return result.value;
     });
   }
 
   async parseVfo(s: string): Promise<number> {
     return this.serialized('parseVfo', async () => {
-      return this.native().parseVfo(s);
+      const result = await this.native().parseVfo(s);
+      if (result.code !== 0) { throw this.failed(result, 'parseVfo'); }
+      return result.value;
     });
   }
 
   async parseFunc(s: string): Promise<number> {
     return this.serialized('parseFunc', async () => {
-      return this.native().parseFunc(s);
+      const result = await this.native().parseFunc(s);
+      if (result.code !== 0) { throw this.failed(result, 'parseFunc'); }
+      return result.value;
     });
   }
 
   async parseLevel(s: string): Promise<number> {
     return this.serialized('parseLevel', async () => {
-      return this.native().parseLevel(s);
+      const result = await this.native().parseLevel(s);
+      if (result.code !== 0) { throw this.failed(result, 'parseLevel'); }
+      return result.value;
     });
   }
 
   async parseParm(s: string): Promise<number> {
     return this.serialized('parseParm', async () => {
-      return this.native().parseParm(s);
+      const result = await this.native().parseParm(s);
+      if (result.code !== 0) { throw this.failed(result, 'parseParm'); }
+      return result.value;
     });
   }
 
   async parseVfoOp(s: string): Promise<number> {
     return this.serialized('parseVfoOp', async () => {
-      return this.native().parseVfoOp(s);
+      const result = await this.native().parseVfoOp(s);
+      if (result.code !== 0) { throw this.failed(result, 'parseVfoOp'); }
+      return result.value;
     });
   }
 
   async parseScan(s: string): Promise<number> {
     return this.serialized('parseScan', async () => {
-      return this.native().parseScan(s);
+      const result = await this.native().parseScan(s);
+      if (result.code !== 0) { throw this.failed(result, 'parseScan'); }
+      return result.value;
     });
   }
 
   async parseRptrShift(s: string): Promise<number> {
     return this.serialized('parseRptrShift', async () => {
-      return this.native().parseRptrShift(s);
+      const result = await this.native().parseRptrShift(s);
+      if (result.code !== 0) { throw this.failed(result, 'parseRptrShift'); }
+      return result.value;
     });
   }
 }

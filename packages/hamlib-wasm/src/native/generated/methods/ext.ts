@@ -28,13 +28,17 @@ export abstract class ExtMethods extends CodecMethods {
 
   async extLookup(name: string): Promise<RigConfparam> {
     return this.serialized('extLookup', async () => {
-      return projectConfparam(await this.native().extLookup(this.handle(), name));
+      const result = await this.native().extLookup(this.handle(), name);
+      if (result.code !== 0) { throw this.failed(result, 'extLookup'); }
+      return projectConfparam(result);
     });
   }
 
   async extLookupTok(token: number): Promise<RigConfparam> {
     return this.serialized('extLookupTok', async () => {
-      return projectConfparam(await this.native().extLookupTok(this.handle(), token));
+      const result = await this.native().extLookupTok(this.handle(), token);
+      if (result.code !== 0) { throw this.failed(result, 'extLookupTok'); }
+      return projectConfparam(result);
     });
   }
 }
