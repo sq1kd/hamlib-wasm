@@ -1,15 +1,38 @@
 # hamlib-wasm
 
-[Hamlib](https://hamlib.github.io/) CAT control compiled to WebAssembly, with a
-switchable serial transport: Web Serial in desktop Chromium-based browsers and
-Firefox 151+ (in a secure context, HTTPS or `localhost`), node-serialport in
-Node and Electron.
+**Control your radio from a web page.** Hamlib's own CAT backends, compiled to
+WebAssembly: Web Serial in Chrome, Edge and Firefox 151+, `serialport` in Node
+and Electron. Nothing native to install.
 
-This repository builds and tests the `hamlib-wasm` npm package. Usage, the API,
-runtime support and limitations are documented in the package README:
-[`packages/hamlib-wasm/README.md`](packages/hamlib-wasm/README.md).
+**[Try the live demo](https://sq1kd.github.io/hamlib-wasm/demo/)** ·
+[Documentation](https://sq1kd.github.io/hamlib-wasm/) ·
+[npm](https://www.npmjs.com/package/hamlib-wasm)
 
-## Layout
+## Quick start
+
+```sh
+npm install hamlib-wasm
+```
+
+```ts
+import { createHamlib } from 'hamlib-wasm';
+
+const hamlib = await createHamlib();
+const modelId = hamlib.models.find((entry) => entry.model === 'TS-480')!.id;
+const rig = await hamlib.open({ modelId });     // asks for the port: call from a click
+
+const { frequency, mode } = await rig.refresh();
+await rig.setFrequency(14_074_000);             // Hz
+
+await rig.close();
+```
+
+Every serial rig Hamlib supports is in the catalogue, driven by the same backend
+code as `rigctl`. The [package README](packages/hamlib-wasm/README.md) is the full
+reference; the [supported rigs](https://sq1kd.github.io/hamlib-wasm/guides/rigs/)
+guide says which models were tested and how.
+
+## Repository layout
 
 | Path | Purpose |
 | --- | --- |
@@ -35,10 +58,12 @@ runtime support and limitations are documented in the package README:
 Build products live in `.cache/hamlib/<version>` (downloaded upstream source and
 object files) and `packages/hamlib-wasm/dist`; neither is committed.
 
-## Development
+## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md): `mise install && mise run bootstrap`,
-then `mise run check` before pushing.
+Bug reports are most useful with the diagnostics report the live demo copies for
+you. See [`CONTRIBUTING.md`](CONTRIBUTING.md) to build and test locally
+(`mise install && mise run bootstrap`, then `mise run check`), and
+[`SECURITY.md`](SECURITY.md) to report a vulnerability.
 
 ## Licensing
 
