@@ -55,7 +55,14 @@ import type {
   RigConf,
   SerialPortLike,
 } from './raw.js';
-import type { DetectBaudRateOptions, RigMode, RigModeState, RigModel } from './catalogue.js';
+import { operationCapabilities } from './catalogue.js';
+import type {
+  DetectBaudRateOptions,
+  RigMode,
+  RigModeState,
+  RigModel,
+  RigOperationCapabilities,
+} from './catalogue.js';
 import { PTT_STATES } from './native/generated/names.js';
 import type { Level } from './native/generated/names.js';
 import { compoundHostOf } from './native/seam.js';
@@ -75,6 +82,7 @@ export type {
   RigModeState,
   RigModel,
   RigModelCapabilities,
+  RigOperationCapabilities,
   SerialHandshake,
   SerialParity,
 } from './catalogue.js';
@@ -198,26 +206,6 @@ export interface RigState {
    * merged across reads.  Absent until one of them has been read.
    */
   levels?: Partial<Record<LevelName, number>>;
-}
-
-/** What a model can do, as booleans a UI can test. */
-export interface RigOperationCapabilities {
-  /** The rig can report its frequency ({@link Rig.refresh} includes `frequency`). */
-  getFrequency: boolean;
-  /** {@link Rig.setFrequency} is available. */
-  setFrequency: boolean;
-  /** The rig can report its mode and passband. */
-  getMode: boolean;
-  /** {@link Rig.setMode} and {@link Rig.setPassband} are available. */
-  setMode: boolean;
-  /** The rig can report push-to-talk ({@link Rig.refresh} includes `ptt`). */
-  getPtt: boolean;
-  /** {@link Rig.setPtt} is available. */
-  setPtt: boolean;
-  /** {@link Rig.sendMorse} is available: the backend has a keyer command. */
-  sendMorse: boolean;
-  /** {@link Rig.stopMorse} can also stop the rig mid-message, not only drop the unsent rest. */
-  stopMorse: boolean;
 }
 
 /** {@link RigOperationCapabilities} plus the levels this rig will read. */
@@ -527,16 +515,7 @@ export interface Hamlib {
  * makes.
  */
 export function capabilitiesOf(model: RigModel): RigOperationCapabilities {
-  return {
-    getFrequency: model.capabilities.has('getFrequency'),
-    setFrequency: model.capabilities.has('setFrequency'),
-    getMode: model.capabilities.has('getMode'),
-    setMode: model.capabilities.has('setMode'),
-    getPtt: model.capabilities.has('getPtt'),
-    setPtt: model.capabilities.has('setPtt'),
-    sendMorse: model.capabilities.has('sendMorse'),
-    stopMorse: model.capabilities.has('stopMorse'),
-  };
+  return operationCapabilities((operation) => model.capabilities.has(operation));
 }
 
 /** One live polling registration; its identity is the unsubscribe handle. */
@@ -597,11 +576,7 @@ class RigHandle implements Rig {
     this.#host = compoundHostOf(rig);
     /* The rig's own view, which counts what its `conf` added: PTT moved onto
      * the RTS/DTR line works whatever the model declares. */
-    this.#operations = {
-      ...capabilitiesOf(rig.model),
-      getPtt: this.#host.can('getPtt'),
-      setPtt: this.#host.can('setPtt'),
-    };
+    this.#operations = operationCapabilities((operation) => this.#host.can(operation));
     this.#configuredLevels = configuredLevels;
     this.#advertisedLevels = advertisedLevels;
     this.#onClose = onClose;

@@ -63,6 +63,7 @@ import type {
 import { GeneratedRigMethods } from './native/generated/methods/index.js';
 import { bindCompoundHost } from './native/seam.js';
 import type { CompoundOperations } from './native/seam.js';
+import { operationCapabilities } from './catalogue.js';
 import type {
   DetectBaudRateOptions,
   RigModel,
@@ -1121,6 +1122,7 @@ function collectModels(list: NativeModelList, native: NativeModule): RigModel[] 
       };
       const { support, limitation } = classifyModel(manufacturer, name, settings);
       const capabilities = collectCapabilities(model, native);
+      const operations = operationCapabilities((operation) => capabilities.has(operation));
 
       models.push({
         id: model.id,
@@ -1137,16 +1139,12 @@ function collectModels(list: NativeModelList, native: NativeModule): RigModel[] 
         support,
         ...(limitation === undefined ? {} : { limitation }),
         capabilities,
-        /* One source: the capability set is the generated-operation list, and
-         * these booleans are its projection for UIs.  PTT is the exception -
-         * a backend that drives it over RTS/DTR declares no `get_ptt`, so the
-         * catalogue carries that fact itself. */
-        canGetFrequency: capabilities.has('getFrequency'),
-        canSetFrequency: capabilities.has('setFrequency'),
-        canGetMode: capabilities.has('getMode'),
-        canSetMode: capabilities.has('setMode'),
-        canGetPtt: model.canGetPtt,
-        canSetPtt: model.canSetPtt,
+        canGetFrequency: operations.getFrequency,
+        canSetFrequency: operations.setFrequency,
+        canGetMode: operations.getMode,
+        canSetMode: operations.setMode,
+        canGetPtt: operations.getPtt,
+        canSetPtt: operations.setPtt,
       });
     }
   } finally {

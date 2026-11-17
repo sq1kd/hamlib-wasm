@@ -12,7 +12,46 @@ import type { BrowserSupport, VERIFIED_MODELS } from './browser-support.js';
 import type { RigConf } from './conf.js';
 import type { SerialPortLike } from './transport.js';
 
-/** What a rig model can do over a serial transport. */
+/**
+ * What a model can do, as booleans a UI can test.
+ *
+ * The catalogue's {@link RigModel.capabilities} set is the source; this is the
+ * one interpretation of it both layers make.
+ */
+export interface RigOperationCapabilities {
+  /** The rig can report its frequency ({@link Rig.refresh} includes `frequency`). */
+  getFrequency: boolean;
+  /** {@link Rig.setFrequency} is available. */
+  setFrequency: boolean;
+  /** The rig can report its mode and passband. */
+  getMode: boolean;
+  /** {@link Rig.setMode} and {@link Rig.setPassband} are available. */
+  setMode: boolean;
+  /** The rig can report push-to-talk ({@link Rig.refresh} includes `ptt`). */
+  getPtt: boolean;
+  /** {@link Rig.setPtt} is available. */
+  setPtt: boolean;
+  /** {@link Rig.sendMorse} is available: the backend has a keyer command. */
+  sendMorse: boolean;
+  /** {@link Rig.stopMorse} can also stop the rig mid-message, not only drop the unsent rest. */
+  stopMorse: boolean;
+}
+
+/** Project a capability test - a model's set, or a rig's own view - onto the booleans. */
+export function operationCapabilities(can: (operation: string) => boolean): RigOperationCapabilities {
+  return {
+    getFrequency: can('getFrequency'),
+    setFrequency: can('setFrequency'),
+    getMode: can('getMode'),
+    setMode: can('setMode'),
+    getPtt: can('getPtt'),
+    setPtt: can('setPtt'),
+    sendMorse: can('sendMorse'),
+    stopMorse: can('stopMorse'),
+  };
+}
+
+/** What a rig model can do over a serial transport; see {@link RigOperationCapabilities}. */
 export interface RigModelCapabilities {
   canGetFrequency: boolean;
   canSetFrequency: boolean;
