@@ -216,7 +216,7 @@ rig.model.capabilities;                               // ReadonlySet<string>: me
 await rig.setRit(500);                                // throws HamlibError on failure
 await rig.setLevel('RF', 0.5);                        // level name + float/int value
 const split = await rig.getSplitFreqMode();           // { txFreq, txMode, txWidth }
-const ext = await rig.extLookupTok(0);                // RigConfparam, or empty when unknown
+const ext = await rig.extLookupTok(token);            // RigConfparam; throws when unknown
 await rig.passbandWide('USB');                        // pure: no CAT traffic, still queued
 await rig.powerToMilliwatts(0.5, 14_074_000, 'USB');  // the model's own power scale
 await rig.sendRaw(new TextEncoder().encode('FA;'), { terminator: 0x3b });  // vendor bytes

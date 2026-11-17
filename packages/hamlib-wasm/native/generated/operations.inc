@@ -779,17 +779,16 @@
             const char *value0 = arg0.c_str();
 
             const struct confparams *source = rig_ext_lookup(rig, value0);
-            ExtLookupResult result = ok<ExtLookupResult>();
 
-            if (source)
-            {
-                result.token = (double) source->token;
-                result.name = textOrEmpty(source->name);
-                result.label = textOrEmpty(source->label);
-                result.tooltip = textOrEmpty(source->tooltip);
-                result.dflt = textOrEmpty(source->dflt);
-                result.type = (double) source->type;
-            }
+            if (!source) { return failure<ExtLookupResult>(-RIG_EINVAL, "rig_ext_lookup matched nothing"); }
+
+            ExtLookupResult result = ok<ExtLookupResult>();
+            result.token = (double) source->token;
+            result.name = textOrEmpty(source->name);
+            result.label = textOrEmpty(source->label);
+            result.tooltip = textOrEmpty(source->tooltip);
+            result.dflt = textOrEmpty(source->dflt);
+            result.type = (double) source->type;
             return result;
         });
     }
@@ -802,17 +801,16 @@
             if (!fromNumber(arg0, &value0)) { return failure<ExtLookupTokResult>(-RIG_EINVAL); }
 
             const struct confparams *source = rig_ext_lookup_tok(rig, value0);
-            ExtLookupTokResult result = ok<ExtLookupTokResult>();
 
-            if (source)
-            {
-                result.token = (double) source->token;
-                result.name = textOrEmpty(source->name);
-                result.label = textOrEmpty(source->label);
-                result.tooltip = textOrEmpty(source->tooltip);
-                result.dflt = textOrEmpty(source->dflt);
-                result.type = (double) source->type;
-            }
+            if (!source) { return failure<ExtLookupTokResult>(-RIG_EINVAL, "rig_ext_lookup_tok matched nothing"); }
+
+            ExtLookupTokResult result = ok<ExtLookupTokResult>();
+            result.token = (double) source->token;
+            result.name = textOrEmpty(source->name);
+            result.label = textOrEmpty(source->label);
+            result.tooltip = textOrEmpty(source->tooltip);
+            result.dflt = textOrEmpty(source->dflt);
+            result.type = (double) source->type;
             return result;
         });
     }
@@ -1228,14 +1226,13 @@
             if (!fromNumber(arg0, &value0)) { return failure<LookupMemCapsResult>(-RIG_EINVAL); }
 
             const chan_t *source = rig_lookup_mem_caps(rig, value0);
-            LookupMemCapsResult result = ok<LookupMemCapsResult>();
 
-            if (source)
-            {
-                result.startc = (double) source->startc;
-                result.endc = (double) source->endc;
-                result.type = (double) source->type;
-            }
+            if (!source) { return failure<LookupMemCapsResult>(-RIG_EINVAL, "rig_lookup_mem_caps matched nothing"); }
+
+            LookupMemCapsResult result = ok<LookupMemCapsResult>();
+            result.startc = (double) source->startc;
+            result.endc = (double) source->endc;
+            result.type = (double) source->type;
             return result;
         });
     }

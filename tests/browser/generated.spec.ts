@@ -32,11 +32,11 @@ test('exposes the generated capability matrix and drives a generated operation',
       hasAgc: await rig.hasGetLevel('AGC'),
     };
 
-    /* `rig_ext_lookup` crosses as a projected `RigConfparam`: a name that is
-     * not an extension parameter comes back as an empty projection rather than
-     * a raw Embind value object. */
-    const miss = await rig.extLookup('not_a_real_ext_param');
-    const missTok = await rig.extLookupTok(0);
+    /* `rig_ext_lookup` answers NULL for a name or token that is not an
+     * extension parameter, which fails the call rather than projecting
+     * nothing. */
+    const miss = await window.__testHelpers.capture(() => rig.extLookup('not_a_real_ext_param'));
+    const missTok = await window.__testHelpers.capture(() => rig.extLookupTok(0));
     const setting = await rig.idxToSetting(await rig.settingToIdx(0));
 
     /* An integer argument takes a whole number its C type can hold; anything
@@ -117,14 +117,15 @@ test('exposes the generated capability matrix and drives a generated operation',
   expect(result.codec.mode).toBe('USB');
   expect(typeof result.codec.hasAgc).toBe('boolean');
 
-  /* A struct projection crosses as a value object with plain string fields. */
-  expect(typeof result.miss.name).toBe('string');
-  expect(result.miss.name).toBe('');
-  expect(result.missTok.name).toBe('');
   expect(typeof result.setting).toBe('number');
 
-  for (const refused of [result.fraction, result.outOfRange]) {
-    expect(expectFailure(refused).hamlibCode).toBe(-RIG_EINVAL);
+  for (const refused of [
+    expectFailure(result.miss),
+    expectFailure(result.missTok),
+    expectFailure(result.fraction),
+    expectFailure(result.outOfRange),
+  ]) {
+    expect(refused.hamlibCode).toBe(-RIG_EINVAL);
   }
 
   /* `get_ant` is one of the functions the TS-480 declares. */

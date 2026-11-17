@@ -348,9 +348,10 @@ function operationBody(facts: OperationFacts): string[] {
     lines.push(`int rc = ${call};`, '', `if (rc != RIG_OK) { return failure<${result}>(rc); }`, '');
     lines.push(`${result} result = ok<${result}>();`, ...pack);
   } else if (operation.pure?.category === 'struct') {
-    /* A lookup that finds nothing returns NULL: an empty projection. */
-    lines.push(`const ${operation.pure.native} *${SOURCE} = ${call};`, `${result} result = ok<${result}>();`, '');
-    lines.push(`if (${SOURCE})`, '{', ...pack.map((line) => `    ${line}`), '}');
+    /* A lookup returns NULL when nothing matches. */
+    lines.push(`const ${operation.pure.native} *${SOURCE} = ${call};`, '');
+    lines.push(`if (!${SOURCE}) { return failure<${result}>(-RIG_EINVAL, "${operation.symbol} matched nothing"); }`, '');
+    lines.push(`${result} result = ok<${result}>();`, ...pack);
   } else {
     lines.push(`const auto ${RETURNED} = ${call};`, `${result} result = ok<${result}>();`, ...pack);
   }
