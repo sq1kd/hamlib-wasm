@@ -10,7 +10,7 @@
 import { afterEach, expect, test } from 'vitest';
 
 import { createRawHamlib, webSerialTransport } from 'hamlib-wasm/raw';
-import type { SerialPortLike, SerialTransport } from 'hamlib-wasm/raw';
+import type { SerialTransport } from 'hamlib-wasm/raw';
 
 import { fakePort } from './fake-port.js';
 import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
@@ -51,10 +51,10 @@ test('drives a rig through a caller-supplied transport and port', async () => {
     expect(await rig.getFrequency()).toBe(7_074_000);
 
     await rig.setPtt('on');
-    expect(control.rig.state.transmitting).toBe(true);
+    expect(control.state.transmitting).toBe(true);
 
     await rig.setPtt('off');
-    expect(control.rig.state.transmitting).toBe(false);
+    expect(control.state.transmitting).toBe(false);
 
     expect(rig.connected).toBe(true);
     await rig.close();
@@ -72,7 +72,7 @@ test('drives a rig through a caller-supplied transport and port', async () => {
   /* The rig really answered: the commands reached the emulator. */
   expect(control.commands).toContain('ID');
   expect(control.commands).toContain('FA00007074000');
-  expect(control.rig.state.frequency).toBe(7_074_000);
+  expect(control.state.frequency).toBe(7_074_000);
 });
 
 test('refuses a request the Web Serial transport cannot serve', async () => {
@@ -103,44 +103,6 @@ test('refuses a request the Web Serial transport cannot serve', async () => {
   }
 });
 
-/**
- * A transport that never settles, which is what a dead port looks like from
- * the module's side.
- */
-function neverSettles(): {
-  readonly port: SerialPortLike;
-  readonly closed: () => boolean;
-  readonly openStarted: () => boolean;
-} {
-  let closed = false;
-  let started = false;
-
-  const port: SerialPortLike = {
-    get readable(): null {
-      return null;
-    },
-    get writable(): null {
-      return null;
-    },
-    open: () => {
-      started = true;
-      return new Promise(() => {});
-    },
-    close: async () => {
-      closed = true;
-    },
-    setSignals: async () => {},
-    getSignals: async () => ({
-      clearToSend: false,
-      dataSetReady: false,
-      dataCarrierDetect: false,
-      ringIndicator: false,
-    }),
-  };
-
-  return { port, closed: () => closed, openStarted: () => started };
-}
-
 afterEach(() => {
   useRealTime();
 });
@@ -150,7 +112,10 @@ afterEach(() => {
 test('bounds a call that never settles and refuses the instance afterwards', async () => {
   useVirtualTime();
 
-  const control = neverSettles();
+  /* An open that never settles is what a dead port looks like from the
+   * module's side. */
+  const control = fakePort();
+  control.holdNextOpen = true;
 
   const transport: SerialTransport = {
     name: 'hung',
@@ -174,7 +139,7 @@ test('bounds a call that never settles and refuses the instance afterwards', asy
       (error: unknown) => error as { code?: string },
     ));
 
-    expect(control.openStarted()).toBe(true);
+    expect(control.openPending).toBe(true);
     expect(failure?.code).toBe('RIG_TIMEOUT');
 
     /* The suspended native stack cannot be re-entered: the next call fails
@@ -191,7 +156,7 @@ test('bounds a call that never settles and refuses the instance afterwards', asy
     await settle(hamlib.dispose());
   }
 
-  expect(control.closed()).toBe(true);
+  expect(control.closeRequests).toBe(1);
 });
 
 test('close releases the native handle', async () => {

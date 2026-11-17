@@ -23,122 +23,41 @@ const RIGS_SOURCE = readFileSync(
   'utf8',
 );
 
-const TRANSPORT_SOURCE = readFileSync(
+const PORT_SOURCE = readFileSync(
+  fileURLToPath(new URL('./fixtures/generated/fake-port.js', import.meta.url)),
+  'utf8',
+);
+
+const WEB_SERIAL_SOURCE = readFileSync(
   fileURLToPath(new URL('./fixtures/generated/fake-serial.js', import.meta.url)),
   'utf8',
 );
 
-/* The rig registry has to be installed before the transport reads it, and both
- * are injected as text so nothing transpiles them. */
-const FAKE_SERIAL_SOURCE = `${RIGS_SOURCE}\n${TRANSPORT_SOURCE}`;
+/* The rig registry has to be installed before the port factory reads it, and
+ * the factory before the Web Serial surface builds its port; all three are
+ * injected as text so nothing transpiles them. */
+const FAKE_SERIAL_SOURCE = `${RIGS_SOURCE}\n${PORT_SOURCE}\n${WEB_SERIAL_SOURCE}`;
 
 const TEST_HELPERS_SOURCE = readFileSync(
   fileURLToPath(new URL('./fixtures/generated/helpers.js', import.meta.url)),
   'utf8',
 );
 
-export interface FakeSerialOptions {
-  baudRate: number;
-  dataBits: number;
-  stopBits: number;
-  parity: string;
-  flowControl: string;
-}
-
-export interface FakeRigState {
-  frequency: number;
-  modeDigit: number;
-  filterValue: number;
-  transmitting: boolean;
-  silent: boolean;
-}
-
-/**
- * The control surface the injected fixture publishes on `window`.
- *
- * Declared here because the fixture is injected as page content, and every
- * helper checks at runtime that it is actually present.
- */
-export interface FakeSerialControl {
-  /** The single fake device the fixture exposes. */
-  port: SerialPort;
-  /** The protocol currently driving the emulator. */
-  rigName: string;
-  openedOptions: FakeSerialOptions | null;
-  openCount: number;
-  closeCount: number;
-  isOpen: boolean;
-  closedWithLockedStreams: boolean;
-  failNextOpen: string | null;
-  /** True while a held `open()` is parked. */
-  openPending: boolean;
-  /** Delay applied to every emulator reply, in milliseconds. */
-  replyDelayMs: number;
-  fragmentBytes: number;
-  fragmentGapMs: number;
-  echo: boolean;
-  /** When true, every host write is refused, as a device that rejects commands. */
-  failWrites: boolean;
-  setSignalsCalls: number;
-  outputSignals: Record<string, boolean> | null;
-  commands: string[];
-  state: FakeRigState;
-  /** Switch the emulated radio; only valid while the port is closed. */
-  useRig(name: FakeRigName): void;
-  removeWebSerial(): void;
-  /** Hold the next `open()` until `releaseOpen()`. */
-  holdNextOpen: boolean;
-  /** Release a parked `open()`. */
-  releaseOpen(): void;
-  /** Inject bytes into the readable stream without a write. */
-  pushRaw(text: string): void;
-  /** Fail the readable stream, as a device unplug would. */
-  errorReadable(name: string): void;
-}
-
-/** The emulated radios the fixture can drive. */
-export type FakeRigName =
-  | 'kenwood-ts480'
-  | 'icom-ic703'
-  | 'icom-ic746'
-  | 'icom-ic746pro'
-  | 'yaesu-ft710'
-  | 'yaesu-ft757gx2'
-  | 'yaesu-frg100';
-
-/** The virtual clock's control surface, as the specs see it. */
-export interface VirtualClockControl {
-  now(): number;
-  mode: VirtualClockMode;
-  pendingTimers(): number;
-  advance(ms: number): Promise<void>;
-  settle<T>(promise: Promise<T>): Promise<T>;
-  until(predicate: () => boolean): Promise<void>;
-}
-
-declare global {
-  interface Window {
-    __fakeSerial: FakeSerialControl;
-    __virtualClock: VirtualClockControl;
-  }
-}
-
-export interface FakeSerialSnapshot {
-  rigName: string;
-  openedOptions: FakeSerialOptions | null;
-  openCount: number;
-  closeCount: number;
-  isOpen: boolean;
-  closedWithLockedStreams: boolean;
-  openPending: boolean;
-  setSignalsCalls: number;
-  outputSignals: Record<string, boolean> | null;
-  commands: string[];
-  state: FakeRigState;
-}
-
-/** How the page's virtual clock moves; see fixtures/virtual-clock.ts. */
-export type VirtualClockMode = 'auto' | 'manual';
+/** A serializable copy of what the fake port recorded. */
+export type FakeSerialSnapshot = Pick<
+  FakePortControl,
+  | 'rigName'
+  | 'openedOptions'
+  | 'openCount'
+  | 'closeCount'
+  | 'isOpen'
+  | 'closedWithLockedStreams'
+  | 'openPending'
+  | 'setSignalsCalls'
+  | 'outputSignals'
+  | 'commands'
+  | 'state'
+>;
 
 /**
  * Put the page on virtual time before any page script runs.
@@ -239,20 +158,18 @@ export async function removeWebSerial(page: Page): Promise<void> {
       throw new Error('the fake Web Serial fixture is not installed');
     }
 
-    window.__fakeSerial.removeWebSerial();
+    Object.defineProperty(navigator, 'serial', { value: undefined, configurable: true });
   });
 }
 
 /** Select the emulated radio the fixture should answer as. */
 export async function useRig(page: Page, name: FakeRigName): Promise<void> {
-  await page.evaluate((rigName: string) => {
+  await page.evaluate((rigName: FakeRigName) => {
     if (!window.__fakeSerial) {
       throw new Error('the fake Web Serial fixture is not installed');
     }
 
-    window.__fakeSerial.useRig(rigName as Parameters<
-      typeof window.__fakeSerial.useRig
-    >[0]);
+    window.__fakeSerial.useRig(rigName);
   }, name);
 }
 

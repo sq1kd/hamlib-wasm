@@ -2,7 +2,10 @@
   "compilerOptions": {
     "tsBuildInfoFile": "../../../.cache/tsc/tests-browser-fixtures.tsbuildinfo",
     "target": "ES2022",
-    "module": "none",
+    /* `preserve` only so the fixtures can name the package's port contract in
+     * type-only `import()` expressions; with no import or export statement
+     * each file is still emitted as a plain script. */
+    "module": "preserve",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     /* The fixtures are plain DOM code, injected into a page.  Nothing may leak
      * globals in from an @types package (notably @types/node's ReadableStream),
@@ -21,5 +24,12 @@
     "noEmitOnError": true,
     "outDir": "generated"
   },
-  "include": ["virtual-clock.ts", "rigs.ts", "fake-serial.ts", "helpers.ts", "fixtures-globals.d.ts"]
+  "include": [
+    "virtual-clock.ts",
+    "rigs.ts",
+    "fake-port.ts",
+    "fake-serial.ts",
+    "helpers.ts",
+    "fixtures-globals.d.ts"
+  ]
 }

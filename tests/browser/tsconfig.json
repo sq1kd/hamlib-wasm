@@ -10,14 +10,13 @@
   },
   "include": ["**/*.ts", "**/*.d.ts"],
   /* The in-page fixtures are standalone scripts with their own project
-   * (fixtures/tsconfig.json).  Their global declarations cannot be typed here
-   * without colliding with globals.d.ts and fixtures.ts, so the spec project
-   * does not carry them; fixtures/compile.ts stays in. */
+   * (fixtures/tsconfig.json).  The spec project reads what they publish
+   * (fixtures-globals.d.ts, and rigs.ts for the registry's names) but does not
+   * check the scripts themselves; fixtures/compile.ts stays in. */
   "exclude": [
     "fixtures/virtual-clock.ts",
-    "fixtures/rigs.ts",
+    "fixtures/fake-port.ts",
     "fixtures/fake-serial.ts",
-    "fixtures/helpers.ts",
-    "fixtures/fixtures-globals.d.ts"
+    "fixtures/helpers.ts"
   ]
 }

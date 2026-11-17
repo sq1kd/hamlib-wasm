@@ -2,7 +2,8 @@
  * Test-seam declarations for the pages the browser specs drive.
  *
  * `tests/harness/src/main.ts` publishes the package on `window`; the React
- * example publishes nothing and is driven through its DOM instead.
+ * example publishes nothing and is driven through its DOM instead.  What the
+ * injected fixtures publish is declared in fixtures/fixtures-globals.d.ts.
  */
 import type { Hamlib, RigOperationCapabilities, HamlibOptions } from 'hamlib-wasm';
 import type {
@@ -18,22 +19,6 @@ import type { HookHarness } from '../harness/src/hook-harness-types';
 
 export type NativeModule = MainModule;
 
-export interface HamlibErrorView {
-  name: string | null;
-  message: string;
-  code: string | null;
-  operation: string | null;
-  hamlibCode: number | null;
-  hamlibMessage: string | null;
-  /** `name: message` of the wrapped cause, when there is one. */
-  cause: string | null;
-  isHamlibError: boolean;
-}
-
-export type Captured<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: HamlibErrorView };
-
 export interface HamlibHarness {
   createRawHamlib(options?: RawHamlibOptions): Promise<RawHamlib>;
   createHamlib(options?: HamlibOptions): Promise<Hamlib>;
@@ -47,15 +32,9 @@ export interface HamlibHarness {
   vocabularies: Readonly<Record<string, readonly string[]>>;
 }
 
-export interface TestHelpers {
-  describeError(value: unknown): HamlibErrorView;
-  capture<T>(action: () => T | Promise<T>): Promise<Captured<T>>;
-}
-
 declare global {
   interface Window {
     __hamlibHarness: HamlibHarness;
-    __testHelpers: TestHelpers;
     __hookHarness: HookHarness;
     /** A hook call a spec started and settles later, on the virtual clock. */
     __pendingHookCall: Promise<string> | undefined;

@@ -9,12 +9,6 @@
 import '../browser/fixtures/rigs.ts';
 
 /** Instantiate an emulated rig by its registry name. */
-export function fakeRig(name = 'kenwood-ts480'): FakeRig {
-  const factory = window.__fakeRigRegistry[name];
-
-  if (!factory) {
-    throw new Error(`unknown emulated rig "${name}"`);
-  }
-
-  return factory();
+export function fakeRig(name: FakeRigName = 'kenwood-ts480'): FakeRig {
+  return window.__fakeRigRegistry[name]();
 }

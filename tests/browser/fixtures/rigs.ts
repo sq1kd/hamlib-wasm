@@ -7,12 +7,13 @@
  *   state     emulated state, always carrying `frequency`, `modeDigit`,
  *             `filterValue`, `transmitting` and `silent`
  *   commands  every request the emulator decoded, as readable text
- *   feed(bytes)  consume a chunk of host bytes and return reply chunks
+ *   hear(bytes, baudRate)  what the radio sends back for host bytes that
+ *             arrived on a line opened at `baudRate`
+ *   feed(bytes)  the protocol alone: decode host bytes, return reply chunks
  *   reset()   forget the partial frame, keeping the state
  *
- * `silent` is honoured by the transport, not here: commands are still decoded
- * and recorded while the emulator is silent, which is what the timeout tests
- * assert against.
+ * Every port double hands host bytes to `hear()`, so the line rules - the
+ * menu rate and `silent` - are the same in the browser and in Node.
  *
  * This file is compiled to `generated/rigs.js` by the neighbouring
  * tsconfig.json and injected into the page as *text* (see
@@ -20,7 +21,7 @@
  * runs in the page's global scope, so it never imports anything.
  */
 
-(function installFakeRigs() {
+function createFakeRigRegistry() {
   var ACK = 0xfb;
   var NAK = 0xfa;
 
@@ -53,7 +54,7 @@
    * Set commands are not answered; the backend verifies them with the
    * following `ID;` transaction, so replying would corrupt the protocol.
    */
-  function createTs480(): FakeRig {
+  function createTs480(): FakeRigProtocol {
     var TERMINATOR = ';';
     var MODE_USB = 2;
 
@@ -210,7 +211,7 @@
    * CI-V model the fixtures need: the IC-703 answers at 0x68, the IC-746 at
    * 0x56 and the IC-746PRO at 0x66, each backend's default address.
    */
-  function createIcomCiv(radioAddress: number, name: string): FakeRig {
+  function createIcomCiv(radioAddress: number, name: string): FakeRigProtocol {
     var PREAMBLE = [0xfe, 0xfe];
     var CONTROLLER = 0xe0; /* host */
     var RADIO = radioAddress;
@@ -387,7 +388,7 @@
    * setting on the radio.  That is what makes it the fixture for a wrong rate
    * (silence, not an error) and for the rate scan.
    */
-  function createFt710(): FakeRig {
+  function createFt710(): FakeRigProtocol {
     var CAT_RATE = 38400;
     var MODE_LSB = 1;
 
@@ -510,7 +511,7 @@
    * needs the CAT port for push-to-talk, which the backend drives with the DTR
    * line rather than with a frame.
    */
-  function createFt757gx2(): FakeRig {
+  function createFt757gx2(): FakeRigProtocol {
     var STATUS_COMMAND = [0x00, 0x00, 0x00, 0x00, 0x10];
     var STATUS_LENGTH = 75;
     var FRAME_LENGTH = 5;
@@ -588,7 +589,7 @@
    * of hertz, exactly as `frg100_read_freq_from_buf()` decodes it.  Every
    * setter is write-only for this backend too.
    */
-  function createFrg100(): FakeRig {
+  function createFrg100(): FakeRigProtocol {
     var FRAME_LENGTH = 5;
     var READ_OP_DATA = [0x00, 0x00, 0x00, 0x02, 0x10];
     var OP_DATA_LENGTH = 19;
@@ -682,18 +683,45 @@
     };
   }
 
-  /** One CI-V factory per bus address. */
-  function civRig(address: number, name: string): () => FakeRig {
-    return function (): FakeRig { return createIcomCiv(address, name); };
+  /**
+   * The radio behind a real line.  A rig with a menu rate hears that rate only:
+   * opened at any other, it sees framing errors and says nothing at all - the
+   * failure a rate scan exists to get past, and one no protocol-level answer
+   * can report.  A silenced rig still decodes and records what it is sent, but
+   * answers none of it.
+   */
+  function onTheLine(create: () => FakeRigProtocol): () => FakeRig {
+    return function (): FakeRig {
+      var protocol = create();
+
+      return Object.assign(protocol, {
+        hear: function (chunk: Uint8Array, baudRate: number | null): Uint8Array[] {
+          if (protocol.baudRate !== undefined && baudRate !== null && baudRate !== protocol.baudRate) {
+            return [];
+          }
+
+          var replies = protocol.feed(chunk);
+
+          return protocol.state.silent ? [] : replies;
+        },
+      });
+    };
   }
 
-  window.__fakeRigRegistry = {
-    'kenwood-ts480': createTs480,
-    'icom-ic703': civRig(0x68, 'icom-ic703'),
-    'icom-ic746': civRig(0x56, 'icom-ic746'),
-    'icom-ic746pro': civRig(0x66, 'icom-ic746pro'),
-    'yaesu-ft710': createFt710,
-    'yaesu-ft757gx2': createFt757gx2,
-    'yaesu-frg100': createFrg100,
+  /** One CI-V factory per bus address. */
+  function civRig(address: number, name: string): () => FakeRigProtocol {
+    return function (): FakeRigProtocol { return createIcomCiv(address, name); };
+  }
+
+  return {
+    'kenwood-ts480': onTheLine(createTs480),
+    'icom-ic703': onTheLine(civRig(0x68, 'icom-ic703')),
+    'icom-ic746': onTheLine(civRig(0x56, 'icom-ic746')),
+    'icom-ic746pro': onTheLine(civRig(0x66, 'icom-ic746pro')),
+    'yaesu-ft710': onTheLine(createFt710),
+    'yaesu-ft757gx2': onTheLine(createFt757gx2),
+    'yaesu-frg100': onTheLine(createFrg100),
   };
-})();
+}
+
+window.__fakeRigRegistry = createFakeRigRegistry();

@@ -16,7 +16,6 @@ import {
   readFakeSerial,
   removeWebSerial,
 } from './fixtures';
-import type { Captured, HamlibErrorView } from './globals';
 import { UPSTREAM_VERSION } from './upstream';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';

@@ -13,7 +13,7 @@ import { createRawHamlib } from 'hamlib-wasm/raw';
 import type { RawHamlib, SerialTransport } from 'hamlib-wasm/raw';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
-import { FAKE_PATH, rigSerialPortModule } from './rig-serialport.js';
+import { rigSerialPortModule } from './rig-serialport.js';
 import { settle, useRealTime, useVirtualTime } from './virtual-time.js';
 
 /** The model id of a catalogue entry, or a failure that names what is missing. */
@@ -43,11 +43,12 @@ test('refuses a port request without a path', async () => {
 });
 
 test('lists the ports the module reports', async () => {
-  const transport = nodeSerialTransport({ serialport: rigSerialPortModule() });
+  const module = rigSerialPortModule();
+  const transport = nodeSerialTransport({ serialport: module });
 
   expect(await transport.listPorts()).toEqual([
     {
-      path: FAKE_PATH,
+      path: module.path,
       manufacturer: 'Emulated',
       serialNumber: undefined,
       pnpId: undefined,
@@ -65,7 +66,7 @@ test('opens the requested path at the rig settings and reads the rig', async () 
 
   try {
     const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
-    const port = await transport.requestPort({ path: FAKE_PATH });
+    const port = await transport.requestPort({ path: module.path });
     const rig = await hamlib.open({ modelId, port, baudRate: 9600 });
 
     expect(await rig.getFrequency()).toBe(14_074_000);
@@ -78,7 +79,7 @@ test('opens the requested path at the rig settings and reads the rig', async () 
   /* What the adapter asked the port constructor for. */
   expect(module.constructed).toEqual([
     {
-      path: FAKE_PATH,
+      path: module.path,
       baudRate: 9600,
       dataBits: 8,
       stopBits: 1,
@@ -91,7 +92,7 @@ test('opens the requested path at the rig settings and reads the rig', async () 
   /* And what reached the binding: the stream strips `binding` and `autoOpen`
    * before it forwards the open options. */
   expect(module.binding.lastOpenOptions).toEqual({
-    path: FAKE_PATH,
+    path: module.path,
     baudRate: 9600,
     dataBits: 8,
     stopBits: 1,
@@ -112,7 +113,7 @@ test('opens the requested path at the rig settings and reads the rig', async () 
 test('maps hardware flow control onto the binding option', async () => {
   const module = rigSerialPortModule();
   const transport = nodeSerialTransport({ serialport: module });
-  const port = await transport.requestPort({ path: FAKE_PATH });
+  const port = await transport.requestPort({ path: module.path });
 
   await port.open({
     baudRate: 9600,
@@ -130,7 +131,7 @@ test('maps hardware flow control onto the binding option', async () => {
 test('sends the complete output state on every setSignals call', async () => {
   const module = rigSerialPortModule();
   const transport = nodeSerialTransport({ serialport: module });
-  const port = await transport.requestPort({ path: FAKE_PATH });
+  const port = await transport.requestPort({ path: module.path });
 
   await port.open({ baudRate: 9600 });
 
@@ -151,7 +152,7 @@ test('sends the complete output state on every setSignals call', async () => {
 test('maps the modem lines the binding reports', async () => {
   const module = rigSerialPortModule();
   const transport = nodeSerialTransport({ serialport: module });
-  const port = await transport.requestPort({ path: FAKE_PATH });
+  const port = await transport.requestPort({ path: module.path });
 
   await port.open({ baudRate: 9600 });
 
@@ -177,7 +178,7 @@ test('maps the modem lines the binding reports', async () => {
 test('refuses to open a port twice, and opens a fresh port after close', async () => {
   const module = rigSerialPortModule();
   const transport = nodeSerialTransport({ serialport: module });
-  const port = await transport.requestPort({ path: FAKE_PATH });
+  const port = await transport.requestPort({ path: module.path });
 
   await port.open({ baudRate: 9600 });
 
@@ -204,7 +205,7 @@ test('surfaces a device that cannot be opened as a Hamlib error, not a crash', a
 
   /* A binding whose open always fails, as a held or absent device does. */
   module.binding.open = async () => {
-    throw Object.assign(new Error(`cannot open ${FAKE_PATH}`), { code: 'ENOENT' });
+    throw Object.assign(new Error(`cannot open ${module.path}`), { code: 'ENOENT' });
   };
 
   const transport: SerialTransport = nodeSerialTransport({ serialport: module });
@@ -212,7 +213,7 @@ test('surfaces a device that cannot be opened as a Hamlib error, not a crash', a
 
   try {
     const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
-    const port = await transport.requestPort({ path: FAKE_PATH });
+    const port = await transport.requestPort({ path: module.path });
     const failure = await hamlib.open({ modelId, port }).then(
       () => null,
       (error: unknown) => error as { code?: string; hamlibCode?: number; message?: string },
@@ -246,7 +247,7 @@ test('finds the rate a rig answers at through the adapter', async () => {
 
   try {
     const modelId = modelIdOf(hamlib, 'Yaesu', 'FT-710');
-    const port = await transport.requestPort({ path: FAKE_PATH });
+    const port = await transport.requestPort({ path: module.path });
     const baudRate = await settle(hamlib.detectBaudRate({ modelId, port }));
 
     /* The FT-710 emulator is silent at every rate but 38400 - the rate its own
@@ -268,7 +269,7 @@ test('an unplugged device fails the next call fast, and the instance stays usabl
 
   try {
     const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
-    const port = await transport.requestPort({ path: FAKE_PATH });
+    const port = await transport.requestPort({ path: module.path });
     const rig = await settle(hamlib.open({ modelId, port, baudRate: 9600 }));
 
     expect(await settle(rig.getFrequency())).toBe(14_074_000);
@@ -312,7 +313,7 @@ test('Hamlib writes nothing to stderr or stdout', async () => {
 
     try {
       const modelId = modelIdOf(hamlib, 'Kenwood', 'TS-480');
-      const rig = await hamlib.open({ modelId, port: await transport.requestPort({ path: FAKE_PATH }), baudRate: 9600 });
+      const rig = await hamlib.open({ modelId, port: await transport.requestPort({ path: module.path }), baudRate: 9600 });
 
       await rig.getFrequency();
       await rig.close();
@@ -333,7 +334,7 @@ test('a port reports the USB ids the listing gave its path', async () => {
   const hamlib = await createRawHamlib({ transport });
 
   try {
-    const port = await transport.requestPort({ path: FAKE_PATH });
+    const port = await transport.requestPort({ path: module.path });
 
     expect(port.getInfo?.()).toEqual({ usbVendorId: 0x1a86, usbProductId: 0x7523 });
 

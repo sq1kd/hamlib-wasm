@@ -10,7 +10,9 @@
 
 (function installTestHelpers() {
   function describeError(error: unknown): HamlibErrorView {
-    var harness = window.__hamlibHarness;
+    /* Published by the harness page on load, so absent while init scripts run. */
+    var harness = (window as { __hamlibHarness?: { isHamlibError(value: unknown): boolean } })
+      .__hamlibHarness;
     var value = error as { [key: string]: unknown } | null;
     var cause = value ? value.cause : null;
     /* `cause` is only read through `.name` and `.message`, and only when it is
@@ -36,7 +38,7 @@
     describeError: describeError,
     capture: async function <T>(
       action: () => T | Promise<T>,
-    ): Promise<CapturedView<Awaited<T>>> {
+    ): Promise<Captured<Awaited<T>>> {
       try {
         return { ok: true, value: await action() };
       } catch (error) {

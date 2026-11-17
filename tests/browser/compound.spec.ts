@@ -15,7 +15,6 @@ import {
   installVirtualClock,
   setReplyDelay,
 } from './fixtures';
-import type { Captured } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
 

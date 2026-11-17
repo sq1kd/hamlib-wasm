@@ -1,18 +1,18 @@
 /**
  * Ambient declarations for the in-page browser fixtures.
  *
- * rigs.ts, fake-serial.ts and helpers.ts are compiled to `generated/*.js` by
- * the neighbouring tsconfig.json and injected into the page as *text* (see
- * tests/browser/fixtures.ts).  They are standalone scripts rather than modules,
- * so they share the page's global scope; this file is the single place that
- * says what they publish on `window`.
+ * virtual-clock.ts, rigs.ts, fake-port.ts, fake-serial.ts and helpers.ts are
+ * compiled to `generated/*.js` by the neighbouring tsconfig.json and injected
+ * into the page as *text* (see tests/browser/fixtures.ts).  They are standalone
+ * scripts rather than modules, so they share the page's global scope; this file
+ * is the single place that says what they publish on `window`.  The spec
+ * project and the Node tests read the same declarations.
  *
  * It is deliberately a global script (no imports, no exports) so that
- * `interface Window` merges with the one lib.dom declares.  The browser spec
- * project excludes this directory because its own declarations for
- * `__hamlibHarness`, `__testHelpers` and `__fakeSerial` are richer (they know
- * `RawHamlib`, `MainModule` and `SerialPort`); these types describe the fixture
- * scripts themselves, which only know the plain DOM.
+ * `interface Window` merges with the one lib.dom declares; the package's port
+ * contract comes in through type-only `import()` expressions, which keep it a
+ * script (and stay clear of the Web Serial globals the spec project declares
+ * under the same names).
  */
 
 /** Every emulator carries this state, whichever protocol it speaks. */
@@ -21,22 +21,20 @@ interface FakeRigState {
   modeDigit: number;
   filterValue: number;
   transmitting: boolean;
+  /** Decode and record what the host sends, but answer none of it. */
   silent: boolean;
 }
 
-/** One emulated radio, as returned by its factory in the registry. */
-interface FakeRig {
+/** One CAT protocol: host bytes in, reply bytes out. */
+interface FakeRigProtocol {
   /** The protocol name, for diagnostics. */
   name: string;
   state: FakeRigState;
   /**
    * The rate this rig's own menu is set to, when it has one.
    *
-   * A rig behind a real UART hears one rate only: opened at any other, it
-   * receives framing errors and stays silent rather than answering with an
-   * error.  Emulators that set this are silent at every other rate - which is
-   * what a scan has to cope with.  Omitted (a USB CDC interface, which ignores
-   * the line rate entirely) the emulator answers at whatever is asked.
+   * Omitted (a USB CDC interface, which ignores the line rate entirely) the
+   * emulator answers at whatever is asked.
    */
   baudRate?: number;
   /** Every request the emulator decoded, as readable text. */
@@ -47,86 +45,35 @@ interface FakeRig {
   feed(chunk: Uint8Array): Uint8Array[];
 }
 
+/** One emulated radio, as returned by its factory in the registry. */
+interface FakeRig extends FakeRigProtocol {
+  /**
+   * What the radio sends back for host bytes that arrived on a line opened at
+   * `baudRate` (null before any open): nothing at a rate its menu is not set
+   * to, nothing while it is silent.  The one entry point every port double
+   * uses.
+   */
+  hear(chunk: Uint8Array, baudRate: number | null): Uint8Array[];
+}
+
+/** The emulated radios rigs.ts publishes, by protocol name. */
+type FakeRigRegistry = ReturnType<typeof createFakeRigRegistry>;
+
+type FakeRigName = keyof FakeRigRegistry;
+
 /**
- * The emulated radios `window.__fakeRigRegistry` publishes.
+ * The control surface of one fake port over one emulated rig (fake-port.ts).
  *
- * The known keys are listed so a factory result and a protocol name are checked
- * where they meet; the index signature is what `useRig(name)` looks up, and it
- * is `| undefined` because an unknown name is a runtime error there.
+ * The same object drives the browser's Web Serial double and the Node tests'
+ * injected port, so every rule a double enforces is written once.
  */
-interface FakeRigRegistry {
-  'kenwood-ts480': () => FakeRig;
-  'icom-ic703': () => FakeRig;
-  'icom-ic746': () => FakeRig;
-  'icom-ic746pro': () => FakeRig;
-  'yaesu-ft710': () => FakeRig;
-  'yaesu-ft757gx2': () => FakeRig;
-  'yaesu-frg100': () => FakeRig;
-  [name: string]: (() => FakeRig) | undefined;
-}
-
-/** The subset of `SerialOptions` the fake transport records and replays. */
-interface FakeSerialOptions {
-  baudRate: number;
-  dataBits: number;
-  stopBits: number;
-  parity: string;
-  flowControl: string;
-}
-
-/** The subset of `SerialOutputSignals` the fake port accepts. */
-interface FakeOutputSignals {
-  dataTerminalReady?: boolean | undefined;
-  requestToSend?: boolean | undefined;
-  break?: boolean | undefined;
-}
-
-/** The input modem lines the fake port reports. */
-interface FakeInputSignals {
-  clearToSend: boolean;
-  dataSetClearToSend: boolean;
-  dataSetReady: boolean;
-  dataCarrierDetect: boolean;
-  ringIndicator: boolean;
-}
-
-/**
- * The port surface the fake transport implements.
- *
- * It is a deliberate subset of the DOM's `SerialPort`: the fixtures provide
- * `lib: DOM` only, and the specs see the fixture through the richer
- * `SerialPort` declaration in tests/browser/fixtures.ts.
- */
-interface FakePort {
-  readable: ReadableStream<Uint8Array> | null;
-  writable: WritableStream<Uint8Array> | null;
-  open(options: FakeSerialOptions): Promise<void>;
-  close(): Promise<void>;
-  setSignals(signals: FakeOutputSignals): Promise<void>;
-  getSignals(): Promise<FakeInputSignals>;
-  getInfo(): { usbVendorId: number; usbProductId: number };
-}
-
-/**
- * The constructor of the prototype-built fake port.
- *
- * TypeScript cannot infer a construct signature for the function expression
- * that builds `FakePort`, and this is the shape the fixtures assert it to.
- */
-interface FakePortConstructor {
-  new (): FakePort;
-  prototype: FakePort;
-}
-
-/**
- * The control surface the fake transport publishes, minus the members that are
- * only attached once the transport exists.
- */
-interface FakeSerialControlBase {
+interface FakePortControl {
+  /** The port, as the package's own contract types it. */
+  readonly port: import('hamlib-wasm/raw').SerialPortLike;
   /** The protocol currently driving the emulator. */
-  rigName: string;
-  /** Options handed to `SerialPort.open()`, or null. */
-  openedOptions: FakeSerialOptions | null;
+  rigName: FakeRigName;
+  /** Line settings the port was opened with, or null before the first open. */
+  openedOptions: import('hamlib-wasm/raw').SerialLineSettings | null;
   openCount: number;
   closeCount: number;
   isOpen: boolean;
@@ -134,63 +81,53 @@ interface FakeSerialControlBase {
   failNextOpen: string | null;
   /**
    * When true, the next `open()` parks until `releaseOpen()` runs.  The
-   * controlled gate a spec uses instead of a sleep to hold a connection
+   * controlled gate a test uses instead of a sleep to hold a connection
    * attempt at its first asynchronous boundary.
    */
   holdNextOpen: boolean;
   /** True while a held `open()` is parked. */
   openPending: boolean;
-  /** Release the parked `open()`, completing it. */
+  /** Release the parked `open()`, completing it.  A no-op when none is parked. */
   releaseOpen(): void;
-  /** Delay applied to every emulator reply, in milliseconds. */
+  /**
+   * Delay every emulator reply by this many milliseconds - of virtual time
+   * when the clock is virtual, as it is in every browser spec.
+   */
   replyDelayMs: number;
-  /** Split every reply into pieces of this many bytes; 0 delivers it whole. */
+  /**
+   * Split every reply into pieces of this many bytes, `fragmentGapMs` apart,
+   * as a USB-serial adapter delivers them.  0 hands each reply over whole.
+   */
   fragmentBytes: number;
-  /** Virtual milliseconds between two pieces of a fragmented reply. */
   fragmentGapMs: number;
-  /** Mirror every host write back, as a CI-V bus or an echoing interface does. */
+  /**
+   * Mirror every host write straight back, as a CI-V bus or an echoing
+   * interface does.  The echo comes from the line, not the radio, so it
+   * arrives even when the rig is silent or opened at the wrong rate.
+   */
   echo: boolean;
-  /** When true, every host write is refused. */
+  /** When true, every host write is refused, as a device that rejects commands. */
   failWrites: boolean;
+  /** Every `close()` call, including those the port refused. */
+  closeRequests: number;
   /** True when close() found a locked stream, i.e. the transport leaked. */
   closedWithLockedStreams: boolean;
   /** Every command the emulator decoded, without its framing. */
   commands: string[];
-  /** Last value passed to `setSignals()`. */
-  outputSignals: FakeOutputSignals | null;
+  /** Every output line the transport has driven, accumulated; null before any. */
+  outputSignals: import('hamlib-wasm/raw').SerialOutputSignals | null;
   /** `setSignals()` calls, for asserting the transport only drives what it must. */
   setSignalsCalls: number;
   /** Input modem lines reported by `getSignals()`. */
-  inputSignals: FakeInputSignals;
+  inputSignals: import('hamlib-wasm/raw').SerialInputSignals;
   /** Emulated protocol state, exposed for assertions. */
   state: FakeRigState;
-}
-
-/**
- * The whole control surface, as the specs drive it through
- * `window.__fakeSerial`.
- */
-interface FakeSerialControl extends FakeSerialControlBase {
-  /** The single fake device the fixture exposes. */
-  port: FakePort;
   /** Switch the emulated radio; only valid while the port is closed. */
-  useRig(name: string): void;
-  /** Remove `navigator.serial` so the unavailable path can be exercised. */
-  removeWebSerial(): void;
+  useRig(name: FakeRigName): void;
   /** Inject bytes into the readable stream without a write. */
   pushRaw(text: string): void;
-  /** Fail the readable stream, as a device unplug would. */
+  /** Fail the readable stream with a DOMException of `name`, as an unplug would. */
   errorReadable(name: string): void;
-}
-
-/**
- * The slice of the harness page the helpers reach for.
- *
- * It is read as `window.__hamlibHarness`, which the harness page publishes on
- * load, so it is absent while `addInitScript` runs.
- */
-interface HamlibHarnessView {
-  isHamlibError(value: unknown): boolean;
 }
 
 /** A structured-clone-safe view of a `HamlibError`. */
@@ -207,12 +144,12 @@ interface HamlibErrorView {
 }
 
 /** The outcome of an in-page action, normalised for Playwright. */
-type CapturedView<T> = { ok: true; value: T } | { ok: false; error: HamlibErrorView };
+type Captured<T> = { ok: true; value: T } | { ok: false; error: HamlibErrorView };
 
 /** The assertion helpers `window.__testHelpers` publishes. */
-interface TestHelpersView {
+interface TestHelpers {
   describeError(value: unknown): HamlibErrorView;
-  capture<T>(action: () => T | Promise<T>): Promise<CapturedView<Awaited<T>>>;
+  capture<T>(action: () => T | Promise<T>): Promise<Captured<Awaited<T>>>;
 }
 
 /** How the virtual clock moves: by itself when the page drains, or on request. */
@@ -249,7 +186,9 @@ interface VirtualClockView {
 interface Window {
   __virtualClock: VirtualClockView;
   __fakeRigRegistry: FakeRigRegistry;
-  __fakeSerial: FakeSerialControl;
-  __hamlibHarness: HamlibHarnessView | undefined;
-  __testHelpers: TestHelpersView;
+  /** A fresh fake port over `rigName`, the TS-480 when omitted. */
+  __createFakePort(rigName?: FakeRigName): FakePortControl;
+  /** The fake port behind the page's `navigator.serial`. */
+  __fakeSerial: FakePortControl;
+  __testHelpers: TestHelpers;
 }

@@ -10,9 +10,9 @@
  * mock's restatement of them.
  *
  * Only two things differ from `@serialport/binding-mock`: reads resolve from
- * the emulator's replies instead of a queue a test pushes into, and the
- * emulator is silenced when the rig's own menu rate is not the rate the port
- * was opened at.
+ * what the emulated rig hears on a line at the rate the port was opened at -
+ * so the rig's menu rate and `silent` rule apply exactly as they do in the
+ * browser - instead of a queue a test pushes into, and an open can be held.
  */
 import { SerialPortStream } from '@serialport/stream';
 import type {
@@ -30,13 +30,10 @@ import type {
 } from 'hamlib-wasm/node';
 import { fakeRig } from './rigs.js';
 
-/** The device path the emulated rig is reachable at. */
-export const FAKE_PATH = '/dev/fake-ts480';
-
-/** The entry `list()` reports for it. */
-function fakePortInfo(): PortInfo {
+/** The entry `list()` reports for the emulated rig at `path`. */
+function fakePortInfo(path: string): PortInfo {
   return {
-    path: FAKE_PATH,
+    path,
     manufacturer: 'Emulated',
     serialNumber: undefined,
     pnpId: undefined,
@@ -155,15 +152,7 @@ class RigBindingPort implements BindingPortInterface {
 
     this.writes.push(Buffer.from(buffer));
 
-    /* A rig behind a real UART hears the one rate its own menu is set to, so a
-     * port opened at any other sees nothing at all. */
-    const { baudRate } = this.rig;
-
-    if (baudRate !== undefined && baudRate !== this.openOptions.baudRate) {
-      return;
-    }
-
-    for (const reply of this.rig.feed(buffer)) {
+    for (const reply of this.rig.hear(buffer, this.openOptions.baudRate)) {
       this.#deliver(Buffer.from(reply));
     }
   }
@@ -203,22 +192,42 @@ class RigBindingPort implements BindingPortInterface {
 
 /** The emulated-rig binding, with the port it handed out last. */
 export interface RigBinding extends BindingInterface<RigBindingPort> {
+  /** The device path the emulated rig is listed at. */
+  readonly path: string;
   /** Options the last `open()` was called with, as the stream passed them. */
   lastOpenOptions: OpenOptions | null;
   /** The port the last successful `open()` returned. */
   port: RigBindingPort | null;
+  /**
+   * Park the next `open()` until {@link releaseOpen}, whichever of the two
+   * runs first - the gate a race is exercised with instead of a sleep.
+   */
+  holdNextOpen(): void;
+  /** Let the held `open()` complete. */
+  releaseOpen(): void;
 }
 
 /** A `serialport` binding that answers as one of the emulated rigs. */
-export function rigBinding(rigName = 'kenwood-ts480'): RigBinding {
+export function rigBinding(rigName: FakeRigName = 'kenwood-ts480'): RigBinding {
   const rig = fakeRig(rigName);
+  const path = `/dev/fake-${rigName}`;
+  let gate: PromiseWithResolvers<void> | null = null;
 
   return {
+    path,
     lastOpenOptions: null,
     port: null,
 
+    holdNextOpen(): void {
+      gate = Promise.withResolvers<void>();
+    },
+
+    releaseOpen(): void {
+      gate?.resolve();
+    },
+
     async list(): Promise<PortInfo[]> {
-      return [fakePortInfo()];
+      return [fakePortInfo(path)];
     },
 
     async open(options: OpenOptions): Promise<RigBindingPort> {
@@ -232,6 +241,16 @@ export function rigBinding(rigName = 'kenwood-ts480'): RigBinding {
 
       if (!options.baudRate) {
         throw new TypeError('"baudRate" is not a valid baudRate');
+      }
+
+      if (gate) {
+        const held = gate;
+
+        await held.promise;
+
+        if (gate === held) {
+          gate = null;
+        }
       }
 
       const port = new RigBindingPort(rig, {
@@ -258,6 +277,8 @@ export function rigBinding(rigName = 'kenwood-ts480'): RigBinding {
 export interface RigSerialPortModule extends SerialPortModuleLike {
   /** The binding behind every port the module hands out. */
   readonly binding: RigBinding;
+  /** The device path the emulated rig is listed at. */
+  readonly path: string;
   /** The options each constructed port was built with. */
   readonly constructed: NodeSerialPortOpenOptions[];
 }
@@ -270,7 +291,7 @@ export interface RigSerialPortModule extends SerialPortModuleLike {
  * `serialport`'s own class injects the detected one - with the records a spec
  * needs to see what the adapter actually asked for.
  */
-export function rigSerialPortModule(rigName = 'kenwood-ts480'): RigSerialPortModule {
+export function rigSerialPortModule(rigName: FakeRigName = 'kenwood-ts480'): RigSerialPortModule {
   const binding = rigBinding(rigName);
   const constructed: NodeSerialPortOpenOptions[] = [];
 
@@ -287,5 +308,5 @@ export function rigSerialPortModule(rigName = 'kenwood-ts480'): RigSerialPortMod
     }
   }
 
-  return { SerialPort: RigSerialPort, binding, constructed };
+  return { SerialPort: RigSerialPort, binding, path: binding.path, constructed };
 }

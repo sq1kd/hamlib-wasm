@@ -13,7 +13,6 @@
 import { expect, test } from '@playwright/test';
 
 import { installFakeSerial, installTestHelpers, installVirtualClock, useRig } from './fixtures';
-import type { Captured } from './globals';
 
 const HARNESS_URL = 'http://127.0.0.1:4174/';
 
