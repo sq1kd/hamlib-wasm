@@ -61,7 +61,8 @@ import type {
   NativeOperations,
 } from './native/generated/operations.js';
 import { GeneratedRigMethods } from './native/generated/methods/index.js';
-import type { CompoundHost } from './native/seam.js';
+import { bindCompoundHost } from './native/seam.js';
+import type { CompoundOperations } from './native/seam.js';
 import type {
   DetectBaudRateOptions,
   RigModel,
@@ -631,7 +632,7 @@ class CompoundScope extends GeneratedRigMethods {
   }
 }
 
-class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
+class RawRigHandle extends GeneratedRigMethods implements RawRig {
   readonly #context: RigContext;
   readonly #path: string;
   readonly #model: RigModel;
@@ -671,6 +672,13 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
       },
       (result, operation) => hamlibError(result, operation),
     );
+    bindCompoundHost(this, {
+      runCompound: (operation, body) => this.#runCompound(operation, body),
+      can: (operation) => this.#can(operation),
+      record: (operation, error) => {
+        this.#context.record(operation, error);
+      },
+    });
   }
 
   get model(): RigModel {
@@ -707,12 +715,8 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
     );
   }
 
-  record(operation: string, error: unknown): void {
-    this.#context.record(operation, error);
-  }
-
   /** Whether `operation` is available on this rig, `conf` included. */
-  can(operation: string): boolean {
+  #can(operation: string): boolean {
     return this.#model.capabilities.has(operation) || this.#gained.has(operation);
   }
 
@@ -755,7 +759,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
     this.available('sendMorse');
     this.#morseGeneration++;
 
-    if (!this.can('stopMorse')) { return; }
+    if (!this.#can('stopMorse')) { return; }
 
     await this.#call('stopMorse', async () => {
       const result = await this.#context.native.stopMorse(this.#handle);
@@ -823,12 +827,12 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig, CompoundHost {
    *
    * The default surface composes its multi-call operations here: the whole body
    * occupies one queue slot, so a raw call, a call on another rig and a later
-   * `Rig` call all wait until it finishes.  Package-internal - not part of the
-   * published `RawRig` interface.
+   * `Rig` call all wait until it finishes.  Package-internal: reached only
+   * through `compoundHostOf()`.
    */
-  runCompound<T>(
+  #runCompound<T>(
     operation: string,
-    body: (operations: GeneratedPublicOperations) => Promise<T>,
+    body: (operations: CompoundOperations) => Promise<T>,
   ): Promise<T> {
     return this.#call(operation, async () => {
       this.#scope.activate();

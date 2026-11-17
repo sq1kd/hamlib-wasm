@@ -58,6 +58,7 @@ import type {
 import type { DetectBaudRateOptions, RigMode, RigModeState, RigModel } from './catalogue.js';
 import { PTT_STATES } from './native/generated/names.js';
 import type { Level } from './native/generated/names.js';
+import { compoundHostOf } from './native/seam.js';
 import type { CompoundHost, CompoundOperations } from './native/seam.js';
 
 export {
@@ -562,11 +563,9 @@ function mergeState(previous: RigState | undefined, next: RigState): RigState {
   return merged;
 }
 
-/** `RawRigHandle` also implements the compound seam (`src/native/seam.ts`). */
-type CompoundRig = RawRig & CompoundHost;
-
 class RigHandle implements Rig {
-  readonly #rig: CompoundRig;
+  readonly #rig: RawRig;
+  readonly #host: CompoundHost;
   readonly #events = new Emitter<RigEvents>();
   readonly #operations: RigOperationCapabilities;
   readonly #configuredLevels: readonly LevelName[];
@@ -594,13 +593,14 @@ class RigHandle implements Rig {
     advertisedLevels: readonly LevelName[],
     onClose: (rig: RigHandle) => void,
   ) {
-    this.#rig = rig as CompoundRig;
+    this.#rig = rig;
+    this.#host = compoundHostOf(rig);
     /* The rig's own view, which counts what its `conf` added: PTT moved onto
      * the RTS/DTR line works whatever the model declares. */
     this.#operations = {
       ...capabilitiesOf(rig.model),
-      getPtt: this.#rig.can('getPtt'),
-      setPtt: this.#rig.can('setPtt'),
+      getPtt: this.#host.can('getPtt'),
+      setPtt: this.#host.can('setPtt'),
     };
     this.#configuredLevels = configuredLevels;
     this.#advertisedLevels = advertisedLevels;
@@ -632,13 +632,13 @@ class RigHandle implements Rig {
   }
 
   async setFrequency(hz: number): Promise<void> {
-    return this.#call('setFrequency', () => this.#rig.runCompound('setFrequency', async (operations) => {
+    return this.#call('setFrequency', () => this.#host.runCompound('setFrequency', async (operations) => {
       await operations.setFrequency(hz);
     }));
   }
 
   async setMode(mode: RigMode, passband?: number): Promise<void> {
-    return this.#call('setMode', () => this.#rig.runCompound('setMode', async (operations) => {
+    return this.#call('setMode', () => this.#host.runCompound('setMode', async (operations) => {
       const width = passband ?? await operations.passbandNormal(mode);
 
       await operations.setMode(mode, width);
@@ -646,7 +646,7 @@ class RigHandle implements Rig {
   }
 
   async setPtt(on: boolean): Promise<void> {
-    return this.#call('setPtt', () => this.#rig.runCompound('setPtt', async (operations) => {
+    return this.#call('setPtt', () => this.#host.runCompound('setPtt', async (operations) => {
       await operations.setPtt(on ? 'on' : 'off');
     }));
   }
@@ -660,7 +660,7 @@ class RigHandle implements Rig {
   }
 
   async setPassband(kind: PassbandSelector): Promise<void> {
-    return this.#call('setPassband', () => this.#rig.runCompound('setPassband', async (operations) => {
+    return this.#call('setPassband', () => this.#host.runCompound('setPassband', async (operations) => {
       /* The mode read, the width lookup and the write share this one queue
        * slot, so a later mode selection cannot land between them and be
        * overwritten by the older passband action. */
@@ -678,13 +678,13 @@ class RigHandle implements Rig {
   async level(name: LevelName): Promise<number> {
     this.#requireLevel(name);
 
-    return this.#call('level', () => this.#rig.runCompound('level', (operations) => (
+    return this.#call('level', () => this.#host.runCompound('level', (operations) => (
       operations.getLevel(name)
     )));
   }
 
   async refresh(): Promise<RigState> {
-    return this.#call('refresh', () => this.#rig.runCompound('refresh', async (operations) => {
+    return this.#call('refresh', () => this.#host.runCompound('refresh', async (operations) => {
       const { partial, failures } = await this.#read(
         operations,
         new Set(RIG_FIELDS),
@@ -915,7 +915,7 @@ class RigHandle implements Rig {
 
     try {
       const { partial, failures } = await this.#call('watch', () => (
-        this.#rig.runCompound('watch', (operations) => (
+        this.#host.runCompound('watch', (operations) => (
           this.#read(operations, fields, levels, { bestEffort: true })
         ))
       ));
@@ -1068,7 +1068,7 @@ class RigHandle implements Rig {
    */
   #publishFailures(failures: readonly HamlibError[]): void {
     for (const failure of failures) {
-      this.#rig.record(failure.operation, failure);
+      this.#host.record(failure.operation, failure);
 
       if (this.#live()) {
         this.#events.emit('error', failure);

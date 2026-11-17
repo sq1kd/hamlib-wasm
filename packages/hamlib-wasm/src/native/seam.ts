@@ -19,7 +19,7 @@ import type { GeneratedPublicOperations } from './generated/operations.js';
  */
 export type CompoundOperations = GeneratedPublicOperations;
 
-/** The seam `RawRigHandle` implements and the default surface consumes. */
+/** The seam a rig `src/raw.ts` opened carries and the default surface consumes. */
 export interface CompoundHost {
   /**
    * Run `body` as one unit on the module's call queue.
@@ -40,4 +40,22 @@ export interface CompoundHost {
    * not see rejected - so `diagnostics()` still lists it.
    */
   record(operation: string, error: unknown): void;
+}
+
+const hosts = new WeakMap<object, CompoundHost>();
+
+/** Attach the seam to a rig `src/raw.ts` opened. */
+export function bindCompoundHost(rig: object, host: CompoundHost): void {
+  hosts.set(rig, host);
+}
+
+/** The seam of a rig `src/raw.ts` opened; any other object is a bug in the caller. */
+export function compoundHostOf(rig: object): CompoundHost {
+  const host = hosts.get(rig);
+
+  if (!host) {
+    throw new TypeError('not a rig opened by this hamlib-wasm instance');
+  }
+
+  return host;
 }
