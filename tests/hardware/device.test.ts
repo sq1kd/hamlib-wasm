@@ -16,6 +16,7 @@ import { describe, expect, test } from 'vitest';
 import { createHamlib } from 'hamlib-wasm';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
+import { label } from './devices.js';
 import { requireDevice, resolveTarget, selectDevice } from './target.js';
 
 const selection = selectDevice();
@@ -44,7 +45,7 @@ describe.skipIf(selection.kind === 'none')('hardware: the selected rig, read-onl
       /* Print before asserting: when a reading is wrong, the operator needs to
        * see what the rig actually said. */
       console.log(
-        `${device.label} · ${target.path} · ${target.baudRate} baud · `
+        `${label(device)} · ${target.path} · ${target.baudRate} baud · `
         + `${String(state.frequency)} Hz ${state.mode ?? ''}`,
       );
 

@@ -20,7 +20,7 @@ import type { RawHamlib, RigModel } from 'hamlib-wasm/raw';
 import type { NodeSerialTransport } from 'hamlib-wasm/node';
 
 import { catalogueModel } from '../node/catalogue.js';
-import { DEVICES } from './devices.js';
+import { DEVICES, label } from './devices.js';
 import type { HardwareDevice } from './devices.js';
 
 /** The process environment, as this module reads it. */
@@ -201,7 +201,7 @@ async function probeForAnswer(
   }
 
   throw new Error(
-    `no ${device.label} answered.  Every attempt, in order:\n  ${tried.join('\n  ')}\n`
+    `no ${label(device)} answered.  Every attempt, in order:\n  ${tried.join('\n  ')}\n`
     + 'The rig and its port are the operator\'s to fix (another application holding it, a '
     + 'renamed /dev/cu.* node, the menu rate); the profiles are data, in tests/hardware/devices.ts.',
   );
@@ -224,7 +224,7 @@ async function candidatePorts(
   if (!usb) {
     throw new Error(
       `${PORT_VARIABLE} is not set and the ${device.id} profile has no USB ids to look for; `
-      + `set ${PORT_VARIABLE} to the port ${device.label} is attached to`,
+      + `set ${PORT_VARIABLE} to the port ${label(device)} is attached to`,
     );
   }
 
@@ -237,7 +237,7 @@ async function candidatePorts(
 
   if (matching.length === 0) {
     throw new Error(
-      `${device.label} is not attached: no port reports USB ids `
+      `${label(device)} is not attached: no port reports USB ids `
       + `${usb.vendorId}:${usb.productId}.  This machine has:\n`
       + entries
         .map((entry) => `  ${entry.path} (${entry.manufacturer ?? 'unknown manufacturer'}, `

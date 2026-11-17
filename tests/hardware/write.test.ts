@@ -14,6 +14,7 @@ import { describe, expect, test } from 'vitest';
 import { createHamlib } from 'hamlib-wasm';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
+import { label } from './devices.js';
 import { requireDevice, resolveTarget, selectDevice, writesEnabled } from './target.js';
 
 const selection = selectDevice();
@@ -49,7 +50,7 @@ describe.skipIf(selection.kind === 'none' || !writes)('hardware: frequency round
       const restored = await rig.raw.getFrequency();
 
       console.log(
-        `${device.label} · ${target.path} · ${target.baudRate} baud · `
+        `${label(device)} · ${target.path} · ${target.baudRate} baud · `
         + `${String(original)} Hz -> ${String(written)} Hz -> ${String(restored)} Hz`,
       );
 

@@ -15,8 +15,8 @@ import type { RigMode } from 'hamlib-wasm';
 export interface HardwareDevice {
   /** The `HAMLIB_WASM_HARDWARE_DEVICE` value. */
   readonly id: string;
-  /** Printed in the report. */
-  readonly label: string;
+  /** The rig as its maker names it, for the report and the documentation site. */
+  readonly name: { readonly manufacturer: string; readonly model: string };
   /** Catalogue lookup, by the manufacturer and model `hamlib.models` reports. */
   readonly model: { readonly manufacturer: string; readonly model: string };
   /** The USB ids `listPorts()` reports, lower-case hex without `0x`. */
@@ -34,10 +34,14 @@ export interface HardwareDevice {
   readonly carrierMode?: RigMode;
 }
 
+export function label(device: HardwareDevice): string {
+  return `${device.name.manufacturer} ${device.name.model}`;
+}
+
 export const DEVICES: Readonly<Record<string, HardwareDevice>> = {
   qmx: {
     id: 'qmx',
-    label: 'QRP Labs QMX+',
+    name: { manufacturer: 'QRP Labs', model: 'QMX+' },
     /* `qrplabs_qmx_caps` in rigs/kenwood/ts480.c: 8N1, no handshake, and it
      * implements `get_freq`, so `rig_open()` verifies the link itself. */
     model: { manufacturer: 'QRPLabs', model: 'QMX' },
@@ -53,7 +57,7 @@ export const DEVICES: Readonly<Record<string, HardwareDevice>> = {
   },
   'ft-710': {
     id: 'ft-710',
-    label: 'Yaesu FT-710',
+    name: { manufacturer: 'Yaesu', model: 'FT-710' },
     /* `ft710.c`: 8N1, no handshake, 4800-115200. */
     model: { manufacturer: 'Yaesu', model: 'FT-710' },
     /* Measured on the reference machine: a CP2105 dual UART, so both of its

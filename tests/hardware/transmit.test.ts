@@ -21,6 +21,7 @@ import type { Rig } from 'hamlib-wasm';
 import { nodeSerialTransport } from 'hamlib-wasm/node';
 
 import { CACHE_LAPSE_MS } from '../hamlib-constants.js';
+import { label } from './devices.js';
 import { requireDevice, resolveTarget, selectDevice, selectTransmit } from './target.js';
 
 const selection = selectDevice();
@@ -99,7 +100,7 @@ describe.skipIf(selection.kind === 'none' || transmit.kind === 'off')('hardware:
       const after = await rig.raw.getPtt();
 
       console.log(
-        `${device.label} · PTT ${String(during)} -> ${after}`
+        `${label(device)} · PTT ${String(during)} -> ${after}`
         + (metered ? ` · forward ${idle.toFixed(3)} idle, ${keyed.toFixed(3)} keyed` : ' · no meter'),
       );
 
