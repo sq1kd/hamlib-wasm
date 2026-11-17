@@ -124,6 +124,45 @@ function verifyPatchRecords(
   }
 }
 
+/**
+ * Every packed source map must resolve: the file it maps and each of its
+ * sources sit inside the package, or the source is embedded.  A map pointing
+ * outside the tarball breaks consumers' debuggers and go-to-definition.
+ */
+function verifySourceMaps(packageRoot: string): number {
+  const maps = walk(packageRoot).filter((file) => file.endsWith('.map'));
+
+  for (const map of maps) {
+    const where = path.relative(packageRoot, map);
+    const parsed = readJson<{
+      sourceRoot?: string;
+      sources?: (string | null)[];
+      sourcesContent?: (string | null)[];
+    }>(map);
+
+    assertFile(map.slice(0, -'.map'.length), `the file ${where} maps`);
+    assert(
+      Array.isArray(parsed.sources) && parsed.sources.length > 0,
+      `${where} lists no sources`,
+    );
+
+    for (const [index, source] of parsed.sources.entries()) {
+      if (typeof parsed.sourcesContent?.[index] === 'string') { continue; }
+
+      assert(source, `${where} has an unnamed source with no embedded content`);
+      const resolved = path.resolve(path.dirname(map), parsed.sourceRoot ?? '', source);
+      const relative = path.relative(packageRoot, resolved);
+
+      assert(
+        !relative.startsWith('..') && !path.isAbsolute(relative) && existsSync(resolved),
+        `${where} points at ${source}, which is not in the package`,
+      );
+    }
+  }
+
+  return maps.length;
+}
+
 function verifyTarball(upstream: Upstream, tarball: string, work: string, relink: boolean): void {
   const packageRoot = extractTarball(tarball, path.join(work, 'unpacked'));
 
@@ -187,6 +226,8 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
   for (const relative of scannedPackageFiles(upstream)) {
     scanText(path.join(packageRoot, relative), relative);
   }
+
+  const sourceMaps = verifySourceMaps(packageRoot);
 
   const loader = readFileSync(
     path.join(packageRoot, packageRelative(DIST_MODULE_JS)),
@@ -340,7 +381,8 @@ function verifyTarball(upstream: Upstream, tarball: string, work: string, relink
   log(
     SCOPE,
     `OK: ${path.basename(tarball)} (${readdirSync(packageRoot).length} top-level entries, `
-    + `${included.length} linked Hamlib objects, source kit verified`
+    + `${included.length} linked Hamlib objects, ${sourceMaps} source maps resolved, `
+    + 'source kit verified'
     + `${relink ? ', clean-room relink verified' : ''})`,
   );
 }
