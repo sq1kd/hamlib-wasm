@@ -1,32 +1,25 @@
 /**
  * The stubbed package boundary the hook unit tests run against.
  *
- * `vi.mock` replaces `hamlib-wasm`'s built entry point with this module, so the
- * real `hamlib-wasm/react` hooks run against a `Hamlib` whose every promise
- * this file hands out.  That is what the browser specs cannot express: they
+ * `vi.mock` swaps the `createHamlib` of `hamlib-wasm`'s built entry point for
+ * the one here and keeps everything else real, so the real
+ * `hamlib-wasm/react` hooks run against a `Hamlib` whose every promise this
+ * file hands out, and against the real `HamlibError`.  That is what the browser specs cannot express: they
  * drive one rig over one emulated port, so they can cancel an attempt but not
  * interleave two and choose which one settles last.
  *
  * Only the surface the hooks touch is implemented; the casts in `createHamlib`
  * say so out loud, and anything else the real interfaces carry is absent.
  */
-import type { Hamlib, Rig, OpenRigOptions, RigModel, RigState, WatchOptions } from 'hamlib-wasm';
-
-/** The `HamlibError` the hooks construct and test with. */
-export class HamlibError extends Error {
-  readonly code: string;
-  readonly operation: string;
-
-  constructor(
-    message: string,
-    options: { code: string; operation: string; cause?: unknown },
-  ) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
-    this.name = 'HamlibError';
-    this.code = options.code;
-    this.operation = options.operation;
-  }
-}
+import type {
+  Hamlib,
+  HamlibError,
+  Rig,
+  OpenRigOptions,
+  RigModel,
+  RigState,
+  WatchOptions,
+} from 'hamlib-wasm';
 
 /** The one model the stub catalogue carries. */
 export const MODEL: RigModel = {

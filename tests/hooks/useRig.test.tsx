@@ -5,7 +5,7 @@
  * These are the cases the browser specs cannot order: two attempts whose
  * outcomes arrive in a chosen sequence, and an attempt that settles after the
  * component that started it is gone.  The real hook from the built package runs
- * here; only `createHamlib`/`HamlibError` are replaced.
+ * here; only `createHamlib` is replaced.
  *
  * A connection is always started *outside* `act`: React's async `act` waits for
  * the work its callback started, and a connection stays pending until the spec
@@ -14,13 +14,18 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HamlibError, newRig, stub } from './fake-hamlib';
+import { HamlibError } from 'hamlib-wasm';
+
+import { newRig, stub } from './fake-hamlib';
 import { flush, renderProbe } from './probe';
 import type { ProbeHandle } from './probe';
 
 /* The factory must import the fake rather than close over it: `vi.mock` is
  * hoisted above the imports, so a static reference would not exist yet. */
-vi.mock('../../packages/hamlib-wasm/dist/index.js', async () => import('./fake-hamlib'));
+vi.mock('../../packages/hamlib-wasm/dist/index.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('hamlib-wasm')>(),
+  createHamlib: (await import('./fake-hamlib')).createHamlib,
+}));
 
 /** Start a connection. It stays pending until the spec settles its attempt. */
 function begin(probe: ProbeHandle): Promise<void> {

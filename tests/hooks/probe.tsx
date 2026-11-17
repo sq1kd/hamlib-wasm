@@ -9,10 +9,9 @@ import type { ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { HamlibProvider, useRig } from 'hamlib-wasm/react';
-import type { HamlibOptions } from 'hamlib-wasm';
+import type { HamlibError, HamlibOptions } from 'hamlib-wasm';
 
 import { MODEL } from './fake-hamlib';
-import type { HamlibError } from './fake-hamlib';
 
 /** Read once by the provider. */
 const PROVIDER_OPTIONS: HamlibOptions = {};
