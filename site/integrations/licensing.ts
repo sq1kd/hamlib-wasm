@@ -23,8 +23,11 @@ interface CopyEntry {
   readonly recursive?: boolean;
 }
 
-const packageDir = fileURLToPath(new URL('../../packages/hamlib-wasm/', import.meta.url));
-const manifestPath = path.join(packageDir, 'dist', 'third_party', 'hamlib', 'PACKAGE-LICENSING.json');
+const manifestUrl = new URL(import.meta.resolve('hamlib-wasm/third_party/hamlib/PACKAGE-LICENSING.json'));
+const manifestPath = fileURLToPath(manifestUrl);
+/* The manifest's paths are relative to the package root, which the package
+ * does not export: three levels up from dist/third_party/hamlib/. */
+const packageDir = fileURLToPath(new URL('../../../', manifestUrl));
 
 export function hamlibLicensing(): AstroIntegration {
   return {

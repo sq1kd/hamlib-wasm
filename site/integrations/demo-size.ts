@@ -19,16 +19,16 @@ export interface DemoDownload {
   readonly brotli: number;
 }
 
-const FILES = ['hamlib-wasm.wasm', 'hamlib-wasm.mjs'];
-
 export function measureDemoDownload(): DemoDownload {
-  const native = new URL('../../packages/hamlib-wasm/dist/native/', import.meta.url);
+  const wasm = new URL(import.meta.resolve('hamlib-wasm/native/hamlib-wasm.wasm'));
+  /* The package does not export its glue; it sits beside the Wasm. */
+  const files = [wasm, new URL('hamlib-wasm.mjs', wasm)];
   let raw = 0;
   let gzip = 0;
   let brotli = 0;
 
-  for (const file of FILES) {
-    const bytes = readFileSync(fileURLToPath(new URL(file, native)));
+  for (const file of files) {
+    const bytes = readFileSync(fileURLToPath(file));
 
     raw += bytes.length;
     gzip += gzipSync(bytes, { level: 9 }).length;
