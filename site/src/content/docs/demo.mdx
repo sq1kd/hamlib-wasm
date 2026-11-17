@@ -8,11 +8,15 @@ import { megabytes } from '../../bytes';
 import LiveDemo from '../../components/LiveDemo';
 import { DEMO_DOWNLOAD, WEB_SERIAL_BROWSERS } from '../../facts';
 
+<div class="demo-page">
+
 Connect a radio over USB, pick its model and press **Connect your radio**. It
 needs {WEB_SERIAL_BROWSERS}. Until a radio is connected, the
 panel plays sample readings.
 
 <LiveDemo client:only="react" />
+
+<div class="demo-notes">
 
 **Auto-detect** tries the rates the model supports, highest first, and
 remembers the one that answered, so the next connect tries it first. Picking
@@ -32,3 +36,7 @@ the same Hamlib module:
 The demo loads with this page only: it fetches the Hamlib WebAssembly module
 and its loader, {megabytes(DEMO_DOWNLOAD.gzip)} gzip, which no other page of this site does. If your
 browser asks to save data, it waits for a click instead.
+
+</div>
+
+</div>

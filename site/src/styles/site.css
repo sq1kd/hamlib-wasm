@@ -247,47 +247,58 @@
 }
 
 /*
- * The demo page.  One column of Starlight's reading width carries the title,
- * the text, the radio and its call console, so every block shares two edges.
- * Wide enough, the column widens and splits in two tracks: the radio and the
- * text on the left, at the landing page's panel width, and the console in the
- * right track, from the radio's top to the last paragraph.  Here, not in
- * demo.css, so the loader holds the radio's place before the demo arrives.
+ * The demo page, whose content demo.mdx wraps in `.demo-page`.  One column of
+ * Starlight's reading width carries the title, the text, the radio and its
+ * call console, so every block shares two edges.  Wide enough, the column
+ * widens and splits in two tracks: the intro, the radio and the notes on the
+ * left, at the landing page's panel width, and the console in the right
+ * track, beside the radio and the notes.  Here, not in demo.css, so the loader
+ * holds the radio's place before the demo arrives.
  */
-body:has(.hamlib-demo, .live-demo-loader) {
+body:has(.demo-page) {
   --sl-content-width: 45rem;
 }
 
 @media (min-width: 82rem) {
-  body:has(.hamlib-demo, .live-demo-loader) {
+  body:has(.demo-page) {
     --sl-content-width: 68rem;
   }
 
-  .sl-markdown-content:has(.hamlib-demo, .live-demo-loader) {
+  .demo-page {
     display: grid;
     grid-template-columns: minmax(0, 36rem) minmax(0, 1fr);
+    grid-template-areas:
+      'intro .'
+      'panel console'
+      'notes console';
     column-gap: 2.5rem;
     align-content: start;
   }
 
-  .sl-markdown-content:has(.hamlib-demo, .live-demo-loader) > *,
-  .sl-markdown-content .hamlib-demo .radio {
-    grid-column: 1;
+  .demo-page > :first-child {
+    grid-area: intro;
+  }
+
+  .demo-page > astro-island,
+  .demo-page .radio {
+    grid-area: panel;
+  }
+
+  .demo-page > .demo-notes {
+    grid-area: notes;
   }
 
   /* The island and the demo's wrappers step aside: the radio and the console
    * are the grid's own items. */
-  .sl-markdown-content > astro-island:has(.hamlib-demo),
-  .sl-markdown-content .hamlib-demo,
-  .sl-markdown-content .hamlib-demo .workspace {
+  .demo-page > astro-island:has(.hamlib-demo),
+  .demo-page .hamlib-demo,
+  .demo-page .hamlib-demo .workspace {
     display: contents;
   }
 
-  /* From the radio's row to past the last paragraph; sized by the rows, never
-   * sizing them. */
-  .sl-markdown-content .hamlib-demo .console-rail {
-    grid-column: 2;
-    grid-row: 2 / span 24;
+  /* Sized by the rows, never sizing them. */
+  .demo-page .console-rail {
+    grid-area: console;
     contain: size;
   }
 }
