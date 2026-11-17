@@ -20,16 +20,11 @@ pass it.
 
 ## Commits
 
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/);
-semantic-release derives the version from them, and the hook `bootstrap`
-installs checks them. Scopes are limited to `hamlib`, `api`, `build`, `deps`,
-`docs`, `ci`, `tests` and `release`.
-
-A change to the `release:` block of `packages/hamlib-wasm/hamlib.config.yaml`
-pins a different Hamlib release, so it must be `feat` or `fix` (with `!` when it
-breaks consumers); `mise run release-guard` checks this locally and on every
-pull request. See
-[`RELEASING.md`](RELEASING.md).
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
+with the scopes `.commitlintrc.json` allows; semantic-release derives the
+version from them, and the hook `bootstrap` installs checks them. A change to
+the pinned Hamlib release must publish: see
+[the release-block rule](RELEASING.md#the-release-block-rule).
 
 ## Testing on a real rig
 

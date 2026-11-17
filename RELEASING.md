@@ -99,25 +99,23 @@ tag on the branch and applies these rules:
 | any type with a `BREAKING CHANGE:` footer | major |
 | `docs`, `ci`, `build`, `chore`, `refactor`, `style`, `test` | no release |
 
-A change to the `release:` block of
-`packages/hamlib-wasm/hamlib.config.yaml` pins a different Hamlib release and
-is always user-visible, so its commit **must** be `feat` or `fix` (use `!` or a
-`BREAKING CHANGE:` footer when the consumer-facing API or behavior breaks).
-`chore(hamlib): bump the pinned release` will not publish and is rejected by
-the release guard. Use, for example:
+No release is produced when the commits contain nothing releasable: the release
+job still succeeds.
+
+### The release-block rule
+
+A change to the `release:` block of `packages/hamlib-wasm/hamlib.config.yaml`
+pins a different Hamlib release, so it must publish. `mise run release-guard`
+rejects any commit that changes the block unless its type is `feat`, `fix` or
+`perf`, its header marks a breaking change with `!` (any type), or its body has
+a `BREAKING CHANGE:` or `BREAKING-CHANGE:` footer. For example:
 
 ```text
 feat(hamlib): update the pinned Hamlib release to 4.8.0
 fix(hamlib): include the upstream regression fix for the QMX
-feat(api)!: replace the initialization options object
 ```
 
-Commit scopes are limited by `.commitlintrc.json` to `hamlib`, `api`, `build`,
-`deps`, `docs`, `ci`, `tests`, and `release` (for example,
-`chore(deps): update the release tooling`).
-
-No release is produced when the commits contain nothing releasable: the release
-job still succeeds.
+The allowed commit scopes are the `scope-enum` in `.commitlintrc.json`.
 
 ## Branches and the `next` prerelease flow
 
@@ -175,18 +173,10 @@ git config core.hooksPath .githooks
 ```
 
 `.githooks/commit-msg` runs the pinned commitlint CLI and rejects malformed
-messages. The release-block guard works offline and also runs on every pull
-request:
-
-```sh
-mise run release-guard
-```
-
-Every commit since the merge base with `main` (or `origin/main`; pass
-`-- --from <rev> --to <rev>` for another range) that changes the `release:`
-block in `packages/hamlib-wasm/hamlib.config.yaml` must be a `feat`, `fix` or
-`perf` commit, or mark a breaking change; otherwise it exits 1 with the
-required type.
+messages. `mise run release-guard` applies
+[the release-block rule](#the-release-block-rule) offline to every commit since
+the merge base with `main` (or `origin/main`; pass `-- --from <rev> --to <rev>`
+for another range); CI runs it on every pull request.
 
 ## Local dry run
 
@@ -266,8 +256,7 @@ delete or move the tag to "fix" it. Repair only the missing artifact.
 
 ## Release checklist
 
-- [ ] Commit messages are conventional; the pinned Hamlib release change uses
-      `feat` or `fix` (and `!` if consumer-breaking).
+- [ ] Commit messages are conventional and `mise run release-guard` passes.
 - [ ] `mise run check-release` passes locally or in CI.
 - [ ] The push is on `main` or `next`.
 - [ ] `release.yml` is green and `npm view hamlib-wasm version` shows the new
