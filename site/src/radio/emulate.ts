@@ -11,7 +11,11 @@
 export const EMULATED_MODEL = 'TS-480';
 
 const FIXTURES = import.meta.env.DEV
-  ? import.meta.glob(['../../../tests/browser/fixtures/rigs.ts', '../../../tests/browser/fixtures/fake-serial.ts'])
+  ? import.meta.glob([
+    '../../../tests/browser/fixtures/rigs.ts',
+    '../../../tests/browser/fixtures/fake-port.ts',
+    '../../../tests/browser/fixtures/fake-serial.ts',
+  ])
   : {};
 
 let installed: Promise<boolean> | undefined;
@@ -23,8 +27,10 @@ export function emulate(): Promise<boolean> {
       return false;
     }
 
-    /* The registry of rigs first: the port picks its rig from it. */
+    /* Each installs a global the next one uses: the registry of rigs, the
+     * port factory that picks its rig from it, then Web Serial over a port. */
     await FIXTURES['../../../tests/browser/fixtures/rigs.ts']?.();
+    await FIXTURES['../../../tests/browser/fixtures/fake-port.ts']?.();
     await FIXTURES['../../../tests/browser/fixtures/fake-serial.ts']?.();
 
     return 'serial' in navigator;
