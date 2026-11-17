@@ -6,12 +6,10 @@
 import { expect, test } from '@playwright/test';
 
 import { UPSTREAM_VERSION } from '../upstream';
-import { SITE_ORIGIN } from '../servers';
-
-const REACT_URL = `${SITE_ORIGIN}/demo/`;
+import { SITE_DEMO_URL } from '../servers';
 
 test('loads the demo without a click, with the call log and its API switch', async ({ page }) => {
-  await page.goto(REACT_URL);
+  await page.goto(SITE_DEMO_URL);
 
   await expect(page.getByTestId('hamlib-version')).toContainText(UPSTREAM_VERSION);
   await expect(page.getByTestId('demo-loading')).toHaveCount(0);
@@ -31,7 +29,7 @@ test('waits for a click when the browser asks to save data', async ({ page }) =>
     });
   });
 
-  await page.goto(REACT_URL);
+  await page.goto(SITE_DEMO_URL);
 
   await expect(page.getByTestId('load-demo')).toBeVisible();
   await expect(page.getByTestId('model-select')).toHaveCount(0);
@@ -43,7 +41,7 @@ test('waits for a click when the browser asks to save data', async ({ page }) =>
 });
 
 test('remembers the model across visits', async ({ page }) => {
-  await page.goto(REACT_URL);
+  await page.goto(SITE_DEMO_URL);
 
   await expect(page.getByTestId('model-select')).toBeEnabled();
   await page.getByTestId('model-select').selectOption({ label: 'Yaesu FRG-100' });

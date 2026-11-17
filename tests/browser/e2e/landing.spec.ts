@@ -16,9 +16,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
+  installSerialDoubles,
   pressPtt,
   readFakeSerial,
   releasePtt,
@@ -46,13 +44,6 @@ function wasmRequests(page: Page): string[] {
   return urls;
 }
 
-/* The fake port, for every test that has Web Serial; the last one has none. */
-async function withFakeSerial(page: Page): Promise<void> {
-  await installVirtualClock(page, 'auto');
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-}
-
 async function connectTs480(page: Page, baud: string): Promise<void> {
   await page.goto(LANDING_URL);
   await useRig(page, 'kenwood-ts480');
@@ -63,7 +54,7 @@ async function connectTs480(page: Page, baud: string): Promise<void> {
 }
 
 test('the panel is HTML until asked: sample readings, the catalogue, and no Wasm', async ({ page }) => {
-  await withFakeSerial(page);
+  await installSerialDoubles(page, 'auto');
 
   const wasm = wasmRequests(page);
 
@@ -84,7 +75,7 @@ test('the panel is HTML until asked: sample readings, the catalogue, and no Wasm
 });
 
 test('connects the emulated TS-480, shows what it reports, polls only reads and writes on request', async ({ page }) => {
-  await withFakeSerial(page);
+  await installSerialDoubles(page, 'auto');
   await connectTs480(page, '9600');
 
   await expect(page.getByTestId('frequency-display')).toHaveText('14.074.000');
@@ -122,7 +113,7 @@ test('connects the emulated TS-480, shows what it reports, polls only reads and 
 });
 
 test('Auto-detect finds the rate, connects, and says which rate it used', async ({ page }) => {
-  await withFakeSerial(page);
+  await installSerialDoubles(page, 'auto');
   await connectTs480(page, 'auto');
 
   await expect(page.getByTestId('frequency-display')).toHaveText('14.074.000');

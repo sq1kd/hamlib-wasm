@@ -10,5 +10,8 @@ export const HARNESS_ORIGIN = 'http://127.0.0.1:4174';
 /** The documentation site's production build (mise run build-site). */
 export const SITE_ORIGIN = 'http://127.0.0.1:4176';
 
+/** Its live demo page. */
+export const SITE_DEMO_URL = `${SITE_ORIGIN}/demo/`;
+
 /** The documentation site's `vite` dev server. */
 export const SITE_DEV_ORIGIN = 'http://127.0.0.1:5176';

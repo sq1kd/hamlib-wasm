@@ -17,9 +17,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 import {
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
+  installSerialDoubles,
   pressPtt,
   readFakeSerial,
   releasePtt,
@@ -27,19 +25,15 @@ import {
   runClockUntilPortClosed,
   setReplyDelay,
 } from '../fixtures';
-import { SITE_ORIGIN } from '../servers';
-
-const REACT_URL = `${SITE_ORIGIN}/demo/`;
+import { SITE_DEMO_URL } from '../servers';
 
 /** The TS-480 the emulator starts on. */
 const TS480_FREQUENCY = '14.074.000';
 const TS480_MODE = 'USB';
 
 test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page, 'manual');
-  await installFakeSerial(page);
-  await installTestHelpers(page);
-  await page.goto(REACT_URL);
+  await installSerialDoubles(page, 'manual');
+  await page.goto(SITE_DEMO_URL);
 });
 
 /** The page preselects the TS-480; the rate is its highest, so the open is one attempt. */

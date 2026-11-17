@@ -25,9 +25,7 @@ import type { Page } from '@playwright/test';
 
 import {
   holdNextPortOpen,
-  installFakeSerial,
-  installTestHelpers,
-  installVirtualClock,
+  installSerialDoubles,
   pressPtt,
   readFakeSerial,
   releasePortOpen,
@@ -39,14 +37,10 @@ import {
   useRig,
   waitForPortOpenPending,
 } from '../fixtures';
-import { SITE_ORIGIN } from '../servers';
-
-const REACT_URL = `${SITE_ORIGIN}/demo/`;
+import { SITE_DEMO_URL } from '../servers';
 
 test.beforeEach(async ({ page }) => {
-  await installVirtualClock(page, 'manual');
-  await installFakeSerial(page);
-  await installTestHelpers(page);
+  await installSerialDoubles(page, 'manual');
 });
 
 /** Pick a model and its highest rate, so the open is one attempt, not an Auto-detect search. */
@@ -57,7 +51,7 @@ async function selectModel(page: Page, label: string): Promise<void> {
 }
 
 test('a frequency-only model connects, shows unknown fields and disconnects', async ({ page }) => {
-  await page.goto(REACT_URL);
+  await page.goto(SITE_DEMO_URL);
 
   /* The FRG-100 receiver: its backend declares frequency only. */
   await useRig(page, 'yaesu-frg100');
@@ -101,7 +95,7 @@ test('a frequency-only model connects, shows unknown fields and disconnects', as
 });
 
 test('a rig that never answers fails the acquisition loudly and releases the port', async ({ page }) => {
-  await page.goto(REACT_URL);
+  await page.goto(SITE_DEMO_URL);
   await useRig(page, 'yaesu-frg100');
   await page.getByTestId('backend-raw').check();
 
@@ -140,7 +134,7 @@ test('a rig that never answers fails the acquisition loudly and releases the por
 });
 
 test('a rejected command reaches the error display of the raw backend', async ({ page }) => {
-  await page.goto(REACT_URL);
+  await page.goto(SITE_DEMO_URL);
   await page.getByTestId('backend-raw').check();
 
   await selectModel(page, 'Kenwood TS-480');
@@ -180,7 +174,7 @@ test('a rejected command reaches the error display of the raw backend', async ({
 });
 
 test('copy diagnostics puts a rig report on the clipboard', async ({ page }) => {
-  await page.goto(REACT_URL);
+  await page.goto(SITE_DEMO_URL);
 
   /* The clipboard is stubbed: neither browser lets a test read the real one. */
   await page.evaluate(() => {

@@ -6,14 +6,12 @@ import { expect, test } from '@playwright/test';
 
 import { removeWebSerial } from '../fixtures';
 import { UPSTREAM_VERSION } from '../upstream';
-import { SITE_ORIGIN } from '../servers';
-
-const REACT_URL = `${SITE_ORIGIN}/demo/`;
+import { SITE_DEMO_URL } from '../servers';
 
 test('reports that Web Serial is unavailable and keeps connect disabled', async ({ page }) => {
   await removeWebSerial(page);
 
-  await page.goto(REACT_URL);
+  await page.goto(SITE_DEMO_URL);
 
   const status = page.getByTestId('web-serial-status');
 

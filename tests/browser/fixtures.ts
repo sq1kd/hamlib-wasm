@@ -70,7 +70,7 @@ export type FakeSerialSnapshot = Pick<
  * whenever the page has drained; `manual` only when a spec asks
  * ({@link advanceClock}, or `window.__virtualClock` in the page).
  */
-export async function installVirtualClock(
+async function installVirtualClock(
   page: Page,
   mode: VirtualClockMode = 'auto',
 ): Promise<void> {
@@ -138,19 +138,13 @@ export async function pendingTimers(page: Page): Promise<number> {
   return page.evaluate(() => window.__virtualClock.pendingTimers());
 }
 
-/** Install the fake Web Serial surface before any page script runs. */
-export async function installFakeSerial(page: Page): Promise<void> {
-  await page.addInitScript({ content: FAKE_SERIAL_SOURCE });
-}
-
 /**
- * Install the in-page assertion helpers.
- *
- * Injected before page scripts like the serial fixture, because the helper
- * reads `window.__hamlibHarness`, which the harness page publishes on load.
+ * Put the page on the virtual clock and behind the fake Web Serial before any
+ * of its scripts runs: what every page a spec drives through the emulator needs.
  */
-export async function installTestHelpers(page: Page): Promise<void> {
-  await page.addInitScript({ content: TEST_HELPERS_SOURCE });
+export async function installSerialDoubles(page: Page, clockMode: VirtualClockMode): Promise<void> {
+  await installVirtualClock(page, clockMode);
+  await page.addInitScript({ content: FAKE_SERIAL_SOURCE });
 }
 
 /** Delete every `serial` accessor: the page's own, and the fake's on `navigator`. */
@@ -371,9 +365,8 @@ export const test = base.extend<HarnessOptions & { harnessPage: Page }>({
   clockMode: ['auto', { option: true }],
   harnessPath: ['/', { option: true }],
   harnessPage: async ({ page, clockMode, harnessPath }, use) => {
-    await installVirtualClock(page, clockMode);
-    await installFakeSerial(page);
-    await installTestHelpers(page);
+    await installSerialDoubles(page, clockMode);
+    await page.addInitScript({ content: TEST_HELPERS_SOURCE });
     await page.goto(harnessPath);
     await use(page);
   },
