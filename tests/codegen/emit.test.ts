@@ -36,8 +36,14 @@ const declarations: readonly AstFunction[] = [
   ]),
 ];
 
+/** The sentinel names `names.ts` reads from the pinned `src/misc.c`. */
+const SENTINELS: ReadonlyMap<string, string> = new Map([
+  ['rig_parse_mode', 'None'],
+  ['rig_parse_rptr_shift', 'None'],
+]);
+
 /** Emit the synthetic declarations, failing loudly if one is refused. */
-function emit(sources: readonly AstFunction[] = declarations): string {
+function emit(sources: readonly AstFunction[] = declarations, sentinels: ReadonlyMap<string, string> = SENTINELS): string {
   const facts = sources.map((fn) => {
     const classified = classifyFunction(fn, new Set<string>(), () => null);
 
@@ -48,7 +54,7 @@ function emit(sources: readonly AstFunction[] = declarations): string {
     return operationFacts(classified, new Set<string>());
   });
 
-  return emitOperations(facts);
+  return emitOperations(facts, sentinels);
 }
 
 describe('emitOperations method names', () => {
@@ -70,7 +76,40 @@ describe('emitOperations argument conversion', () => {
     ]);
 
     expect(code).toContain('rmode_t value0 = rig_parse_mode(arg0.c_str());');
-    expect(code).toContain('if (value0 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }');
+    expect(code).toContain('if (value0 == RIG_MODE_NONE && arg0 != "None") { return failure<NumberResult>(-RIG_EINVAL); }');
+  });
+
+  it('refuses every name the parser answers its sentinel for when the vocabulary does not name the sentinel', () => {
+    const code = emit([declaration('rig_set_rptr_shift', [['rig', 'RIG *'], ['vfo', 'vfo_t'], ['rptr_shift', 'rptr_shift_t']])], new Map());
+
+    expect(code).toContain('if (value0 == RIG_RPT_SHIFT_NONE) { return failure<CodeResult>(-RIG_EINVAL); }');
+  });
+
+  it('accepts the sentinel by its own name, which is a real setting', () => {
+    const code = emit([declaration('rig_set_rptr_shift', [['rig', 'RIG *'], ['vfo', 'vfo_t'], ['rptr_shift', 'rptr_shift_t']])]);
+
+    expect(code).toContain('if (value0 == RIG_RPT_SHIFT_NONE && arg0 != "None") { return failure<CodeResult>(-RIG_EINVAL); }');
+  });
+});
+
+describe('emitOperations result conversion', () => {
+  const getMode = declaration('rig_get_mode', [
+    ['rig', 'RIG *'],
+    ['vfo', 'vfo_t'],
+    ['mode', 'rmode_t *'],
+    ['width', 'pbwidth_t *'],
+  ]);
+
+  it('reports the sentinel by the name its vocabulary gives it', () => {
+    /* `rig_strrmode(RIG_MODE_NONE)` is "", which is not a `RigMode`. */
+    expect(emit([getMode])).toContain('if (out0 == RIG_MODE_NONE) { result.mode = "None"; }');
+  });
+
+  it('fails on any other value the stringifier has no name for', () => {
+    const code = emit([getMode]);
+
+    expect(code).toContain('else if (const char *text = rig_strrmode(out0); text != nullptr && *text != \'\\0\') { result.mode = text; }');
+    expect(code).toContain('else { return failure<GetModeResult>(-RIG_EPROTO, "rig_get_mode returned a rmode_t Hamlib does not name"); }');
   });
 
   it('reports a helper through the same result value object as a getter', () => {

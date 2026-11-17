@@ -221,7 +221,9 @@ function createFakeRigRegistry() {
     var C_SET_FREQ = 0x05;
     var C_SET_MODE = 0x06;
     var C_SELECT_VFO = 0x07;
+    var C_SPLIT_DUPLEX = 0x0f;
     var C_PTT = 0x1c;
+    var S_DUP_OFF = 0x10;
 
     var MODE_USB = 0x01;
 
@@ -231,6 +233,8 @@ function createFakeRigRegistry() {
       filterValue: 0,
       transmitting: false,
       silent: false,
+      /* `0F` subcommand: 10 simplex, 11 duplex -, 12 duplex +. */
+      duplex: S_DUP_OFF,
     };
 
     var commands: string[] = [];
@@ -285,6 +289,12 @@ function createFakeRigRegistry() {
           return [acknowledge()];
 
         case C_SELECT_VFO:
+          return [acknowledge()];
+
+        case C_SPLIT_DUPLEX:
+          if (data.length === 0) { return [radio([C_SPLIT_DUPLEX, state.duplex])]; }
+
+          state.duplex = data[0]!;
           return [acknowledge()];
 
         case C_PTT:

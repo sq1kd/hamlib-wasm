@@ -44,12 +44,6 @@ export interface TypeBinding {
   /** Parser sentinel that means "not a valid name". */
   readonly enumNone?: string;
   /**
-   * For an `enum` binding whose stringifier answers `NULL` for a value it has
-   * no name for (a generated codec): every name it returns is in the union, so
-   * an unnamed value is a failure rather than a name outside the type.
-   */
-  readonly strictNames?: boolean;
-  /**
    * For a `value_t` binding, the macro that says whether the value is stored
    * as a float (`.f`) or an integer (`.i`) for this setting namespace.
    */
@@ -228,7 +222,6 @@ function enumBinding(enumName: string, native: string, namespace?: SettingNamesp
     enumStr: codec.str,
     enumParse: codec.parse,
     enumNone: codec.none,
-    strictNames: record.codec === 'generated',
   };
 }
 

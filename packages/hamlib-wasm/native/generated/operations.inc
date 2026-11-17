@@ -38,7 +38,7 @@
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
             rmode_t value0 = rig_parse_mode(arg0.c_str());
-            if (value0 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0 == RIG_MODE_NONE && arg0 != "None") { return failure<CodeResult>(-RIG_EINVAL); }
             pbwidth_t value1{};
             if (!fromNumber(arg1, &value1)) { return failure<CodeResult>(-RIG_EINVAL); }
 
@@ -63,7 +63,9 @@
             if (rc != RIG_OK) { return failure<GetModeResult>(rc); }
 
             GetModeResult result = ok<GetModeResult>();
-            result.mode = textOrEmpty(rig_strrmode(out0));
+            if (out0 == RIG_MODE_NONE) { result.mode = "None"; }
+            else if (const char *text = rig_strrmode(out0); text != nullptr && *text != '\0') { result.mode = text; }
+            else { return failure<GetModeResult>(-RIG_EPROTO, "rig_get_mode returned a rmode_t Hamlib does not name"); }
             result.passband = (double) out1;
             return result;
         });
@@ -74,7 +76,7 @@
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
             vfo_t value0 = rig_parse_vfo(arg0.c_str());
-            if (value0 == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0 == RIG_VFO_NONE && arg0 != "None") { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_vfo(rig, value0);
 
@@ -96,7 +98,9 @@
             if (rc != RIG_OK) { return failure<TextResult>(rc); }
 
             TextResult result = ok<TextResult>();
-            result.value = textOrEmpty(rig_strvfo(out0));
+            if (out0 == RIG_VFO_NONE) { result.value = "None"; }
+            else if (const char *text = rig_strvfo(out0); text != nullptr && *text != '\0') { result.value = text; }
+            else { return failure<TextResult>(-RIG_EPROTO, "rig_get_vfo returned a vfo_t Hamlib does not name"); }
             return result;
         });
     }
@@ -117,7 +121,9 @@
 
             GetVfoInfoResult result = ok<GetVfoInfoResult>();
             result.freq = (double) out0;
-            result.mode = textOrEmpty(rig_strrmode(out1));
+            if (out1 == RIG_MODE_NONE) { result.mode = "None"; }
+            else if (const char *text = rig_strrmode(out1); text != nullptr && *text != '\0') { result.mode = text; }
+            else { return failure<GetVfoInfoResult>(-RIG_EPROTO, "rig_get_vfo_info returned a rmode_t Hamlib does not name"); }
             result.width = (double) out2;
             result.split = out3 != RIG_SPLIT_OFF;
             result.satmode = (double) out4;
@@ -146,7 +152,7 @@
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
             rptr_shift_t value0 = rig_parse_rptr_shift(arg0.c_str());
-            if (value0 == RIG_RPT_SHIFT_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0 == RIG_RPT_SHIFT_NONE && arg0 != "None") { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_rptr_shift(rig, RIG_VFO_CURR, value0);
 
@@ -168,7 +174,9 @@
             if (rc != RIG_OK) { return failure<TextResult>(rc); }
 
             TextResult result = ok<TextResult>();
-            result.value = textOrEmpty(rig_strptrshift(out0));
+            if (out0 == RIG_RPT_SHIFT_NONE) { result.value = "None"; }
+            else if (const char *text = rig_strptrshift(out0); text != nullptr && *text != '\0') { result.value = text; }
+            else { return failure<TextResult>(-RIG_EPROTO, "rig_get_rptr_shift returned a rptr_shift_t Hamlib does not name"); }
             return result;
         });
     }
@@ -370,7 +378,7 @@
         return withRig<CodeResult>(handle, [&](RIG *rig)
         {
             rmode_t value0 = rig_parse_mode(arg0.c_str());
-            if (value0 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0 == RIG_MODE_NONE && arg0 != "None") { return failure<CodeResult>(-RIG_EINVAL); }
             pbwidth_t value1{};
             if (!fromNumber(arg1, &value1)) { return failure<CodeResult>(-RIG_EINVAL); }
 
@@ -395,7 +403,9 @@
             if (rc != RIG_OK) { return failure<GetSplitModeResult>(rc); }
 
             GetSplitModeResult result = ok<GetSplitModeResult>();
-            result.txMode = textOrEmpty(rig_strrmode(out0));
+            if (out0 == RIG_MODE_NONE) { result.txMode = "None"; }
+            else if (const char *text = rig_strrmode(out0); text != nullptr && *text != '\0') { result.txMode = text; }
+            else { return failure<GetSplitModeResult>(-RIG_EPROTO, "rig_get_split_mode returned a rmode_t Hamlib does not name"); }
             result.txWidth = (double) out1;
             return result;
         });
@@ -408,7 +418,7 @@
             freq_t value0{};
             if (!fromNumber(arg0, &value0)) { return failure<CodeResult>(-RIG_EINVAL); }
             rmode_t value1 = rig_parse_mode(arg1.c_str());
-            if (value1 == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value1 == RIG_MODE_NONE && arg1 != "None") { return failure<CodeResult>(-RIG_EINVAL); }
             pbwidth_t value2{};
             if (!fromNumber(arg2, &value2)) { return failure<CodeResult>(-RIG_EINVAL); }
 
@@ -435,7 +445,9 @@
 
             GetSplitFreqModeResult result = ok<GetSplitFreqModeResult>();
             result.txFreq = (double) out0;
-            result.txMode = textOrEmpty(rig_strrmode(out1));
+            if (out1 == RIG_MODE_NONE) { result.txMode = "None"; }
+            else if (const char *text = rig_strrmode(out1); text != nullptr && *text != '\0') { result.txMode = text; }
+            else { return failure<GetSplitFreqModeResult>(-RIG_EPROTO, "rig_get_split_freq_mode returned a rmode_t Hamlib does not name"); }
             result.txWidth = (double) out2;
             return result;
         });
@@ -447,7 +459,7 @@
         {
             split_t value0 = arg0 ? RIG_SPLIT_ON : RIG_SPLIT_OFF;
             vfo_t value1 = rig_parse_vfo(arg1.c_str());
-            if (value1 == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value1 == RIG_VFO_NONE && arg1 != "None") { return failure<CodeResult>(-RIG_EINVAL); }
 
             int rc = rig_set_split_vfo(rig, RIG_VFO_CURR, value0, value1);
 
@@ -471,7 +483,9 @@
 
             GetSplitVfoResult result = ok<GetSplitVfoResult>();
             result.split = out0 != RIG_SPLIT_OFF;
-            result.txVfo = textOrEmpty(rig_strvfo(out1));
+            if (out1 == RIG_VFO_NONE) { result.txVfo = "None"; }
+            else if (const char *text = rig_strvfo(out1); text != nullptr && *text != '\0') { result.txVfo = text; }
+            else { return failure<GetSplitVfoResult>(-RIG_EPROTO, "rig_get_split_vfo returned a vfo_t Hamlib does not name"); }
             return result;
         });
     }
@@ -581,7 +595,7 @@
             freq_t value1{};
             if (!fromNumber(arg1, &value1)) { return failure<NumberResult>(-RIG_EINVAL); }
             rmode_t value2 = rig_parse_mode(arg2.c_str());
-            if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (value2 == RIG_MODE_NONE && arg2 != "None") { return failure<NumberResult>(-RIG_EINVAL); }
             unsigned int out0{};
 
             int rc = rig_power2mW(rig, &out0, value0, value1, value2);
@@ -603,7 +617,7 @@
             freq_t value1{};
             if (!fromNumber(arg1, &value1)) { return failure<NumberResult>(-RIG_EINVAL); }
             rmode_t value2 = rig_parse_mode(arg2.c_str());
-            if (value2 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (value2 == RIG_MODE_NONE && arg2 != "None") { return failure<NumberResult>(-RIG_EINVAL); }
             float out0{};
 
             int rc = rig_mW2power(rig, &out0, value0, value1, value2);
@@ -715,7 +729,7 @@
             if (rc != RIG_OK) { return failure<TextResult>(rc); }
 
             TextResult result = ok<TextResult>();
-            if (const char *text = strPowerStatus(out0)) { result.value = text; }
+            if (const char *text = strPowerStatus(out0); text != nullptr && *text != '\0') { result.value = text; }
             else { return failure<TextResult>(-RIG_EPROTO, "rig_get_powerstat returned a powerstat_t Hamlib does not name"); }
             return result;
         });
@@ -1138,21 +1152,21 @@
             if (!fromNumber(arg0.channelNum, &value0.channel_num)) { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.bankNum, &value0.bank_num)) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.vfo = rig_parse_vfo(arg0.vfo.c_str());
-            if (value0.vfo == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0.vfo == RIG_VFO_NONE && arg0.vfo != "None") { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.ant, &value0.ant)) { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.freq, &value0.freq)) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.mode = rig_parse_mode(arg0.mode.c_str());
-            if (value0.mode == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0.mode == RIG_MODE_NONE && arg0.mode != "None") { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.width, &value0.width)) { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.txFreq, &value0.tx_freq)) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.tx_mode = rig_parse_mode(arg0.txMode.c_str());
-            if (value0.tx_mode == RIG_MODE_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0.tx_mode == RIG_MODE_NONE && arg0.txMode != "None") { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.txWidth, &value0.tx_width)) { return failure<CodeResult>(-RIG_EINVAL); }
             value0.split = arg0.split ? RIG_SPLIT_ON : RIG_SPLIT_OFF;
             value0.tx_vfo = rig_parse_vfo(arg0.txVfo.c_str());
-            if (value0.tx_vfo == RIG_VFO_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0.tx_vfo == RIG_VFO_NONE && arg0.txVfo != "None") { return failure<CodeResult>(-RIG_EINVAL); }
             value0.rptr_shift = rig_parse_rptr_shift(arg0.rptrShift.c_str());
-            if (value0.rptr_shift == RIG_RPT_SHIFT_NONE) { return failure<CodeResult>(-RIG_EINVAL); }
+            if (value0.rptr_shift == RIG_RPT_SHIFT_NONE && arg0.rptrShift != "None") { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.rptrOffs, &value0.rptr_offs)) { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.tuningStep, &value0.tuning_step)) { return failure<CodeResult>(-RIG_EINVAL); }
             if (!fromNumber(arg0.rit, &value0.rit)) { return failure<CodeResult>(-RIG_EINVAL); }
@@ -1190,17 +1204,27 @@
             RigChannelResult result = ok<RigChannelResult>();
             result.channelNum = (double) out0.channel_num;
             result.bankNum = (double) out0.bank_num;
-            result.vfo = textOrEmpty(rig_strvfo(out0.vfo));
+            if (out0.vfo == RIG_VFO_NONE) { result.vfo = "None"; }
+            else if (const char *text = rig_strvfo(out0.vfo); text != nullptr && *text != '\0') { result.vfo = text; }
+            else { return failure<RigChannelResult>(-RIG_EPROTO, "rig_get_channel returned a vfo_t Hamlib does not name"); }
             result.ant = (double) out0.ant;
             result.freq = (double) out0.freq;
-            result.mode = textOrEmpty(rig_strrmode(out0.mode));
+            if (out0.mode == RIG_MODE_NONE) { result.mode = "None"; }
+            else if (const char *text = rig_strrmode(out0.mode); text != nullptr && *text != '\0') { result.mode = text; }
+            else { return failure<RigChannelResult>(-RIG_EPROTO, "rig_get_channel returned a rmode_t Hamlib does not name"); }
             result.width = (double) out0.width;
             result.txFreq = (double) out0.tx_freq;
-            result.txMode = textOrEmpty(rig_strrmode(out0.tx_mode));
+            if (out0.tx_mode == RIG_MODE_NONE) { result.txMode = "None"; }
+            else if (const char *text = rig_strrmode(out0.tx_mode); text != nullptr && *text != '\0') { result.txMode = text; }
+            else { return failure<RigChannelResult>(-RIG_EPROTO, "rig_get_channel returned a rmode_t Hamlib does not name"); }
             result.txWidth = (double) out0.tx_width;
             result.split = out0.split != RIG_SPLIT_OFF;
-            result.txVfo = textOrEmpty(rig_strvfo(out0.tx_vfo));
-            result.rptrShift = textOrEmpty(rig_strptrshift(out0.rptr_shift));
+            if (out0.tx_vfo == RIG_VFO_NONE) { result.txVfo = "None"; }
+            else if (const char *text = rig_strvfo(out0.tx_vfo); text != nullptr && *text != '\0') { result.txVfo = text; }
+            else { return failure<RigChannelResult>(-RIG_EPROTO, "rig_get_channel returned a vfo_t Hamlib does not name"); }
+            if (out0.rptr_shift == RIG_RPT_SHIFT_NONE) { result.rptrShift = "None"; }
+            else if (const char *text = rig_strptrshift(out0.rptr_shift); text != nullptr && *text != '\0') { result.rptrShift = text; }
+            else { return failure<RigChannelResult>(-RIG_EPROTO, "rig_get_channel returned a rptr_shift_t Hamlib does not name"); }
             result.rptrOffs = (double) out0.rptr_offs;
             result.tuningStep = (double) out0.tuning_step;
             result.rit = (double) out0.rit;
@@ -1301,7 +1325,7 @@
         return withRig<NumberResult>(handle, [&](RIG *rig)
         {
             rmode_t value0 = rig_parse_mode(arg0.c_str());
-            if (value0 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (value0 == RIG_MODE_NONE && arg0 != "None") { return failure<NumberResult>(-RIG_EINVAL); }
 
             const auto returned = rig_passband_normal(rig, value0);
             NumberResult result = ok<NumberResult>();
@@ -1315,7 +1339,7 @@
         return withRig<NumberResult>(handle, [&](RIG *rig)
         {
             rmode_t value0 = rig_parse_mode(arg0.c_str());
-            if (value0 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (value0 == RIG_MODE_NONE && arg0 != "None") { return failure<NumberResult>(-RIG_EINVAL); }
 
             const auto returned = rig_passband_narrow(rig, value0);
             NumberResult result = ok<NumberResult>();
@@ -1329,7 +1353,7 @@
         return withRig<NumberResult>(handle, [&](RIG *rig)
         {
             rmode_t value0 = rig_parse_mode(arg0.c_str());
-            if (value0 == RIG_MODE_NONE) { return failure<NumberResult>(-RIG_EINVAL); }
+            if (value0 == RIG_MODE_NONE && arg0 != "None") { return failure<NumberResult>(-RIG_EINVAL); }
 
             const auto returned = rig_passband_wide(rig, value0);
             NumberResult result = ok<NumberResult>();

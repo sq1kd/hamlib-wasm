@@ -8,7 +8,7 @@
  */
 
 import { RIG_EINVAL } from '../hamlib-constants';
-import { expect, expectFailure, expectOk, test } from './fixtures';
+import { expect, expectFailure, expectOk, test, useRig } from './fixtures';
 
 test('exposes the generated capability matrix and drives a generated operation', async ({ harnessPage: page }) => {
   const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
@@ -134,4 +134,35 @@ test('exposes the generated capability matrix and drives a generated operation',
   const gated = expectFailure(result.gated);
   expect(gated.code).toBe('UNSUPPORTED_OPERATION');
   expect(gated.operation).toBe('getParm');
+});
+
+test('the NONE repeater shift is a setting, while an unknown name is refused', async ({ harnessPage: page }) => {
+  await useRig(page, 'icom-ic746');
+
+  const captured = await page.evaluate(() => window.__testHelpers.capture(async () => {
+    const hamlib = await window.__hamlibHarness.createRawHamlib();
+    const port = await hamlib.requestPort();
+    const ic746 = window.__testHelpers.catalogueModel(hamlib.models, 'Icom', 'IC-746');
+    const rig = await hamlib.open({ modelId: ic746.id, port });
+
+    await rig.setRptrShift('+');
+    const plus = await rig.getRptrShift();
+    await rig.setRptrShift('None');
+    const none = await rig.getRptrShift();
+    const unknown = await window.__testHelpers.capture(() => rig.setRptrShift('simplex' as 'None'));
+    const commands = [...window.__fakeSerial.commands];
+
+    await rig.close();
+    await hamlib.dispose();
+
+    return { plus, none, unknown, commands };
+  }));
+
+  const result = expectOk(captured);
+
+  expect(result.plus).toBe('+');
+  expect(result.none).toBe('None');
+  /* `0F 10` is the CI-V simplex command icom_set_rptr_shift() sends for RIG_RPT_SHIFT_NONE. */
+  expect(result.commands).toContain('0F 10');
+  expect(expectFailure(result.unknown).hamlibCode).toBe(-RIG_EINVAL);
 });

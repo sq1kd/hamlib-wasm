@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseStringArray, parseSwitchNames, parseTable } from '../../packages/hamlib-codegen/src/names.ts';
+import { parseStringArray, parseSwitchNames, parseTable, switchName, tableName } from '../../packages/hamlib-codegen/src/names.ts';
 
 const MISC = `
 static const struct
@@ -13,6 +13,7 @@ static const struct
     { RIG_MODE_CWR, "CWR" },
     { RIG_MODE_CWR, "CW-R" },   // an alias the parser also accepts
     { RIG_MODE_CW, "CW" },
+    { RIG_MODE_NONE, "None" }, // so we can return None when NONE is requested
 
     { RIG_MODE_NONE, "" },
 };
@@ -41,11 +42,23 @@ const char *HAMLIB_API rig_strptrshift(rptr_shift_t shift)
 
 describe('parseTable', () => {
   it('reads every name once, aliases included, up to the sentinel', () => {
-    expect(parseTable(MISC, 'mode_str')).toEqual(['CW', 'CWR', 'CW-R']);
+    expect(parseTable(MISC, 'mode_str')).toEqual(['CW', 'CWR', 'CW-R', 'None']);
   });
 
   it('treats a NULL name as the end-of-table sentinel', () => {
     expect(parseTable(MISC, 'scan_str')).toEqual(['STOP']);
+  });
+});
+
+describe('sentinel names', () => {
+  it('reads the name a table gives a constant, skipping the empty end marker', () => {
+    expect(tableName(MISC, 'mode_str', 'RIG_MODE_NONE')).toBe('None');
+    expect(tableName(MISC, 'scan_str', 'RIG_SCAN_NONE')).toBeUndefined();
+  });
+
+  it('reads the name a switch stringifier returns for one case', () => {
+    expect(switchName(MISC, 'const char *HAMLIB_API rig_strptrshift', 'RIG_RPT_SHIFT_NONE')).toBe('None');
+    expect(switchName(MISC, 'const char *HAMLIB_API rig_strptrshift', 'RIG_RPT_SHIFT_PLUS')).toBeUndefined();
   });
 });
 

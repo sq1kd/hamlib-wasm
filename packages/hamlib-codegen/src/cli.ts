@@ -50,7 +50,7 @@ import { emitCapabilities, emitCodecs, emitEmbind, emitOperations, emitResults }
 import { emitMethodFiles } from './emit/methods.ts';
 import { emitPolicyHeader, lineSettingsTypes, policyConstants } from './emit/policy.ts';
 import { emitNames, emitTransportTypes, errorMessageConstants } from './emit/names.ts';
-import { loadErrorMessages, loadVocabularies } from './names.ts';
+import { loadErrorMessages, loadVocabularies, sentinelNames } from './names.ts';
 import type { NameVocabulary } from './names.ts';
 import { createProjectionResolver, staleProjectionRenames } from './project.ts';
 import type { ProjectionSpec } from './types.ts';
@@ -480,11 +480,11 @@ function render(
   };
 
   const files: (readonly [string, string])[] = [
-    [paths.results, emitResults(model, facts)],
+    [paths.results, emitResults(model, facts, sentinelNames(vocabularies))],
     [paths.codecs, emitCodecs(vocabularies)],
     [paths.transport, emitTransportTypes(vocabularies, lineSettingsTypes(model, vocabularies))],
     [paths.policy, emitPolicyHeader(model, vocabularies)],
-    [paths.operations, emitOperations(facts)],
+    [paths.operations, emitOperations(facts, sentinelNames(vocabularies))],
     [paths.capabilities, emitCapabilities(model, facts)],
     [paths.embind, emitEmbind(model, facts)],
     [paths.contract, emitContract(model, facts, {

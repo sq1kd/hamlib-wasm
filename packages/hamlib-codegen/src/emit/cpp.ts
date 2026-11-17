@@ -92,7 +92,7 @@ function emitValueObjectStruct(object: ValueObject): string[] {
   ];
 }
 
-export function emitResults(model: Model, facts: readonly OperationFacts[]): string {
+export function emitResults(model: Model, facts: readonly OperationFacts[], sentinels: ReadonlyMap<string, string>): string {
   const lines = [GENERATED_HEADER, ''];
 
   for (const spec of usedProjections(facts)) {
@@ -111,13 +111,13 @@ export function emitResults(model: Model, facts: readonly OperationFacts[]): str
    * a generated result, so a walked entry and a looked-up one agree. */
   for (const spec of usedProjections(facts).filter((candidate) =>
     model.vectors.some((vector) => vector.type === candidate.cpp))) {
-    const context: Context = { result: spec.cpp, symbol: `project${spec.cpp}`, setting: null };
+    const context: Context = { result: spec.cpp, symbol: `project${spec.cpp}`, setting: null, sentinels };
 
     lines.push(`static inline ${spec.cpp} project${spec.cpp}(const ${spec.type} &source)`, '{');
     lines.push(`    ${spec.cpp} result{};`);
 
     for (const field of spec.fields) {
-      if (field.binding.strictNames) {
+      if (field.binding.category === 'enum') {
         throw new Error(`${spec.cpp}.${field.name}: a vector element cannot fail on an unnamed value`);
       }
 
@@ -162,6 +162,13 @@ interface Context {
   readonly symbol: string;
   /** The `setting_t` local a `value_t` is interpreted against. */
   readonly setting: string | null;
+  /** The name of each parser's sentinel, when its vocabulary names it (names.ts). */
+  readonly sentinels: ReadonlyMap<string, string>;
+}
+
+/** A C string literal; vocabulary names never need escaping beyond this. */
+function cString(text: string): string {
+  return JSON.stringify(text);
 }
 
 function assign(target: Target, type: string, expression: string): string {
@@ -203,9 +210,14 @@ function convertIn(binding: TypeBinding, source: string, target: Target, context
   }
 
   if (binding.category === 'enum') {
+    const sentinel = context.sentinels.get(binding.enumParse as string);
+    const unknown = sentinel === undefined
+      ? `${target.name} == ${binding.enumNone}`
+      : `${target.name} == ${binding.enumNone} && ${source} != ${cString(sentinel)}`;
+
     return [
       assign(target, binding.native, `${binding.enumParse}(${source}.c_str())`),
-      `if (${target.name} == ${binding.enumNone}) { return failure<${context.result}>(-RIG_EINVAL); }`,
+      `if (${unknown}) { return failure<${context.result}>(-RIG_EINVAL); }`,
     ];
   }
 
@@ -253,9 +265,11 @@ function checkedNumber(source: string, destination: string, context: Context): s
 }
 
 /**
- * Convert the C value `source` into the result field `destination`.  A value
- * a generated codec has no name for fails the call with `-RIG_EPROTO`: the
- * public type promises one of the names.
+ * Convert the C value `source` into the result field `destination`.  The
+ * public type promises one of the vocabulary's names, so the sentinel is
+ * reported by the name the vocabulary gives it (`rig_strrmode()` answers `""`
+ * for `RIG_MODE_NONE`, which `mode_str[]` calls `"None"`), and any other value
+ * the stringifier has no name for fails the call with `-RIG_EPROTO`.
  */
 function convertOut(
   binding: TypeBinding,
@@ -265,12 +279,13 @@ function convertOut(
   charArray: number | null,
 ): string[] {
   if (binding.category === 'enum') {
-    return binding.strictNames
-      ? [
-        `if (const char *text = ${binding.enumStr}(${source})) { ${destination} = text; }`,
-        `else { return failure<${context.result}>(-RIG_EPROTO, "${context.symbol} returned a ${binding.native} Hamlib does not name"); }`,
-      ]
-      : [`${destination} = textOrEmpty(${binding.enumStr}(${source}));`];
+    const sentinel = context.sentinels.get(binding.enumParse as string);
+
+    return [
+      ...(sentinel === undefined ? [] : [`if (${source} == ${binding.enumNone}) { ${destination} = ${cString(sentinel)}; }`]),
+      `${sentinel === undefined ? '' : 'else '}if (const char *text = ${binding.enumStr}(${source}); text != nullptr && *text != '\\0') { ${destination} = text; }`,
+      `else { return failure<${context.result}>(-RIG_EPROTO, "${context.symbol} returned a ${binding.native} Hamlib does not name"); }`,
+    ];
   }
 
   if (binding.category === 'string') {
@@ -318,13 +333,14 @@ function callArguments(operation: GeneratedOperation): string[] {
 }
 
 /** The body of a generated method, after the rig (if any) is in hand. */
-function operationBody(facts: OperationFacts): string[] {
+function operationBody(facts: OperationFacts, sentinels: ReadonlyMap<string, string>): string[] {
   const { operation, result } = facts;
   const settingIndex = operation.arguments.findIndex((argument) => argument.binding.native === 'setting_t');
   const context: Context = {
     result,
     symbol: operation.symbol,
     setting: settingIndex >= 0 ? valueName(settingIndex) : null,
+    sentinels,
   };
   const lines: string[] = [];
 
@@ -366,18 +382,18 @@ function indent(lines: readonly string[], depth: number): string[] {
   return lines.map((line) => (line === '' ? '' : `${' '.repeat(depth)}${line}`));
 }
 
-function emitOperation(facts: OperationFacts): string[] {
+function emitOperation(facts: OperationFacts, sentinels: ReadonlyMap<string, string>): string[] {
   const { result } = facts;
   const lines = [`    ${result} ${facts.operation.method}(${cppParameters(facts).join(', ')})`, '    {'];
 
   if (facts.needsHandle) {
     lines.push(`        return withRig<${result}>(handle, [&](RIG *rig)`);
     lines.push('        {');
-    lines.push(...indent(operationBody(facts), 12));
+    lines.push(...indent(operationBody(facts, sentinels), 12));
     lines.push('        });');
   } else {
     lines.push('        webserial_clear_error();', '');
-    lines.push(...indent(operationBody(facts), 8));
+    lines.push(...indent(operationBody(facts, sentinels), 8));
   }
 
   lines.push('    }');
@@ -385,11 +401,11 @@ function emitOperation(facts: OperationFacts): string[] {
   return lines;
 }
 
-export function emitOperations(facts: readonly OperationFacts[]): string {
+export function emitOperations(facts: readonly OperationFacts[], sentinels: ReadonlyMap<string, string>): string {
   const lines: string[] = [GENERATED_HEADER, ''];
 
   for (const fact of facts) {
-    lines.push(...emitOperation(fact), '');
+    lines.push(...emitOperation(fact, sentinels), '');
   }
 
   return `${lines.join('\n')}\n`;

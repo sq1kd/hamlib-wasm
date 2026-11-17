@@ -26,7 +26,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import type { AstEnum, AstEnumConstant } from './ast.ts';
-import { ENUMS, type EnumRecord, type NameSource } from './enums.ts';
+import { codecOf, ENUMS, type EnumRecord, type NameSource } from './enums.ts';
 
 /** One enum's names, resolved from its {@link EnumRecord}. */
 export interface NameVocabulary {
@@ -41,6 +41,12 @@ export interface NameVocabulary {
    */
   readonly constants?: readonly AstEnumConstant[];
   readonly spelling?: string;
+  /**
+   * The name the vocabulary gives the value its parser answers for a name it
+   * does not know (`"None"` for `RIG_MODE_NONE`), when it gives it one: that
+   * value is then a real setting, not only a refusal.
+   */
+  readonly sentinelName?: string;
 }
 
 function fail(message: string): never {
@@ -48,10 +54,16 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-const ENTRY = /^\{\s*[^{}",]+,\s*(?:"([^"\\]*)"|NULL)\s*\},?\s*(?:\/\/.*)?$/;
+const ENTRY = /^\{\s*([^{}",]+?),\s*(?:"([^"\\]*)"|NULL)\s*\},?\s*(?:\/\/.*)?$/;
 
-/** The names of one `static const struct { ... } <table>[] = { ... };` table. */
-export function parseTable(source: string, table: string): string[] {
+/** One `{ <value>, "<name>" }` entry; an empty name is a NULL or `""` sentinel. */
+interface TableEntry {
+  readonly value: string;
+  readonly name: string;
+}
+
+/** The entries of one `static const struct { ... } <table>[] = { ... };` table. */
+function tableEntries(source: string, table: string): TableEntry[] {
   const lines = source.split('\n');
   const header = lines.findIndex((line) => new RegExp(`^\\}\\s*${table}\\[\\]\\s*=\\s*$`).test(line.trim()));
 
@@ -59,17 +71,17 @@ export function parseTable(source: string, table: string): string[] {
     fail(`src/misc.c has no "} ${table}[] =" table followed by "{"`);
   }
 
-  const names: string[] = [];
+  const entries: TableEntry[] = [];
 
   for (let index = header + 2; index < lines.length; index++) {
     const line = (lines[index] as string).trim();
 
     if (line === '};') {
-      if (names.length === 0) {
+      if (!entries.some((entry) => entry.name !== '')) {
         fail(`${table} has no entries`);
       }
 
-      return names;
+      return entries;
     }
 
     if (line === '' || line.startsWith('//') || (line.startsWith('/*') && line.endsWith('*/'))) {
@@ -82,15 +94,23 @@ export function parseTable(source: string, table: string): string[] {
       fail(`${table}: line ${index + 1} is not a { value, "name" } entry: ${line}`);
     }
 
-    /* An empty name or NULL is the end-of-table sentinel the codecs stop at. */
-    const name = entry[1] ?? '';
-
-    if (name !== '' && !names.includes(name)) {
-      names.push(name);
-    }
+    entries.push({ value: (entry[1] as string).trim(), name: entry[2] ?? '' });
   }
 
   return fail(`${table} is not closed by "};"`);
+}
+
+/** The names of one `{ value, "name" }` table, aliases included, in table order. */
+export function parseTable(source: string, table: string): string[] {
+  /* An empty name or NULL is the end-of-table sentinel the codecs stop at. */
+  return [...new Set(tableEntries(source, table).map((entry) => entry.name).filter((name) => name !== ''))];
+}
+
+/** The name a table gives `constant`, or `undefined` when it gives none. */
+export function tableName(source: string, table: string, constant: string): string | undefined {
+  const name = tableEntries(source, table).find((entry) => entry.value === constant)?.name;
+
+  return name === '' ? undefined : name;
 }
 
 /**
@@ -99,21 +119,28 @@ export function parseTable(source: string, table: string): string[] {
  * function's declaration up to its opening parenthesis.
  */
 export function parseSwitchNames(source: string, signature: string): string[] {
-  const start = source.indexOf(`${signature}(`);
-
-  if (start < 0) {
-    fail(`no ${signature}() to read names from`);
-  }
-
-  const end = source.indexOf('\n}\n', start);
-  const body = source.slice(start, end);
-  const names = [...body.matchAll(/return "([^"\\]+)";/g)].map((match) => match[1] as string);
+  const names = [...switchBody(source, signature).matchAll(/return "([^"\\]+)";/g)].map((match) => match[1] as string);
 
   if (names.length === 0) {
     fail(`${signature}() returns no names`);
   }
 
   return [...new Set(names)];
+}
+
+function switchBody(source: string, signature: string): string {
+  const start = source.indexOf(`${signature}(`);
+
+  if (start < 0) {
+    fail(`no ${signature}() to read names from`);
+  }
+
+  return source.slice(start, source.indexOf('\n}\n', start));
+}
+
+/** The name a switch stringifier returns for `case <constant>:`, if any. */
+export function switchName(source: string, signature: string, constant: string): string | undefined {
+  return new RegExp(`case\\s+${constant}\\s*:\\s*return\\s+"([^"\\\\]+)";`).exec(switchBody(source, signature))?.[1];
 }
 
 const STRING_ENTRY = /^"((?:[^"\\]|\\.)*)",?$/;
@@ -214,6 +241,19 @@ export function constantNames(
   };
 }
 
+/**
+ * The sentinel's name of every codec that has one, keyed by the codec's
+ * parser: a name a caller may pass even though the parser answers the
+ * sentinel for it.
+ */
+export function sentinelNames(vocabularies: readonly NameVocabulary[]): ReadonlyMap<string, string> {
+  return new Map(vocabularies.flatMap((vocabulary) => {
+    const codec = codecOf(vocabulary.record);
+
+    return codec === null || vocabulary.sentinelName === undefined ? [] : [[codec.parse, vocabulary.sentinelName] as const];
+  }));
+}
+
 /** Every vocabulary of {@link ENUMS}, from the pinned `src/misc.c` and the AST. */
 export function loadVocabularies(
   sourceDir: string,
@@ -231,14 +271,29 @@ export function loadVocabularies(
   return ENUMS.map((record): NameVocabulary => {
     const from = record.source;
 
+    const none = codecOf(record)?.none;
+
     if ('table' in from) {
-      return { record, source: `\`${from.table}[]\` in Hamlib's src/misc.c`, names: parseTable(source, from.table) };
+      const sentinelName = none === undefined ? undefined : tableName(source, from.table, none);
+
+      return {
+        record,
+        source: `\`${from.table}[]\` in Hamlib's src/misc.c`,
+        names: parseTable(source, from.table),
+        ...(sentinelName === undefined ? {} : { sentinelName }),
+      };
     }
 
     if ('stringifier' in from) {
       const name = from.stringifier.split(' ').at(-1) as string;
+      const sentinelName = none === undefined ? undefined : switchName(source, from.stringifier, none);
 
-      return { record, source: `\`${name}()\` in Hamlib's src/misc.c`, names: parseSwitchNames(source, from.stringifier) };
+      return {
+        record,
+        source: `\`${name}()\` in Hamlib's src/misc.c`,
+        names: parseSwitchNames(source, from.stringifier),
+        ...(sentinelName === undefined ? {} : { sentinelName }),
+      };
     }
 
     return constantNames(record, from, enums);
