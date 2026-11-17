@@ -4,6 +4,12 @@ import type { SerialTransport } from './transport.js';
 import type * as NodeEntry from './node.js';
 import { webSerialTransport } from './web-serial.js';
 
+function runsInNode(): boolean {
+  const scope = globalThis as { process?: { versions?: { node?: string } } };
+
+  return typeof scope.process?.versions?.node === 'string';
+}
+
 /**
  * The transport a caller gets when none is passed: Web Serial where the
  * runtime has it, the `serialport` transport in Node - the way `serialport`'s
@@ -12,12 +18,6 @@ import { webSerialTransport } from './web-serial.js';
  * is neither falls back to Web Serial, whose own TRANSPORT_UNAVAILABLE error
  * names what is missing.
  */
-function runsInNode(): boolean {
-  const scope = globalThis as { process?: { versions?: { node?: string } } };
-
-  return typeof scope.process?.versions?.node === 'string';
-}
-
 export async function selectTransport(explicit?: SerialTransport): Promise<SerialTransport> {
   if (explicit) { return explicit; }
 

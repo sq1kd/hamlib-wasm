@@ -549,10 +549,10 @@ class Serializer {
 /* rig                                                                */
 /* ------------------------------------------------------------------ */
 
-/** What a rig handle needs from the Hamlib instance that owns it. */
 /** The longest reply rig_send_raw() reads: its own buffer. */
 const MAX_RAW_REPLY = 200;
 
+/** What a rig handle needs from the Hamlib instance that owns it. */
 interface RigContext {
   readonly native: NativeModule;
   readonly queue: Serializer;

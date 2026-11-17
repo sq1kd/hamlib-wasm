@@ -232,15 +232,6 @@ interface PortListeners {
   readonly close: (failure?: Error | null) => void;
 }
 
-/**
- * One `serialport` port behind the package's port contract.
- *
- * The device is opened by `open()`, not by construction, because the line
- * settings come from the rig the caller is about to open.  A `serialport` port
- * cannot be reopened after `close()`, so each open builds a fresh one - which
- * is also what makes Hamlib's own baud-rate reconfiguration (close + open)
- * work.
- */
 /** `listPorts()`' hex strings as Web Serial's numeric ids; absent ones stay absent. */
 function usbInfo(listed: NodeSerialPortListEntry | undefined): SerialPortInfo {
   const id = (hex: string | undefined): number | undefined =>
@@ -254,6 +245,15 @@ function usbInfo(listed: NodeSerialPortListEntry | undefined): SerialPortInfo {
   };
 }
 
+/**
+ * One `serialport` port behind the package's port contract.
+ *
+ * The device is opened by `open()`, not by construction, because the line
+ * settings come from the rig the caller is about to open.  A `serialport` port
+ * cannot be reopened after `close()`, so each open builds a fresh one - which
+ * is also what makes Hamlib's own baud-rate reconfiguration (close + open)
+ * work.
+ */
 class NodeSerialPortAdapter implements SerialPortLike {
   readonly #path: string;
   readonly #SerialPort: SerialPortConstructorLike;
