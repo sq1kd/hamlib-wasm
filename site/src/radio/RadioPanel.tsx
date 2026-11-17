@@ -288,7 +288,7 @@ export function RadioPanel(props: RadioPanelProps): ReactElement {
           </select>
         </label>
         <button
-          className="radio-primary"
+          className="hw-primary"
           data-testid="connect-button"
           data-radio-connect
           type="button"

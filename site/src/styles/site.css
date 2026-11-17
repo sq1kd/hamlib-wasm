@@ -22,6 +22,31 @@
   --hw-radius: 0.5rem;
   --hw-radius-lg: 0.875rem;
   --hw-radius-pill: 999rem;
+
+  /* The landing page's width: its hero and the cards below it. */
+  --hw-wrap: min(75rem, 100% - 2 * var(--sl-content-pad-x));
+
+  /* The radio's colours, a lit display on a dark faceplate in both themes:
+   * the hero, the panel and the demo's console of calls. */
+  --hw-bg: #07090c;
+  --hw-surface: #0f141a;
+  --hw-raised: #141b22;
+  --hw-well: #0a0e12;
+  --hw-well-raised: #0d1217;
+  --hw-line: #1f2731;
+  --hw-line-hover: #3a4652;
+  --hw-control: #161d25;
+  --hw-control-line: #26303a;
+  --hw-ink: #e8edf2;
+  --hw-ink-dim: #b3bec8;
+  --hw-muted: #a7b2bd;
+  --hw-faint: #6b7884;
+  --hw-accent: #59e0c5;
+  --hw-accent-hover: #7deccf;
+  --hw-accent-dim: #3fbfa6;
+  --hw-accent-ink: #04211b;
+  --hw-disabled: #1d2a2f;
+  --hw-tx: #ffcf5a;
 }
 
 :root,
@@ -111,8 +136,41 @@
 
 [data-has-hero] .sl-markdown-content,
 [data-has-hero] .content-panel footer {
-  width: min(75rem, 100% - 2 * var(--sl-content-pad-x));
+  width: var(--hw-wrap);
   margin-inline: auto;
+}
+
+/* The primary action on the radio's faceplate: the hero's call to action and
+ * Connect.  Where it sits sets its size. */
+.hw-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--hw-radius);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--hw-accent);
+  color: var(--hw-accent-ink);
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.hw-primary:hover:not(:disabled) {
+  background: var(--hw-accent-hover);
+  color: var(--hw-accent-ink);
+  transform: translateY(-1px);
+}
+
+.hw-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.hw-primary:disabled {
+  background: var(--hw-disabled);
+  color: var(--hw-faint);
+  cursor: not-allowed;
 }
 
 [data-has-hero] .sl-markdown-content {

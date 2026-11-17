@@ -1,31 +1,20 @@
 /*
  * The radio panel, on the landing page and the demo page alike.
  *
- * A lit display on a dark faceplate in both site themes: the panel carries
- * its own colours instead of following Starlight's.
+ * A lit display on a dark faceplate in both site themes: the panel takes the
+ * radio's colours from site.css instead of following Starlight's.
  */
 .radio {
-  --r-surface: #0f141a;
-  --r-raised: #141b22;
-  --r-line: #1f2731;
-  --r-control: #161d25;
-  --r-control-line: #26303a;
-  --r-ink: #e8edf2;
-  --r-faint: #6b7884;
-  --r-accent: #59e0c5;
-  --r-accent-ink: #04211b;
-  --r-accent-dim: #3fbfa6;
-  --r-tx: #ffcf5a;
   /* One height for every button, select and field, so a row's edges line up. */
   --r-control-h: 2.625rem;
 
   container-type: inline-size;
-  color: var(--r-ink);
+  color: var(--hw-ink);
   font-family: var(--__sl-font);
   font-size: 1rem;
   line-height: 1.5;
-  background: linear-gradient(var(--r-raised), var(--r-surface));
-  border: 1px solid var(--r-line);
+  background: linear-gradient(var(--hw-raised), var(--hw-surface));
+  border: 1px solid var(--hw-line);
   border-radius: var(--hw-radius-lg);
   padding: 1.5rem;
   text-align: start;
@@ -42,7 +31,7 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
 /* Header */
 .radio-head { display: flex; align-items: center; gap: 0.75rem; min-height: 1.9rem; }
 .radio-name { font-weight: 600; }
-.radio-meta { font-size: 0.875rem; color: var(--r-faint); font-variant-numeric: tabular-nums; }
+.radio-meta { font-size: 0.875rem; color: var(--hw-faint); font-variant-numeric: tabular-nums; }
 .radio-status { margin-left: auto; display: flex; }
 .radio-pill {
   display: inline-flex;
@@ -50,16 +39,16 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   gap: 0.45rem;
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--r-faint);
-  border: 1px solid var(--r-line);
+  color: var(--hw-faint);
+  border: 1px solid var(--hw-line);
   padding: 0.2rem 0.65rem 0.2rem 0.55rem;
   border-radius: var(--hw-radius-pill);
   white-space: nowrap;
 }
 .radio-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.radio[data-state='connecting'] .radio-pill { color: var(--r-tx); border-color: #ffcf5a40; }
-.radio[data-state='connected'] .radio-pill { color: var(--r-accent); background: #59e0c514; border-color: #59e0c533; }
-.radio[data-state='connected'] .radio-pill::before { box-shadow: 0 0 0 3px #59e0c526; }
+.radio[data-state='connecting'] .radio-pill { color: var(--hw-tx); border-color: color-mix(in srgb, var(--hw-tx) 25%, transparent); }
+.radio[data-state='connected'] .radio-pill { color: var(--hw-accent); background: color-mix(in srgb, var(--hw-accent) 8%, transparent); border-color: color-mix(in srgb, var(--hw-accent) 20%, transparent); }
+.radio[data-state='connected'] .radio-pill::before { box-shadow: 0 0 0 3px color-mix(in srgb, var(--hw-accent) 15%, transparent); }
 
 /* Connected, the pill carries its own way out: one capsule, Disconnect its second half. */
 .radio-disconnect {
@@ -67,10 +56,10 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   align-items: center;
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--r-faint);
+  color: var(--hw-faint);
   background: none;
-  border: 1px solid #59e0c533;
-  border-left-color: #59e0c51f;
+  border: 1px solid color-mix(in srgb, var(--hw-accent) 20%, transparent);
+  border-left-color: color-mix(in srgb, var(--hw-accent) 12%, transparent);
   border-radius: 0 var(--hw-radius-pill) var(--hw-radius-pill) 0;
   margin-left: -1px;
   padding: 0.2rem 0.75rem 0.2rem 0.6rem;
@@ -78,18 +67,18 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
 }
-.radio-disconnect:hover { color: var(--r-ink); background: #59e0c50f; }
+.radio-disconnect:hover { color: var(--hw-ink); background: color-mix(in srgb, var(--hw-accent) 6%, transparent); }
 .radio[data-state='connected'] .radio-disconnect { display: inline-flex; }
 .radio[data-state='connected'] .radio-pill { border-radius: var(--hw-radius-pill) 0 0 var(--hw-radius-pill); }
 
 /* Display */
 .radio-lcd { margin-top: 1rem; background: #061210; border: 1px solid #12352f; border-radius: var(--hw-radius); padding: 1.25rem 1.4rem 1rem; }
 .radio-freq { display: flex; align-items: baseline; gap: 0.75rem; }
-.radio-seg { position: relative; font: min(3.9rem, 11cqi)/1 'DSEG7 Classic', monospace; color: var(--r-accent); white-space: pre; }
-.radio-ghost { color: #59e0c512; }
-.radio-lit { position: absolute; right: 0; top: 0; text-shadow: 0 0 14px #59e0c540; }
-.radio[data-sample] .radio-lit { color: #59e0c5b0; text-shadow: none; }
-.radio[data-state='connecting'] .radio-lit { color: #59e0c560; text-shadow: none; }
+.radio-seg { position: relative; font: min(3.9rem, 11cqi)/1 'DSEG7 Classic', monospace; color: var(--hw-accent); white-space: pre; }
+.radio-ghost { color: color-mix(in srgb, var(--hw-accent) 7%, transparent); }
+.radio-lit { position: absolute; right: 0; top: 0; text-shadow: 0 0 14px color-mix(in srgb, var(--hw-accent) 25%, transparent); }
+.radio[data-sample] .radio-lit { color: color-mix(in srgb, var(--hw-accent) 69%, transparent); text-shadow: none; }
+.radio[data-state='connecting'] .radio-lit { color: color-mix(in srgb, var(--hw-accent) 38%, transparent); text-shadow: none; }
 .radio-unit { font-size: 1rem; font-weight: 500; color: #2fa891; }
 .radio-readout {
   margin-left: auto;
@@ -97,12 +86,12 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   justify-items: end;
   gap: 0.15rem;
   font: 0.85rem var(--__sl-font-mono);
-  color: var(--r-accent-dim);
+  color: var(--hw-accent-dim);
   align-self: center;
   white-space: nowrap;
 }
-.radio-readout .radio-mode { color: var(--r-accent); font-size: 1rem; }
-.radio-tx { font-weight: 600; color: #07090c; background: var(--r-tx); padding: 0 0.45rem; border-radius: var(--hw-radius-sm); }
+.radio-readout .radio-mode { color: var(--hw-accent); font-size: 1rem; }
+.radio-tx { font-weight: 600; color: var(--hw-bg); background: var(--hw-tx); padding: 0 0.45rem; border-radius: var(--hw-radius-sm); }
 
 .radio-modes { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.9rem; }
 .radio-modes button {
@@ -111,55 +100,37 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   border: 1px solid #1d4a42;
   border-radius: var(--hw-radius-sm);
   background: none;
-  color: var(--r-accent-dim);
+  color: var(--hw-accent-dim);
 }
 .radio-modes button:disabled { cursor: default; }
 .radio-modes button:not(:disabled) { cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
-.radio-modes button:not(:disabled):hover { border-color: var(--r-accent); transform: translateY(-1px); }
-.radio-modes button[aria-pressed='true'] { background: var(--r-accent); color: var(--r-accent-ink); border-color: var(--r-accent); }
+.radio-modes button:not(:disabled):hover { border-color: var(--hw-accent); transform: translateY(-1px); }
+.radio-modes button[aria-pressed='true'] { background: var(--hw-accent); color: var(--hw-accent-ink); border-color: var(--hw-accent); }
 
 .radio-meter { margin-top: 1rem; display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; }
 .radio-meter i { height: 9px; border-radius: 1px; background: #11302a; transition: background 0.12s; }
-.radio-meter i[data-on='on'] { background: var(--r-accent); }
-.radio-meter i[data-on='over'] { background: var(--r-tx); }
+.radio-meter i[data-on='on'] { background: var(--hw-accent); }
+.radio-meter i[data-on='over'] { background: var(--hw-tx); }
 .radio-scale { display: flex; justify-content: space-between; margin-top: 0.35rem; font: 0.7rem var(--__sl-font-mono); color: #2f7a6c; }
 
-/* Buttons and fields */
-.radio-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  height: var(--r-control-h);
-  padding: 0 1.2rem;
-  border: 0;
-  border-radius: var(--hw-radius);
-  font-weight: 500;
-  white-space: nowrap;
-  background: var(--r-accent);
-  color: var(--r-accent-ink);
-  cursor: pointer;
-  transition: transform 0.15s, background 0.15s;
-}
-.radio-primary:hover:not(:disabled) { background: #7deccf; transform: translateY(-1px); }
-.radio-primary:active:not(:disabled) { transform: translateY(1px); }
-.radio-primary:disabled { background: #1d2a2f; color: var(--r-faint); cursor: not-allowed; }
+/* Buttons and fields; Connect is the site's primary button (site.css). */
+.radio-setup .hw-primary { box-sizing: border-box; height: var(--r-control-h); padding: 0 1.2rem; }
 
 .radio-controls button,
 .radio-controls select,
 .radio-controls input,
 .radio-field select {
   font-size: 0.9rem;
-  color: var(--r-ink);
-  background: var(--r-control);
-  border: 1px solid var(--r-control-line);
+  color: var(--hw-ink);
+  background: var(--hw-control);
+  border: 1px solid var(--hw-control-line);
   border-radius: var(--hw-radius);
   box-sizing: border-box;
   height: var(--r-control-h);
   padding: 0 0.75rem;
 }
 .radio-controls button { cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
-.radio-controls button:hover:not(:disabled) { border-color: #3a4652; transform: translateY(-1px); }
+.radio-controls button:hover:not(:disabled) { border-color: var(--hw-line-hover); transform: translateY(-1px); }
 .radio-controls button:active:not(:disabled) { transform: translateY(1px); }
 .radio-controls :disabled, .radio-field select:disabled { opacity: 0.55; cursor: not-allowed; }
 
@@ -171,7 +142,7 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   align-items: center;
   margin-top: 1.1rem;
 }
-.radio-label { font-size: 0.75rem; color: var(--r-faint); }
+.radio-label { font-size: 0.75rem; color: var(--hw-faint); }
 .radio-row { display: flex; gap: 0.6rem; min-width: 0; }
 .radio-group { display: flex; gap: 0.35rem; min-width: 0; }
 .radio-entry { flex: 1; }
@@ -190,7 +161,7 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   min-width: 5.5rem;
   font: 600 0.9rem var(--__sl-font-mono);
   letter-spacing: 0.06em;
-  color: var(--r-tx);
+  color: var(--hw-tx);
   border-color: #5c4c18;
   background: #2a2410;
   touch-action: none;
@@ -198,24 +169,24 @@ fieldset.radio-modes, fieldset.radio-group { margin: 0; padding: 0; border: 0; m
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-.radio-controls .radio-ptt:hover:not(:disabled) { border-color: var(--r-tx); }
+.radio-controls .radio-ptt:hover:not(:disabled) { border-color: var(--hw-tx); }
 .radio-controls .radio-ptt[data-held],
-.radio-controls .radio-ptt[aria-pressed='true'] { color: #07090c; background: var(--r-tx); border-color: var(--r-tx); transform: none; }
+.radio-controls .radio-ptt[aria-pressed='true'] { color: var(--hw-bg); background: var(--hw-tx); border-color: var(--hw-tx); transform: none; }
 
 /* Setup */
 .radio-setup { display: flex; gap: 0.6rem; margin-top: 1.1rem; align-items: end; }
-.radio-field { display: grid; gap: 0.3rem; font-size: 0.75rem; color: var(--r-faint); min-width: 0; }
+.radio-field { display: grid; gap: 0.3rem; font-size: 0.75rem; color: var(--hw-faint); min-width: 0; }
 .radio-field select { width: 100%; padding-inline: 0.6rem; }
-.radio-field select:hover:not(:disabled) { border-color: #3a4652; }
+.radio-field select:hover:not(:disabled) { border-color: var(--hw-line-hover); }
 .radio-model { flex: 1; }
 .radio:not([data-state='connected']) .radio-controls,
 .radio[data-state='connected'] .radio-setup { display: none; }
 
-.radio-note { display: flex; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--r-line); font-size: 0.82rem; color: var(--r-faint); }
-.radio-note a { color: var(--r-accent); text-decoration: none; background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size 0.2s; }
+.radio-note { display: flex; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--hw-line); font-size: 0.82rem; color: var(--hw-faint); }
+.radio-note a { color: var(--hw-accent); text-decoration: none; background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size 0.2s; }
 .radio-note a:hover { background-size: 100% 1px; }
-.radio-limitation { margin-top: 0.6rem; font-size: 0.85rem; color: var(--r-tx); }
-.radio-error { margin-top: 0.5rem; font-size: 0.85rem; color: var(--r-tx); }
+.radio-limitation { margin-top: 0.6rem; font-size: 0.85rem; color: var(--hw-tx); }
+.radio-error { margin-top: 0.5rem; font-size: 0.85rem; color: var(--hw-tx); }
 
 /* A narrow panel - a tablet's split column or a phone - puts the model on its own row. */
 @container (max-width: 34rem) {

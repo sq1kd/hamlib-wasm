@@ -34,7 +34,7 @@ const initial = defaultModel(models);
       <h1 id="_top" data-page-title set:html={title} />
       {tagline && <p class="hw-lede" set:html={tagline} />}
       <div class="hw-actions">
-        {primary && <a class="hw-btn" href={primary.link}>{primary.text}</a>}
+        {primary && <a class="hw-primary" href={primary.link}>{primary.text}</a>}
         <button class="hw-npm" type="button" data-copy="npm i hamlib-wasm" aria-label="Copy the install command">
           <span aria-hidden="true">$</span> npm i hamlib-wasm
         </button>
@@ -99,14 +99,11 @@ const initial = defaultModel(models);
 <style>
   /* The hero is a dark band in both themes: the radio is a lit display. */
   .hw-hero {
-    --bg: #07090c; --surface: #0f141a; --raised: #141b22; --line: #1f2731;
-    --ink: #e8edf2; --muted: #a7b2bd; --faint: #6b7884;
-    --accent: #59e0c5; --accent-ink: #04211b; --tx: #ffcf5a;
     position: relative;
     isolation: isolate;
     overflow: hidden;
-    background: var(--bg);
-    color: var(--ink);
+    background: var(--hw-bg);
+    color: var(--hw-ink);
     min-height: calc(100svh - var(--sl-nav-height));
     display: grid;
     align-items: center;
@@ -122,7 +119,7 @@ const initial = defaultModel(models);
   }
 
   .hw-wrap {
-    width: min(75rem, 100% - 2 * var(--sl-content-pad-x));
+    width: var(--hw-wrap);
     margin-inline: auto;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
@@ -136,7 +133,7 @@ const initial = defaultModel(models);
     line-height: 1.03;
     letter-spacing: -0.022em;
     font-weight: 600;
-    color: var(--ink);
+    color: var(--hw-ink);
   }
 
   .hw-lede {
@@ -144,64 +141,49 @@ const initial = defaultModel(models);
     line-height: 1.55;
     margin-top: 1.4rem;
     max-width: 33em;
-    color: var(--muted);
+    color: var(--hw-muted);
   }
 
   .hw-actions { display: flex; gap: 0.75rem; margin-top: 2.1rem; flex-wrap: wrap; }
 
-  .hw-btn {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.85rem 1.4rem;
-    border: 0;
-    border-radius: var(--hw-radius);
-    font: 500 1rem var(--__sl-font);
-    text-decoration: none;
-    background: var(--accent);
-    color: var(--accent-ink);
-    cursor: pointer;
-    transition: transform 0.15s, background 0.15s;
-  }
-  .hw-btn:hover { background: #7deccf; transform: translateY(-1px); color: var(--accent-ink); }
-  .hw-btn:active { transform: translateY(1px); }
-  .hw-btn:disabled { background: #1d2a2f; color: var(--faint); cursor: not-allowed; transform: none; }
+  .hw-actions .hw-primary { padding: 0.85rem 1.4rem; font: 500 1rem var(--__sl-font); }
 
   .hw-npm {
     font: 0.94rem var(--__sl-font-mono);
     padding: 0.8rem 1.1rem;
     border-radius: var(--hw-radius);
-    background: #0d1217e6;
-    border: 1px solid var(--line);
-    color: var(--ink);
+    background: color-mix(in srgb, var(--hw-well-raised) 90%, transparent);
+    border: 1px solid var(--hw-line);
+    color: var(--hw-ink);
     cursor: copy;
     transition: border-color 0.15s;
   }
-  .hw-npm span { color: var(--accent); }
+  .hw-npm span { color: var(--hw-accent); }
   .hw-npm:hover { border-color: #33404c; }
-  .hw-npm[data-copied]::after { content: '  copied'; color: var(--accent); }
+  .hw-npm[data-copied]::after { content: '  copied'; color: var(--hw-accent); }
 
   .hw-facts { display: flex; flex-wrap: wrap; gap: 1rem 0; margin-top: 2.9rem; }
-  .hw-facts div { padding-right: 1.4rem; margin-right: 1.4rem; border-right: 1px solid var(--line); }
+  .hw-facts div { padding-right: 1.4rem; margin-right: 1.4rem; border-right: 1px solid var(--hw-line); }
   .hw-facts div:last-child { border: 0; }
-  .hw-facts dt { font: 500 1.35rem var(--__sl-font-mono); color: var(--ink); }
-  .hw-facts dd { margin: 0.1rem 0 0; font-size: 0.875rem; color: var(--faint); }
+  .hw-facts dt { font: 500 1.35rem var(--__sl-font-mono); color: var(--hw-ink); }
+  .hw-facts dd { margin: 0.1rem 0 0; font-size: 0.875rem; color: var(--hw-faint); }
 
   /* Lifted off the waterfall here; in the docs the panel sits flat, like the rest of the page. */
   .hw-side :global(.radio) { box-shadow: 0 40px 90px -30px #000; }
 
   .hw-code {
     margin-top: 1rem;
-    background: #0a0e12e6;
-    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--hw-well) 90%, transparent);
+    border: 1px solid var(--hw-line);
     border-radius: var(--hw-radius);
     padding: 1rem 1.1rem;
     font: 0.84rem/1.7 var(--__sl-font-mono);
-    color: #b3bec8;
+    color: var(--hw-ink-dim);
     overflow: auto;
   }
-  .hw-code .k { color: var(--accent); }
-  .hw-code .s { color: var(--tx); }
-  .hw-code .c { color: var(--faint); }
+  .hw-code .k { color: var(--hw-accent); }
+  .hw-code .s { color: var(--hw-tx); }
+  .hw-code .c { color: var(--hw-faint); }
 
   @media (max-width: 62rem) {
     .hw-wrap { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
@@ -209,7 +191,7 @@ const initial = defaultModel(models);
   }
 
   @media (max-width: 34rem) {
-    .hw-btn, .hw-npm { width: 100%; justify-content: center; }
+    .hw-primary, .hw-npm { width: 100%; justify-content: center; }
     .hw-facts div:nth-child(2) { border: 0; }
   }
 </style>
