@@ -57,8 +57,6 @@ struct ModelInfo
     std::string serialHandshake;
     bool canGetPtt;
     bool canSetPtt;
-    bool canSendMorse;
-    bool canStopMorse;
 };
 
 struct CodeResult
@@ -188,8 +186,6 @@ int collectModel(const struct rig_caps *caps, void *data)
      * and TypeScript derives the booleans from it. */
     info.canGetPtt = caps->get_ptt != NULL || serialPttCapable(caps->ptt_type);
     info.canSetPtt = caps->set_ptt != NULL || serialPttCapable(caps->ptt_type);
-    info.canSendMorse = caps->send_morse != NULL;
-    info.canStopMorse = caps->stop_morse != NULL;
 
     models->push_back(info);
     return 1;

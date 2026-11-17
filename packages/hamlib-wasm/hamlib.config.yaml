@@ -51,11 +51,6 @@ results:
       # get_ptt/set_ptt function pointer.
       - [ canGetPtt, bool ]
       - [ canSetPtt, bool ]
-      # The backend's own send_morse/stop_morse.  Hamlib's rig_send_morse only
-      # queues for a worker thread this build does not start, so the facade
-      # calls these directly and the catalogue says whether they exist.
-      - [ canSendMorse, bool ]
-      - [ canStopMorse, bool ]
   CodeResult:
     fields:
       - [ code, int ]
@@ -89,8 +84,9 @@ vectors:
 # pinned signatures are recorded in coverage.json, so a drift fails the build.
 # `capability` names a ModelInfo flag the method is gated on, for the
 # operations rig_caps cannot describe (serial RTS/DTR push-to-talk declares no
-# get_ptt function pointer).  Everything else is classified from the upstream
-# AST and generated end to end.
+# get_ptt function pointer); `capsMember` names the rig_caps function pointer a
+# body needs, which puts the operation in the generated capability matrix.
+# Everything else is classified from the upstream AST and generated end to end.
 operations:
   - name: initialize
     scope: module
@@ -178,6 +174,7 @@ operations:
   # generation, and getMode is generated.
   - name: sendMorse
     scope: module
+    capsMember: send_morse
     args:
       - [ handle, int ]
       - [ text, string ]
@@ -186,6 +183,7 @@ operations:
     calls: []
   - name: stopMorse
     scope: module
+    capsMember: stop_morse
     args:
       - [ handle, int ]
     result: CodeResult

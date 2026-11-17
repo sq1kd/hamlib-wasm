@@ -434,6 +434,13 @@ function render(
   }
 
   const facts = operations.map((operation) => operationFacts(operation, members));
+  const unknownMembers = model.operations
+    .filter((operation) => operation.capsMember !== undefined && !members.has(operation.capsMember))
+    .map((operation) => `${operation.name}: ${operation.capsMember}`);
+
+  if (unknownMembers.length > 0) {
+    fail(`capsMember names no struct rig_caps function pointer: ${unknownMembers.join(', ')}`);
+  }
 
   const signatures: Record<string, readonly string[]> = {};
 
@@ -471,7 +478,7 @@ function render(
     [paths.results, emitResults(model, facts)],
     [paths.codecs, emitCodecs(vocabularies)],
     [paths.operations, emitOperations(facts)],
-    [paths.capabilities, emitCapabilities(facts)],
+    [paths.capabilities, emitCapabilities(model, facts)],
     [paths.embind, emitEmbind(model, facts)],
     [paths.contract, emitContract(model, facts, {
       upstream,

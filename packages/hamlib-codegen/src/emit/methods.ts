@@ -126,7 +126,7 @@ function bespokeMethodLines(model: Model, operation: ModelOperation, imports: Im
   const call = `this.native().${name}(${['this.handle()', ...bespokeParameters(operation).map(([parameter]) => parameter)].join(', ')})`;
   const lines = [`  async ${name}(${signature.parameters}): Promise<${signature.result}> {`];
 
-  if (operation.capability !== undefined) {
+  if (operation.capability !== undefined || operation.capsMember !== undefined) {
     lines.push(`    this.available('${name}');`);
   }
 

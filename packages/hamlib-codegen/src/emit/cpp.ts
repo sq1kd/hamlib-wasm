@@ -360,7 +360,7 @@ export function emitOperations(facts: readonly OperationFacts[]): string {
 /* capabilities and Embind                                             */
 /* ------------------------------------------------------------------ */
 
-export function emitCapabilities(facts: readonly OperationFacts[]): string {
+export function emitCapabilities(model: Model, facts: readonly OperationFacts[]): string {
   const lines: string[] = [GENERATED_HEADER, ''];
 
   lines.push('    std::vector<std::string> capabilities(int modelId)');
@@ -371,8 +371,14 @@ export function emitCapabilities(facts: readonly OperationFacts[]): string {
   lines.push('        if (!caps) { return available; }');
   lines.push('');
 
-  for (const fact of facts.filter((candidate) => candidate.gate !== null)) {
-    lines.push(`        if (caps->${fact.gate} != NULL) { available.push_back("${fact.operation.method}"); }`);
+  const gated = [
+    ...model.operations.flatMap((operation) =>
+      (operation.capsMember === undefined ? [] : [[operation.name, operation.capsMember] as const])),
+    ...facts.flatMap((fact) => (fact.gate === null ? [] : [[fact.operation.method, fact.gate] as const])),
+  ];
+
+  for (const [name, member] of gated) {
+    lines.push(`        if (caps->${member} != NULL) { available.push_back("${name}"); }`);
   }
 
   for (const fact of facts.filter((candidate) => candidate.gate === null)) {

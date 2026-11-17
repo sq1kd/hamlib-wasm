@@ -284,7 +284,7 @@ type Expect<T extends true> = T;
  * push-to-talk over the serial RTS/DTR line declares no `get_ptt`/`set_ptt`
  * function pointer, yet PTT works through the port.
  */
-export type RigFlag = 'canGetPtt' | 'canSetPtt' | 'canSendMorse' | 'canStopMorse';
+export type RigFlag = 'canGetPtt' | 'canSetPtt';
 
 /**
  * Operations gated on one of those flags, so `src/raw.ts` can fold them

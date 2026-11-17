@@ -60,6 +60,12 @@ export interface ModelOperation {
    * the serial RTS/DTR line declares no `get_ptt`/`set_ptt` function pointer).
    */
   readonly capability?: string;
+  /**
+   * The `struct rig_caps` function pointer the operation needs, which puts it
+   * in the generated capability matrix like a generated operation: the
+   * bespoke Morse bodies call the backend's `send_morse`/`stop_morse`.
+   */
+  readonly capsMember?: string;
 }
 
 export interface ModelVector {
@@ -218,8 +224,12 @@ function readOperations(
       );
     }
 
-    if (capability !== undefined && scope !== 'rig') {
-      fail(file, `${where}.capability is only meaningful for a rig-scoped operation`);
+    const capsMember = operation.capsMember === undefined
+      ? undefined
+      : asString(file, operation.capsMember, `${where}.capsMember`);
+
+    if (capability !== undefined && capsMember !== undefined) {
+      fail(file, `${where} is gated either by a capability flag or by a rig_caps member, not both`);
     }
 
     return {
@@ -230,6 +240,7 @@ function readOperations(
       result,
       calls,
       ...(capability === undefined ? {} : { capability }),
+      ...(capsMember === undefined ? {} : { capsMember }),
     };
   });
 }

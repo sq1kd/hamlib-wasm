@@ -8,6 +8,8 @@
 
         if (!caps) { return available; }
 
+        if (caps->send_morse != NULL) { available.push_back("sendMorse"); }
+        if (caps->stop_morse != NULL) { available.push_back("stopMorse"); }
         if (caps->set_freq != NULL) { available.push_back("setFrequency"); }
         if (caps->get_freq != NULL) { available.push_back("getFrequency"); }
         if (caps->set_mode != NULL) { available.push_back("setMode"); }

@@ -1064,10 +1064,6 @@ function collectCapabilities(model: NativeModel, native: NativeModule): Readonly
     }
   }
 
-  /* Hand-written on top of module primitives, so not in the generated list. */
-  if (model.canSendMorse) { capabilities.add('sendMorse'); }
-  if (model.canStopMorse) { capabilities.add('stopMorse'); }
-
   return capabilities;
 }
 

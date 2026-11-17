@@ -14,9 +14,7 @@
     .field("serialParity", &ModelInfo::serialParity)
     .field("serialHandshake", &ModelInfo::serialHandshake)
     .field("canGetPtt", &ModelInfo::canGetPtt)
-    .field("canSetPtt", &ModelInfo::canSetPtt)
-    .field("canSendMorse", &ModelInfo::canSendMorse)
-    .field("canStopMorse", &ModelInfo::canStopMorse);
+    .field("canSetPtt", &ModelInfo::canSetPtt);
 
     emscripten::value_object<CodeResult>("CodeResult")
     .field("code", &CodeResult::code)
