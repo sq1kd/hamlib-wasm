@@ -1,11 +1,11 @@
 # hamlib-wasm Node example
 
-The same package as the browser example, driven from a terminal. Ports come
-from node-serialport rather than a page's Web Serial chooser, because
-`createHamlib()` / `createRawHamlib()` select the transport the runtime has:
-`hamlib-wasm/node` is imported here for `listPorts()`, not to wire the
-transport. The catalogue, the model ids, the baud-rate search and `refresh()`
-are unchanged.
+The same package the documentation site's live demo runs, driven from a
+terminal. Ports come from node-serialport rather than a page's Web Serial
+chooser, because `createHamlib()` / `createRawHamlib()` select the transport
+the runtime has: `hamlib-wasm/node` is imported here for `listPorts()`, not to
+wire the transport. The catalogue, the model ids, the baud-rate search and
+`refresh()` are unchanged.
 
 `serialport` is the package's optional peer dependency and is installed by this
 example, so run it from the repository root with the workspace's dependencies in
@@ -33,8 +33,8 @@ node examples/node/src/main.ts --port /dev/tty.usbserial-1410 --model TS-480
 `--port` takes the device path `--list` printed. `--model` takes a
 `RigModel.model` name from the catalogue and defaults to `TS-480`. `--baud`
 pins the line rate; without it the example runs `detectBaudRate()` first, the
-same search the browser example offers, because a wrong rate produces silence
-rather than an error.
+same search the live demo's Auto-detect runs, because a wrong rate produces
+silence rather than an error.
 
 The example only reads: it opens the port, prints what `refresh()` reports
 (`frequency`, `mode` with passband, `ptt`), and closes the port again. It never

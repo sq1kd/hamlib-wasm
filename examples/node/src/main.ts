@@ -1,7 +1,7 @@
 /**
  * Node command line example: the same package, without a browser.
  *
- * The Vanilla and React examples acquire a port from a page's Web Serial
+ * The documentation site's live demo acquires a port from a page's Web Serial
  * chooser.  A terminal has no chooser, so this entry names the device itself
  * and lets `createHamlib()` select the Node transport, the one this runtime
  * gets.  `hamlib-wasm/node` is imported for `listPorts()`.  Everything above
@@ -136,8 +136,7 @@ function parseArguments(argv: readonly string[]): Command {
 /**
  * The catalogue entry `--model` names.
  *
- * Matched on `RigModel.model`, the short name the catalogue and the browser
- * examples use, ignoring case.
+ * Matched on `RigModel.model`, the catalogue's short name, ignoring case.
  */
 function findModel(models: readonly RigModel[], name: string): RigModel {
   const wanted = name.toLowerCase();
@@ -240,8 +239,8 @@ async function openRig(options: OpenCommand): Promise<void> {
 }
 
 /**
- * Explain a failure the way the browser examples do: the operation, the stable
- * code, Hamlib's own text and the underlying cause.  A terminal has no panel to
+ * Explain a failure: the operation, the stable code, Hamlib's own text and
+ * the underlying cause.  A terminal has no panel to
  * put this in, so it goes to stderr and the exit code carries the outcome.
  */
 function reportError(error: unknown): void {

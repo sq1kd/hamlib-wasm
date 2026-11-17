@@ -184,7 +184,7 @@ async function probeForAnswer(
 
     try {
       /* The rate a rig answers at is not on the port: with none configured the
-       * search runs first, exactly as the browser examples do. */
+       * search runs first, as the site's demo does on Auto-detect. */
       baudRate ??= await hamlib.detectBaudRate({ modelId: model.id, port });
 
       const rig = await hamlib.open({ modelId: model.id, port, baudRate });
