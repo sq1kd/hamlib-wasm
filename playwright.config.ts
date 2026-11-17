@@ -23,8 +23,7 @@ export default defineConfig({
   /* The browser fixtures are injected as compiled text, so they are built
    * before any spec (and its fixtures.ts import) is loaded. */
   globalSetup: './tests/browser/fixtures/compile.ts',
-  fullyParallel: false,
-  workers: 1,
+  fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: [['list']],
