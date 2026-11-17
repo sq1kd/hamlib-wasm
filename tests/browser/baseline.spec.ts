@@ -22,7 +22,6 @@
  * Re-record with:
  *   HAMLIB_WASM_RECORD_BASELINE=1 npx playwright test tests/browser/baseline.spec.ts
  */
-import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -186,7 +185,7 @@ test('matches the recorded upstream baseline', async ({ page }) => {
   const actual: Baseline = {
     catalogue: {
       count: sample.catalogueCount,
-      sha256: createHash('sha256').update(sample.catalogueText).digest('hex'),
+      sha256: sha256(sample.catalogueText),
     },
     ts480: sample.ts480,
   };
