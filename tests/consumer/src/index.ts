@@ -141,6 +141,8 @@ export async function runConsumerFlow(
         canSetMode: model.canSetMode,
         canGetPtt: model.canGetPtt,
         canSetPtt: model.canSetPtt,
+        canSendMorse: model.canSendMorse,
+        canStopMorse: model.canStopMorse,
       },
     };
   } catch (error) {

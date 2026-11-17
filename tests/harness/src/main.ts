@@ -7,15 +7,14 @@
  * directly with `page.evaluate`, using the same artifacts an application gets.
  *
  * Both browser entries are published: `hamlib-wasm/raw` (createRawHamlib) and
- * the default `hamlib-wasm` (createHamlib and capabilitiesOf), so a spec can drive
- * either surface against the same emulator.
+ * the default `hamlib-wasm` (createHamlib), so a spec can drive either surface against the same emulator.
  *
  * `nativeModule()` additionally loads the built Emscripten module, so the
  * transport primitives behind the facade can be exercised on their own.  The
  * package does not export that module - raw access would bypass the queue every
  * public call goes through - so the harness reaches into the build output.
  */
-import { capabilitiesOf, createHamlib } from 'hamlib-wasm';
+import { createHamlib } from 'hamlib-wasm';
 import * as hamlibWasm from 'hamlib-wasm/raw';
 import type { SerialPortLike, SerialTransport } from 'hamlib-wasm/raw';
 import createNativeModule from '../../../packages/hamlib-wasm/dist/native/hamlib-wasm.mjs';
@@ -50,7 +49,6 @@ function fakeTransport(port: SerialPortLike): SerialTransport & { calls: string[
 window.__hamlibHarness = {
   createRawHamlib: hamlibWasm.createRawHamlib,
   createHamlib,
-  capabilitiesOf,
   fakeTransport,
   isHamlibError: (value: unknown): boolean => value instanceof hamlibWasm.HamlibError,
   vocabularies: {

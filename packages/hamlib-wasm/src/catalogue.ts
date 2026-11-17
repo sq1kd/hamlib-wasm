@@ -51,14 +51,22 @@ export function operationCapabilities(can: (operation: string) => boolean): RigO
   };
 }
 
-/** What a rig model can do over a serial transport; see {@link RigOperationCapabilities}. */
-export interface RigModelCapabilities {
-  canGetFrequency: boolean;
-  canSetFrequency: boolean;
-  canGetMode: boolean;
-  canSetMode: boolean;
-  canGetPtt: boolean;
-  canSetPtt: boolean;
+/**
+ * What a rig model can do over a serial transport: each
+ * {@link RigOperationCapabilities} entry as a `can` flag, e.g. `canSetFrequency`.
+ */
+export type RigModelCapabilities = {
+  [K in keyof RigOperationCapabilities as `can${Capitalize<K>}`]: boolean;
+};
+
+/** The `can` flags for a model's operations. */
+export function modelCapabilities(operations: RigOperationCapabilities): RigModelCapabilities {
+  return Object.fromEntries(
+    Object.entries(operations).map(([operation, supported]) => [
+      `can${operation.charAt(0).toUpperCase()}${operation.slice(1)}`,
+      supported,
+    ]),
+  ) as RigModelCapabilities;
 }
 
 /** A rig model reachable over a serial transport, sorted by manufacturer then model. */

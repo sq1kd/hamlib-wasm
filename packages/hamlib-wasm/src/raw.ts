@@ -67,7 +67,7 @@ import { GeneratedRigMethods } from './native/generated/methods/index.js';
 import type { GeneratedCallResult } from './native/generated/methods/base.js';
 import { bindCompoundHost } from './native/seam.js';
 import type { CompoundOperations } from './native/seam.js';
-import { operationCapabilities } from './catalogue.js';
+import { modelCapabilities, operationCapabilities } from './catalogue.js';
 import type { DetectBaudRateOptions, RigModel } from './catalogue.js';
 
 export { HamlibError } from './errors.js';
@@ -1079,12 +1079,7 @@ function describeModel(model: NativeModel, native: NativeModule): RigModel {
     support,
     ...(limitation === undefined ? {} : { limitation }),
     capabilities,
-    canGetFrequency: operations.getFrequency,
-    canSetFrequency: operations.setFrequency,
-    canGetMode: operations.getMode,
-    canSetMode: operations.setMode,
-    canGetPtt: operations.getPtt,
-    canSetPtt: operations.setPtt,
+    ...modelCapabilities(operations),
   };
 }
 

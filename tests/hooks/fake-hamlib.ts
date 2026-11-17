@@ -42,6 +42,8 @@ export const MODEL: RigModel = {
   canSetMode: true,
   canGetPtt: true,
   canSetPtt: true,
+  canSendMorse: false,
+  canStopMorse: false,
 };
 
 type StubEvent = 'state' | 'error';

@@ -20,7 +20,16 @@ test('a frequency-only model produces a frequency-only snapshot', async ({ harne
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = window.__testHelpers.catalogueModel(hamlib.models, 'Yaesu', 'FRG-100');
 
-    const capabilities = window.__hamlibHarness.capabilitiesOf(model);
+    const capabilities = {
+      getFrequency: model.canGetFrequency,
+      setFrequency: model.canSetFrequency,
+      getMode: model.canGetMode,
+      setMode: model.canSetMode,
+      getPtt: model.canGetPtt,
+      setPtt: model.canSetPtt,
+      sendMorse: model.canSendMorse,
+      stopMorse: model.canStopMorse,
+    };
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
     const first = await rig.refresh();
 
@@ -100,7 +109,7 @@ test('a set-only PTT model takes both PTT commands and refuses the read', async 
     const hamlib = await window.__hamlibHarness.createHamlib({});
     const model = window.__testHelpers.catalogueModel(hamlib.models, 'Kenwood', 'TS-140S');
 
-    const capabilities = window.__hamlibHarness.capabilitiesOf(model);
+    const capabilities = { getPtt: model.canGetPtt, setPtt: model.canSetPtt };
     const rig = await hamlib.open({ modelId: model.id, baudRate: model.serialRateMax });
 
     const state = await rig.refresh();

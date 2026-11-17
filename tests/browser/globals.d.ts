@@ -5,11 +5,10 @@
  * example publishes nothing and is driven through its DOM instead.  What the
  * injected fixtures publish is declared in fixtures/fixtures-globals.d.ts.
  */
-import type { Hamlib, RigOperationCapabilities, HamlibOptions } from 'hamlib-wasm';
+import type { Hamlib, HamlibOptions } from 'hamlib-wasm';
 import type {
   RawHamlib,
   RawHamlibOptions,
-  RigModel,
   SerialPortLike,
   SerialTransport,
 } from 'hamlib-wasm/raw';
@@ -22,7 +21,6 @@ export type NativeModule = MainModule;
 export interface HamlibHarness {
   createRawHamlib(options?: RawHamlibOptions): Promise<RawHamlib>;
   createHamlib(options?: HamlibOptions): Promise<Hamlib>;
-  capabilitiesOf(model: RigModel): RigOperationCapabilities;
   /** A transport over `port`, recording every call the facade makes on it. */
   fakeTransport(port: SerialPortLike): SerialTransport & { calls: string[] };
   isHamlibError(value: unknown): boolean;

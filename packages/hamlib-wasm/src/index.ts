@@ -500,18 +500,6 @@ export interface Hamlib {
   dispose(): Promise<void>;
 }
 
-/**
- * Which of the operations {@link Rig} uses a model implements.
- *
- * Exported because a caller driving `hamlib-wasm/raw` directly still wants
- * the same booleans: the catalogue's `capabilities` is the raw set of generated
- * operation names, and this is the one interpretation of it this layer
- * makes.
- */
-export function capabilitiesOf(model: RigModel): RigOperationCapabilities {
-  return operationCapabilities((operation) => model.capabilities.has(operation));
-}
-
 /** One live polling registration; its identity is the unsubscribe handle. */
 interface PollSubscription {
   readonly intervalMs: number;
