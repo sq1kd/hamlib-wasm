@@ -101,7 +101,7 @@ const TRACE_LIMIT = 200;
 const ERROR_LIMIT = 20;
 
 /** The `rig_debug_level_e` value of a level name. */
-export function debugLevelIndex(level: DebugLevel, operation: string): DebugLevelValue {
+export function debugLevelValue(level: DebugLevel, operation: string): DebugLevelValue {
   if (!Object.hasOwn(DEBUG_LEVEL_VALUES, level)) {
     throw new HamlibError(
       `debug.level must be one of ${DEBUG_LEVELS.join(', ')}, got ${String(level)}`,

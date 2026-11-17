@@ -12,13 +12,19 @@
  * (`native/emscripten-globals.d.ts`, which cannot import this file).
  */
 
-/** Line settings a transport opens a port with.  Field names are Web Serial's. */
+import type { LINE_DATA_BITS, LINE_HANDSHAKES, LINE_PARITIES, LINE_STOP_BITS } from './native/generated/names.js';
+
+/**
+ * Line settings a transport opens a port with.  Field names are Web Serial's;
+ * the values are the ones every transport accepts (`lineSettings` in
+ * `hamlib.config.yaml`), whose Hamlib names are also Web Serial's.
+ */
 export interface SerialLineSettings {
   baudRate: number;
-  dataBits?: 7 | 8;
-  stopBits?: 1 | 2;
-  parity?: 'none' | 'even' | 'odd';
-  flowControl?: 'none' | 'hardware';
+  dataBits?: (typeof LINE_DATA_BITS)[number];
+  stopBits?: (typeof LINE_STOP_BITS)[number];
+  parity?: (typeof LINE_PARITIES)[number];
+  flowControl?: (typeof LINE_HANDSHAKES)[number];
   /** Web Serial read-buffer hint; transports without that notion ignore it. */
   bufferSize?: number;
 }

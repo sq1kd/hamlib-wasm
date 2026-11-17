@@ -38,7 +38,7 @@ import {
 import type { BrowserSupport, DeclaredLineSettings } from './browser-support.js';
 import { confKeysPttLine, encodeConf } from './conf.js';
 import type { RigConf } from './conf.js';
-import { DiagnosticsRecorder, debugLevelIndex } from './diagnostics.js';
+import { DiagnosticsRecorder, debugLevelValue } from './diagnostics.js';
 import { drainVector } from './embind.js';
 import type { DebugOptions, Diagnostics, DiagnosticsRig } from './diagnostics.js';
 import {
@@ -67,12 +67,7 @@ import { GeneratedRigMethods } from './native/generated/methods/index.js';
 import { bindCompoundHost } from './native/seam.js';
 import type { CompoundOperations } from './native/seam.js';
 import { operationCapabilities } from './catalogue.js';
-import type {
-  DetectBaudRateOptions,
-  RigModel,
-  SerialHandshake,
-  SerialParity,
-} from './catalogue.js';
+import type { DetectBaudRateOptions, RigModel } from './catalogue.js';
 
 export { HamlibError } from './errors.js';
 export type { HamlibErrorCode, HamlibErrorOptions } from './errors.js';
@@ -113,7 +108,7 @@ export {
   VFOS,
   VFO_OPS,
 } from './native/generated/names.js';
-import { RIG_ERRCODES } from './native/generated/names.js';
+import { RIG_ERRCODES, SERIAL_HANDSHAKES, SERIAL_PARITIES } from './native/generated/names.js';
 export type {
   Func,
   Level,
@@ -177,8 +172,6 @@ function locateAsset(file: string): string | URL {
     // biome-ignore lint/style/useTemplate: a template literal here becomes a Vite directory glob.
     : new URL('./native/' + file, import.meta.url);
 }
-
-const RIG_OK = RIG_ERRCODES.OK;
 
 /**
  * How long one native call may hold the queue by default.
@@ -743,7 +736,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
       const sent = await this.#call('sendMorse', async () => {
         const result = await this.#context.native.sendMorse(this.#handle, chunk, checkMode);
 
-        if (result.code !== RIG_OK) { throw hamlibError(result, 'sendMorse'); }
+        if (result.code !== RIG_ERRCODES.OK) { throw hamlibError(result, 'sendMorse'); }
 
         return result.value;
       });
@@ -765,7 +758,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
     await this.#call('stopMorse', async () => {
       const result = await this.#context.native.stopMorse(this.#handle);
 
-      if (result.code !== RIG_OK) { throw hamlibError(result, 'stopMorse'); }
+      if (result.code !== RIG_ERRCODES.OK) { throw hamlibError(result, 'stopMorse'); }
     });
   }
 
@@ -799,7 +792,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
         terminator === undefined ? (replyLength ?? 0) : 0,
       );
 
-      if (result.code !== RIG_OK) { throw hamlibError(result, 'sendRaw'); }
+      if (result.code !== RIG_ERRCODES.OK) { throw hamlibError(result, 'sendRaw'); }
 
       return String(result.value);
     });
@@ -853,7 +846,7 @@ class RawRigHandle extends GeneratedRigMethods implements RawRig {
         const result = await this.#context.native.closeRig(this.#handle);
         this.#handle = 0;
 
-        if (result.code !== RIG_OK) {
+        if (result.code !== RIG_ERRCODES.OK) {
           throw hamlibError(result, 'close');
         }
       });
@@ -1009,17 +1002,13 @@ function assertBaudRate(baudRate: number, model: RigModel): void {
   }
 }
 
-const SERIAL_PARITIES: readonly SerialParity[] = ['none', 'odd', 'even', 'mark', 'space'];
-const SERIAL_HANDSHAKES: readonly SerialHandshake[] = ['none', 'xon-xoff', 'hardware'];
-
-function toParity(value: unknown): SerialParity {
+/**
+ * A declared line setting by its Hamlib name.  The facade names every value
+ * Hamlib defines; one it has no name for reads as `'none'`.
+ */
+function declaredSetting<T extends string>(names: readonly T[], value: unknown): T | 'none' {
   const text = String(value);
-  return SERIAL_PARITIES.find((parity) => parity === text) ?? 'none';
-}
-
-function toHandshake(value: unknown): SerialHandshake {
-  const text = String(value);
-  return SERIAL_HANDSHAKES.find((handshake) => handshake === text) ?? 'none';
+  return names.find((name) => name === text) ?? 'none';
 }
 
 /**
@@ -1073,8 +1062,8 @@ function describeModel(model: NativeModel, native: NativeModule): RigModel {
   const settings = {
     serialDataBits: model.serialDataBits,
     serialStopBits: model.serialStopBits,
-    serialParity: toParity(model.serialParity),
-    serialHandshake: toHandshake(model.serialHandshake),
+    serialParity: declaredSetting(SERIAL_PARITIES, model.serialParity),
+    serialHandshake: declaredSetting(SERIAL_HANDSHAKES, model.serialHandshake),
   };
   const { support, limitation } = classifyModel(manufacturer, name, settings);
   const capabilities = collectCapabilities(model, native);
@@ -1145,7 +1134,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
   static async create(options: RawHamlibOptions): Promise<RawHamlibInstance> {
     /* Without `debug`, Hamlib's error lines are still kept for diagnostics(). */
     const level = options.debug === undefined ? 'err' : (options.debug.level ?? 'verbose');
-    const debugLevel = debugLevelIndex(level, 'createRawHamlib');
+    const debugLevel = debugLevelValue(level, 'createRawHamlib');
     const callTimeoutMs = normalizeCallTimeout(options.callTimeoutMs);
     const recorder = new DiagnosticsRecorder(level, options.debug?.onLog);
     const native = await createNativeModule({
@@ -1165,7 +1154,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
      * call suspended and a plain value when it did not. */
     const initialization = await native.initialize();
 
-    if (initialization.code !== RIG_OK) {
+    if (initialization.code !== RIG_ERRCODES.OK) {
       throw hamlibError(initialization, 'initialize');
     }
 
@@ -1184,7 +1173,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     const debug = await native.setDebug(debugLevel);
 
-    if (debug.code !== RIG_OK) {
+    if (debug.code !== RIG_ERRCODES.OK) {
       throw hamlibError(debug, 'initialize');
     }
 
@@ -1248,7 +1237,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
     const rig = await this.#withBorrowedPort('open', port, { keep: true }, async (path) => {
       const opened = await this.#native.openRig(modelId, path, baudRate ?? 0, conf);
 
-      if (opened.code !== RIG_OK) {
+      if (opened.code !== RIG_ERRCODES.OK) {
         throw hamlibError(opened, 'open');
       }
 
@@ -1312,7 +1301,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       for (const rate of candidates) {
         const probed = await this.#native.probeBaudRate(modelId, path, rate, conf);
 
-        if (probed.code === RIG_OK) {
+        if (probed.code === RIG_ERRCODES.OK) {
           return rate;
         }
 
@@ -1485,7 +1474,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       const result = await this.queue.enqueue<T>(operation, async () => {
         const registered = await this.#native.registerPort(path, token);
 
-        if (registered.code !== RIG_OK) {
+        if (registered.code !== RIG_ERRCODES.OK) {
           throw hamlibError(registered, operation);
         }
 
@@ -1511,7 +1500,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
     await this.queue.drain(operation, async () => {
       const result = await this.#native.unregisterPort(path);
 
-      if (result.code !== RIG_OK) {
+      if (result.code !== RIG_ERRCODES.OK) {
         throw hamlibError(result, operation);
       }
 
