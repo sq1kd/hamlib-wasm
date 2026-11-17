@@ -6,6 +6,7 @@ import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
 import { hamlibLicensing } from './integrations/licensing';
 import { readCatalogue } from './integrations/catalogue';
 import { measureDemoDownload } from './integrations/demo-size';
+import { SOCIAL_IMAGE } from './integrations/social';
 import { ENTRIES, TSCONFIG } from './typedoc/entries';
 
 /*
@@ -23,6 +24,7 @@ const site = process.env.SITE_URL
   ?? (owner === undefined ? 'http://127.0.0.1:4176' : `https://${owner}.github.io`);
 const base = process.env.SITE_BASE ?? (repo === undefined ? '/' : `/${repo}/`);
 const repositoryUrl = repository === undefined ? undefined : `https://github.com/${repository}`;
+const socialImage = new URL(`${base.replace(/\/?$/, '/')}${SOCIAL_IMAGE.file}`, site).href;
 
 export default defineConfig({
   site,
@@ -39,6 +41,14 @@ export default defineConfig({
           social: [{ icon: 'github', label: 'GitHub', href: repositoryUrl }],
           editLink: { baseUrl: `${repositoryUrl}/edit/main/site/` },
         }),
+      /* Link previews need an absolute image URL; Starlight sets the title and description. */
+      head: [
+        { tag: 'meta', attrs: { property: 'og:image', content: socialImage } },
+        { tag: 'meta', attrs: { property: 'og:image:width', content: String(SOCIAL_IMAGE.width) } },
+        { tag: 'meta', attrs: { property: 'og:image:height', content: String(SOCIAL_IMAGE.height) } },
+        { tag: 'meta', attrs: { property: 'og:image:alt', content: SOCIAL_IMAGE.alt } },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: socialImage } },
+      ],
       logo: { src: './src/assets/logo.svg' },
       components: { Hero: './src/components/Hero.astro' },
       /* Code blocks take the site's box corners from site.css. */

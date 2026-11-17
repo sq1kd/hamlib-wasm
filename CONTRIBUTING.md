@@ -18,6 +18,9 @@ later builds reuse `.cache`. CI runs `mise run check-release`, which adds the
 packed-tarball audit and the backend audit to `check`; a pull request should
 pass it.
 
+The site's link-preview image, `site/public/social.png`, is a capture of the
+landing hero; run `mise run social-image` after a change to what the hero shows.
+
 ## Commits
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)

@@ -81,6 +81,11 @@ description = "Build the documentation site: astro check, TypeDoc API reference,
 depends = ["build-package"]
 run = "npm run build --workspace site"
 
+[tasks.social-image]
+description = "Capture the landing hero as the site's link-preview image (site/public/social.png)"
+depends = ["build-site"]
+run = "node site/scripts/social-image.ts"
+
 [tasks.build-harness]
 description = "Build the browser test harness app"
 depends = ["build-package"]
