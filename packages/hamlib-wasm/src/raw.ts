@@ -1467,7 +1467,7 @@ class RawHamlibInstance implements RawHamlib, RigContext {
 
     for (const path of [...this.#paths]) {
       try {
-        await this.#releasePath(path);
+        await this.#releasePath(path, 'dispose');
       } catch (error) {
         failures.push(error);
       }
@@ -1548,18 +1548,21 @@ class RawHamlibInstance implements RawHamlib, RigContext {
       if (!kept) {
         /* The work's own outcome is the one the caller needs; dispose()
          * reports leftover registrations. */
-        await this.#releasePath(path).catch(() => {});
+        await this.#releasePath(path, operation).catch(() => {});
       }
     }
   }
 
-  /** Unregister one logical path; the native handle is already closed. */
-  async #releasePath(path: string): Promise<void> {
-    await this.queue.drain('dispose', async () => {
+  /**
+   * Unregister one logical path; the native handle is already closed.  A
+   * failure is reported under `operation`, the call that let the path go.
+   */
+  async #releasePath(path: string, operation: string): Promise<void> {
+    await this.queue.drain(operation, async () => {
       const result = await this.#native.unregisterPort(path);
 
       if (result.code !== RIG_OK) {
-        throw hamlibError(result, 'dispose');
+        throw hamlibError(result, operation);
       }
 
       this.#paths.delete(path);
