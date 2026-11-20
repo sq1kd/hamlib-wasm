@@ -129,6 +129,15 @@
   border-color: var(--sl-color-accent-low);
 }
 
+/* Starlight lines the search up with the content column, which sits in a
+ * different place on the landing page, the docs and the demo; here it stays
+ * at the right, beside the GitHub link and theme picker, on every page. */
+@media (min-width: 50rem) {
+  .header {
+    grid-template-columns: 1fr minmax(0, 18rem) auto;
+  }
+}
+
 /* The landing page: the hero runs edge to edge, the cards below keep a wrap. */
 [data-has-hero] main {
   overflow-x: clip;
