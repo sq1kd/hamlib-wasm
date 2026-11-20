@@ -11,9 +11,9 @@ exposed as promise based TypeScript methods. Radio backends are upstream Hamlib
 code and are not modified, so ordinary serial CAT rigs work without per-model
 browser or Node code.
 
-**[Live demo](https://sq1kd.github.io/hamlib-wasm/demo/)** ·
-[Documentation](https://sq1kd.github.io/hamlib-wasm/) ·
-[GitHub](https://github.com/sq1kd/hamlib-wasm)
+Try it in the [live demo](https://sq1kd.github.io/hamlib-wasm/demo/); the
+[documentation](https://sq1kd.github.io/hamlib-wasm/getting-started/) has guides and the API
+reference, and the source is [on GitHub](https://github.com/sq1kd/hamlib-wasm).
 
 This package is licensed `MIT AND LGPL-2.1-or-later`: the original wrapper code
 is MIT, and the included Hamlib WASM is LGPL-2.1-or-later. See

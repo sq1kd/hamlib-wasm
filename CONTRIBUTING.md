@@ -21,6 +21,32 @@ pass it.
 The site's link-preview image, `site/public/social.png`, is a capture of the
 landing hero; run `mise run social-image` after a change to what the hero shows.
 
+## Layout
+
+| Path | Purpose |
+| --- | --- |
+| `packages/hamlib-wasm` | The package: the entry points in `src/` (`index.ts`, `raw.ts`, `node.ts`, `react.ts`), native sources and build scripts |
+| `packages/hamlib-wasm/hamlib.config.yaml` | The one config: the pinned release (version, archive URL + SHA-256, patches) and the binding surface |
+| `packages/hamlib-wasm/coverage.json` | Generated coverage report: bound vs refused declarations, with reasons |
+| `packages/hamlib-wasm/build` | Native build, package build, audits and the generator wrapper |
+| `packages/hamlib-wasm/native` | Serial transport (TypeScript, compiled to the Emscripten JS library), link-time POSIX wrappers, Embind facade, `pthread` shim |
+| `packages/hamlib-wasm/baseline/baseline.json` | Recorded catalogue digest and CAT trace for the pinned release |
+| `packages/hamlib-codegen` | The AST-driven generator: classifies upstream declarations and emits the binding surface |
+| `site` | Documentation website (Astro Starlight, TypeDoc API reference) with the on-demand live rig demo |
+| `examples/node` | Node CLI: lists this machine's serial ports and drives a rig read-only through the Node transport |
+| `tests/browser` | Playwright Web Serial double with emulated rigs, a virtual page clock, and the scenarios driving them, in Chromium and Firefox |
+| `tests/harness` | Pages that publish the built package (`index.html`) and drive the React hooks (`hooks.html`) for the browser specs |
+| `tests/hooks` | `vitest` + jsdom: the React hook state machine against a stubbed package boundary |
+| `tests/node` | `vitest` in Node: the built Wasm module, the port contract and the `serialport` adapter against the emulated rigs |
+| `tests/codegen` | `vitest`: the generator against synthetic clang ASTs |
+| `tests/hardware` | Opt-in, read-only checks against a real rig through the Node transport |
+| `tests/consumer` | External consumer fixture, typechecked against the packed tarball |
+| `.github/` | `ci.yml` (the release gate, commitlint on PRs), `release.yml` (gate, publish, Pages on push) and the shared `actions/setup` |
+| `release.config.cjs` / `RELEASING.md` | semantic-release configuration and the publishing runbook |
+
+Build products live in `.cache/hamlib/<version>` (downloaded upstream source and
+object files) and `packages/hamlib-wasm/dist`; neither is committed.
+
 ## Commits
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)

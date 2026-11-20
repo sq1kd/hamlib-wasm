@@ -10,7 +10,7 @@
  *
  *   1. every `mise run <task>` in the READMEs, CONTRIBUTING.md, RELEASING.md
  *      and the REBUILDING template is a task (or alias) this repository declares;
- *   2. every relative path in the root README's Layout table exists.
+ *   2. every relative path in CONTRIBUTING.md's Layout table exists.
  *
  * The task list comes from `mise tasks ls --json`, so `[tasks.*]` tables and
  * file tasks are covered alike, and the user's global tasks are not.
@@ -76,7 +76,7 @@ function mentionedTasks(text: string): readonly string[] {
   return [...names];
 }
 
-/** The path tokens in the first column of the root README's Layout table. */
+/** The path tokens in the first column of CONTRIBUTING.md's Layout table. */
 function layoutPaths(text: string): readonly string[] {
   const lines = text.split('\n');
   const start = lines.findIndex((line) => /^##\s+Layout\s*$/.test(line));
@@ -126,11 +126,15 @@ function main(): void {
     }
   }
 
-  const readme = readFileSync(path.join(REPO_ROOT, 'README.md'), 'utf8');
+  const contributing = readFileSync(path.join(REPO_ROOT, 'CONTRIBUTING.md'), 'utf8');
 
-  for (const relative of layoutPaths(readme)) {
+  const layout = layoutPaths(contributing);
+
+  assert(layout.length > 0, 'CONTRIBUTING.md has no "## Layout" table to check');
+
+  for (const relative of layout) {
     if (!existsSync(path.join(REPO_ROOT, relative))) {
-      mismatches.push(`README.md: layout path "${relative}" does not exist`);
+      mismatches.push(`CONTRIBUTING.md: layout path "${relative}" does not exist`);
     }
   }
 
