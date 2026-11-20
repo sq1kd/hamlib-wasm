@@ -12,9 +12,12 @@
     "node",
     "electron",
     "ham-radio",
-    "cat"
+    "amateur-radio",
+    "cat",
+    "rig-control",
+    "serialport"
   ],
-  "homepage": "https://github.com/sq1kd/hamlib-wasm#readme",
+  "homepage": "https://sq1kd.github.io/hamlib-wasm/",
   "bugs": {
     "url": "https://github.com/sq1kd/hamlib-wasm/issues"
   },
